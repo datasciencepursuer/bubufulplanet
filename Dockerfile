@@ -16,9 +16,10 @@ FROM node:${NODE_VERSION}-alpine AS base
 # Set working directory for all build stages.
 WORKDIR /usr/src/app
 
-# Install pnpm and TypeScript globally.
+# Install pnpm, TypeScript globally, and postgresql-client for migrations.
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g pnpm@${PNPM_VERSION} typescript
+    npm install -g pnpm@${PNPM_VERSION} typescript && \
+    apk add --no-cache postgresql-client
 
 ################################################################################
 # Create a stage for installing production dependecies.
@@ -68,9 +69,12 @@ COPY package.json .
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/.next ./.next
 
+# Copy and setup startup script
+COPY startup.sh ./startup.sh
+RUN chmod +x ./startup.sh
 
 # Expose the port that the application listens on.
 EXPOSE 3000
 
-# Run the application.
-CMD ["pnpm", "start"]
+# Run the application using startup script.
+CMD ["./startup.sh"]
