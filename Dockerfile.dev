@@ -1,0 +1,22 @@
+# Development Dockerfile - Optimized for hot reloading
+FROM node:22.14.0-alpine
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@10.11.1
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install
+
+# Copy the rest of the application
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start development server
+CMD ["pnpm", "run", "dev"]
