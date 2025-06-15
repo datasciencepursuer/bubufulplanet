@@ -5,8 +5,9 @@ import { createServiceClient } from '@/lib/supabase/service'
 // Get current user's group information
 export async function GET() {
   try {
-    const groupId = cookies().get('vacation-planner-group-id')?.value
-    const travelerName = cookies().get('vacation-planner-traveler-name')?.value
+    const cookieStore = await cookies()
+    const groupId = cookieStore.get('vacation-planner-group-id')?.value
+    const travelerName = cookieStore.get('vacation-planner-traveler-name')?.value
 
     if (!groupId || !travelerName) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })

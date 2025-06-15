@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:reset": "prisma migrate reset",
+    "db:seed": "prisma db seed",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.17",
@@ -14,6 +19,7 @@
     "@fullcalendar/interaction": "^6.1.17",
     "@fullcalendar/react": "^6.1.17",
     "@fullcalendar/timegrid": "^6.1.17",
+    "@prisma/client": "^6.9.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.8",
     "class-variance-authority": "^0.7.1",
@@ -21,6 +27,7 @@
     "date-fns": "^4.1.0",
     "lucide-react": "^0.513.0",
     "next": "15.3.2",
+    "prisma": "^6.9.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.3.0"

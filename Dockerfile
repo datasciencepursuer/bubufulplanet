@@ -16,10 +16,9 @@ FROM node:${NODE_VERSION}-alpine AS base
 # Set working directory for all build stages.
 WORKDIR /usr/src/app
 
-# Install pnpm, TypeScript globally, and postgresql-client for migrations.
+# Install pnpm and TypeScript globally.
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g pnpm@${PNPM_VERSION} typescript && \
-    apk add --no-cache postgresql-client
+    npm install -g pnpm@${PNPM_VERSION} typescript
 
 ################################################################################
 # Create a stage for installing production dependecies.
@@ -47,6 +46,10 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 
 # Copy the rest of the source files into the image.
 COPY . .
+
+# Generate Prisma client before building
+RUN npx prisma generate
+
 # Run the build script.
 RUN pnpm run build
 
@@ -69,12 +72,14 @@ COPY package.json .
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/.next ./.next
 
-# Copy and setup startup script
-COPY startup.sh ./startup.sh
-RUN chmod +x ./startup.sh
+# Copy Prisma files for migrations and client
+COPY --from=build /usr/src/app/prisma ./prisma
+
+# Copy startup script
+COPY --from=build /usr/src/app/scripts ./scripts
 
 # Expose the port that the application listens on.
 EXPOSE 3000
 
-# Run the application using startup script.
-CMD ["./startup.sh"]
+# Run Prisma migrations and start the application
+CMD ["./scripts/start.sh"]

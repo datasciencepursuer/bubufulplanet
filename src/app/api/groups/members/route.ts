@@ -5,8 +5,9 @@ import { createServiceClient } from '@/lib/supabase/service'
 // Get group members
 export async function GET() {
   try {
-    const groupId = cookies().get('vacation-planner-group-id')?.value
-    const travelerName = cookies().get('vacation-planner-traveler-name')?.value
+    const cookieStore = await cookies()
+    const groupId = cookieStore.get('vacation-planner-group-id')?.value
+    const travelerName = cookieStore.get('vacation-planner-traveler-name')?.value
 
     if (!groupId || !travelerName) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -39,8 +40,9 @@ export async function PUT(request: NextRequest) {
   try {
     const { memberId, permissions }: { memberId: string; permissions: { read: boolean; create: boolean; modify: boolean } } = await request.json()
 
-    const groupId = cookies().get('vacation-planner-group-id')?.value
-    const travelerName = cookies().get('vacation-planner-traveler-name')?.value
+    const cookieStore = await cookies()
+    const groupId = cookieStore.get('vacation-planner-group-id')?.value
+    const travelerName = cookieStore.get('vacation-planner-traveler-name')?.value
 
     if (!groupId || !travelerName) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -85,8 +87,9 @@ export async function POST(request: NextRequest) {
   try {
     const { travelerName, role = 'follower' }: { travelerName: string; role?: 'adventurer' | 'follower' } = await request.json()
 
-    const groupId = cookies().get('vacation-planner-group-id')?.value
-    const currentTravelerName = cookies().get('vacation-planner-traveler-name')?.value
+    const cookieStore = await cookies()
+    const groupId = cookieStore.get('vacation-planner-group-id')?.value
+    const currentTravelerName = cookieStore.get('vacation-planner-traveler-name')?.value
 
     if (!groupId || !currentTravelerName) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })

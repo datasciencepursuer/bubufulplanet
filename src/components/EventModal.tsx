@@ -293,7 +293,7 @@ export default function EventModal({
               <div>
                 <input
                   type="date"
-                  value={formData.end_date}
+                  value={formData.end_date || ''}
                   onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                   className="w-full p-2 border rounded-md"
                 />
@@ -305,7 +305,7 @@ export default function EventModal({
             <label className="block text-sm font-medium mb-2">Location</label>
             <input
               type="text"
-              value={formData.location}
+              value={formData.location || ''}
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
               className="w-full p-2 border rounded-md"
               placeholder="Event location"
@@ -315,7 +315,7 @@ export default function EventModal({
           <div>
             <label className="block text-sm font-medium mb-2">Notes</label>
             <textarea
-              value={formData.notes}
+              value={formData.notes || ''}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               className="w-full p-2 border rounded-md"
               rows={3}
@@ -382,7 +382,7 @@ export default function EventModal({
                 />
                 <input
                   type="text"
-                  value={expense.category}
+                  value={expense.category || ''}
                   onChange={(e) => updateExpense(index, 'category', e.target.value)}
                   className="col-span-2 p-2 border rounded-md"
                   placeholder="Category"

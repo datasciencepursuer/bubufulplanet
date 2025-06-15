@@ -1,0 +1,101 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model Trip {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @db.VarChar(255)
+  startDate   DateTime @map("start_date") @db.Date
+  endDate     DateTime @map("end_date") @db.Date
+  destination String?  @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  userId      String   @map("user_id") @db.VarChar(255)
+
+  tripDays     TripDay[]
+  packingItems PackingItem[]
+
+  @@index([userId], map: "idx_trips_user_id")
+  @@index([startDate, endDate], map: "idx_trips_dates")
+  @@map("trips")
+}
+
+model TripDay {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tripId    String   @map("trip_id") @db.Uuid
+  dayNumber Int      @map("day_number")
+  date      DateTime @db.Date
+  notes     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  trip     Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  events   Event[]
+  expenses Expense[]
+
+  @@unique([tripId, dayNumber])
+  @@unique([tripId, date])
+  @@index([tripId], map: "idx_trip_days_trip_id")
+  @@index([date], map: "idx_trip_days_date")
+  @@map("trip_days")
+}
+
+model Event {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dayId     String    @map("day_id") @db.Uuid
+  title     String    @db.VarChar(255)
+  startTime DateTime  @map("start_time") @db.Time(6)
+  endTime   DateTime? @map("end_time") @db.Time(6)
+  location  String?   @db.VarChar(255)
+  notes     String?   @db.Text
+  weather   String?   @db.VarChar(255)
+  loadout   String?   @db.Text
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  day      TripDay   @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+
+  @@index([dayId], map: "idx_events_day_id")
+  @@index([startTime, endTime], map: "idx_events_time")
+  @@map("events")
+}
+
+model Expense {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId     String?  @map("event_id") @db.Uuid
+  dayId       String   @map("day_id") @db.Uuid
+  description String   @db.VarChar(255)
+  amount      Decimal  @db.Decimal(10, 2)
+  category    String?  @db.VarChar(100)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  event Event?  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  day   TripDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  @@index([dayId], map: "idx_expenses_day_id")
+  @@index([eventId], map: "idx_expenses_event_id")
+  @@map("expenses")
+}
+
+model PackingItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tripId    String   @map("trip_id") @db.Uuid
+  itemName  String   @map("item_name") @db.VarChar(255)
+  quantity  Int      @default(1)
+  packed    Boolean  @default(false)
+  category  String?  @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId], map: "idx_packing_items_trip_id")
+  @@map("packing_items")
+}
