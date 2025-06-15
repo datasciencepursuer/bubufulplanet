@@ -18,7 +18,8 @@ WORKDIR /usr/src/app
 
 # Install pnpm and TypeScript globally.
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g pnpm@${PNPM_VERSION} typescript
+    npm install -g pnpm@${PNPM_VERSION} typescript && \
+    pnpm config set store-dir /root/.local/share/pnpm/store
 
 ################################################################################
 # Create a stage for installing production dependecies.
@@ -31,7 +32,7 @@ FROM base AS deps
 RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=pnpm-lock.yaml,target=pnpm-lock.yaml \
     --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --prod --no-frozen-lockfile
+    pnpm install --prod --frozen-lockfile
 
 ################################################################################
 # Create a stage for building the application.
@@ -42,7 +43,7 @@ FROM deps AS build
 RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=pnpm-lock.yaml,target=pnpm-lock.yaml \
     --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --no-frozen-lockfile
+    pnpm install --frozen-lockfile
 
 # Copy the rest of the source files into the image.
 COPY . .
