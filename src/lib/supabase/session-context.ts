@@ -6,7 +6,7 @@ import { cookies } from 'next/headers'
  * Must be called before any database operations in API routes
  */
 export async function setSessionContext(groupId?: string, travelerName?: string) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   
   // Get values from parameters or cookies
   const sessionGroupId = groupId || cookieStore.get('vacation-planner-group-id')?.value
@@ -51,7 +51,7 @@ export async function setSessionContext(groupId?: string, travelerName?: string)
  * Use this instead of creating clients manually in API routes
  */
 export async function createSessionClient(groupId?: string, travelerName?: string) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -76,8 +76,8 @@ export async function createSessionClient(groupId?: string, travelerName?: strin
 /**
  * Gets current session info from cookies
  */
-export function getSessionInfo() {
-  const cookieStore = cookies()
+export async function getSessionInfo() {
+  const cookieStore = await cookies()
   
   return {
     groupId: cookieStore.get('vacation-planner-group-id')?.value,

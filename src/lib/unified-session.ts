@@ -134,18 +134,20 @@ export async function createUnifiedSession(
     // Save device session if device info provided
     if (deviceFingerprint) {
       try {
-        await prisma.deviceSession.upsert({
+        // First deactivate any existing sessions for this device
+        await prisma.deviceSession.updateMany({
           where: {
-            deviceFingerprint
+            deviceFingerprint,
+            isActive: true
           },
-          update: {
-            groupId,
-            travelerName,
-            userAgent,
-            isActive: true,
-            lastUsed: new Date()
-          },
-          create: {
+          data: {
+            isActive: false
+          }
+        })
+        
+        // Create new session
+        await prisma.deviceSession.create({
+          data: {
             deviceFingerprint,
             groupId,
             travelerName,

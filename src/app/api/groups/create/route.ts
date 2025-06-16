@@ -147,20 +147,9 @@ export async function POST(request: NextRequest) {
           }
         })
 
-        // Then create/update the session for the current group
-        await prisma.deviceSession.upsert({
-          where: {
-            deviceFingerprint
-          },
-          update: {
-            groupId: group.id,
-            travelerName: validMembers[0].name.trim(),
-            userAgent,
-            ipAddress: ip,
-            isActive: true,
-            lastUsed: new Date()
-          },
-          create: {
+        // Then create new session for the current group
+        await prisma.deviceSession.create({
+          data: {
             deviceFingerprint,
             groupId: group.id,
             travelerName: validMembers[0].name.trim(),

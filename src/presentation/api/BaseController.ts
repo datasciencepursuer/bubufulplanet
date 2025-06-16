@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DomainError } from '../../domain/errors/DomainError';
-import { getSessionContext, SessionContext } from '@/lib/supabase/session';
+import { validateUnifiedSession, type UnifiedSessionContext } from '@/lib/unified-session';
 
 export abstract class BaseController {
   protected async handleRequest<T>(
@@ -37,18 +37,18 @@ export abstract class BaseController {
 
   protected async handleRequestWithGroupAuth<T>(
     request: NextRequest,
-    handler: (request: NextRequest, context: SessionContext) => Promise<T>
+    handler: (request: NextRequest, context: UnifiedSessionContext) => Promise<T>
   ): Promise<NextResponse> {
     try {
-      const context = await getSessionContext();
-      if (!context) {
+      const validation = await validateUnifiedSession();
+      if (!validation.isValid || !validation.context) {
         return NextResponse.json(
           { error: 'Unauthorized' },
           { status: 401 }
         );
       }
 
-      const result = await handler(request, context);
+      const result = await handler(request, validation.context);
       return NextResponse.json(result);
     } catch (error) {
       return this.handleError(error);
