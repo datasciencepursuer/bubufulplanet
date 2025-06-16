@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { createServiceClient } from '@/lib/supabase/service'
+import { unifiedLogout } from '@/lib/unified-session'
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const groupId = cookieStore.get('vacation-planner-group-id')?.value
-    const travelerName = cookieStore.get('vacation-planner-traveler-name')?.value
-
     // Get device fingerprint from request body if provided
     let deviceFingerprint: string | undefined
     try {
@@ -17,31 +12,17 @@ export async function POST(request: NextRequest) {
       // Body parsing failed, continue without device fingerprint
     }
 
-    // If we have device info, remove the device session
-    if (deviceFingerprint && groupId && travelerName) {
-      const supabase = createServiceClient()
-      
-      try {
-        // Mark the device session as inactive instead of deleting it
-        // This preserves the session but prevents auto-login
-        await supabase
-          .from('device_sessions')
-          .update({ is_active: false })
-          .eq('device_fingerprint', deviceFingerprint)
-          .eq('group_id', groupId)
-          .eq('traveler_name', travelerName)
-      } catch (error) {
-        console.error('Failed to deactivate device session:', error)
-        // Don't fail the logout if device session cleanup fails
-      }
-    }
-    
-    // Clear all group-based session cookies
-    cookieStore.delete('vacation-planner-session')
-    cookieStore.delete('vacation-planner-group-id')
-    cookieStore.delete('vacation-planner-traveler-name')
+    // Use unified logout to clear both sessions and cookies
+    const success = await unifiedLogout(deviceFingerprint)
 
-    return NextResponse.json({ success: true })
+    if (success) {
+      return NextResponse.json({ success: true })
+    } else {
+      return NextResponse.json(
+        { error: 'Logout partially failed' },
+        { status: 500 }
+      )
+    }
   } catch (error) {
     console.error('Logout error:', error)
     return NextResponse.json(

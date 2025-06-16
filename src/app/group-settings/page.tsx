@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 interface GroupMember {
   id: string
   traveler_name: string
-  role: 'adventurer' | 'follower'
+  role: 'adventurer' | 'party member'
   permissions: {
     read: boolean
     create: boolean

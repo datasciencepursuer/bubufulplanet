@@ -10,6 +10,7 @@ import {
   type DeviceInfo,
   type RecentGroupAccess 
 } from '@/lib/device-fingerprint'
+import { attemptAutoLoginFromDevice } from '@/lib/unified-session-client'
 
 interface AvailableSession {
   groupId: string
@@ -120,7 +121,7 @@ export function useDeviceSession() {
     setRecentGroups(getRecentGroupAccesses())
   }
 
-  // Attempt automatic login with device session
+  // Attempt automatic login with unified session system
   const attemptAutoLogin = async (
     groupId: string, 
     travelerName: string
@@ -130,40 +131,40 @@ export function useDeviceSession() {
     }
 
     try {
-      const response = await fetch('/api/device-sessions/auto-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deviceFingerprint: deviceInfo.fingerprint,
-          groupId,
-          travelerName
-        })
-      })
+      // Use unified session auto-login
+      const result = await attemptAutoLoginFromDevice(
+        deviceInfo.fingerprint,
+        groupId,
+        travelerName
+      )
 
-      if (response.ok) {
-        const data = await response.json()
-        
-        // Update recent groups
-        if (data.group && data.currentMember) {
-          storeGroupAccess({
-            groupId: data.group.id,
-            groupName: data.group.name,
-            travelerName: data.currentMember.name,
-            role: data.currentMember.role,
-            accessCode: data.group.accessCode,
-            lastAccessed: new Date().toISOString()
-          })
-        }
+      if (result.success) {
+        // Get group and member info for backward compatibility
+        const response = await fetch('/api/groups/current')
+        if (response.ok) {
+          const data = await response.json()
+          
+          // Update recent groups
+          if (data.group && data.currentMember) {
+            storeGroupAccess({
+              groupId: data.group.id,
+              groupName: data.group.name,
+              travelerName: data.currentMember.name,
+              role: data.currentMember.role,
+              accessCode: data.group.accessCode,
+              lastAccessed: new Date().toISOString()
+            })
+          }
 
-        return {
-          success: true,
-          group: data.group,
-          currentMember: data.currentMember
+          return {
+            success: true,
+            group: data.group,
+            currentMember: data.currentMember
+          }
         }
-      } else {
-        const errorData = await response.json()
-        return { success: false, error: errorData.error }
       }
+
+      return { success: false, error: result.error }
     } catch (error) {
       console.error('Auto-login error:', error)
       return { success: false, error: 'Auto-login failed' }

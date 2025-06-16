@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       // Check create permission
       requirePermission(context, 'create');
 
-      // Create trip with group_id
+      // Create trip - RLS will automatically set group_id based on session context
       const { data: trip, error: tripError } = await supabase
         .from('trips')
         .insert({
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
           start_date: startDate,
           end_date: endDate,
           destination,
-          group_id: context.groupId,
+          group_id: context.groupId, // Still need to explicitly set group_id for INSERT
           user_id: null // No longer using user_id for group trips
         })
         .select()
@@ -91,11 +91,10 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     return await withSessionContext(async (context, supabase) => {
-      // Manually filter by group_id to ensure proper isolation
+      // RLS automatically filters by session group - no manual filtering needed
       const { data: trips, error } = await supabase
         .from('trips')
         .select('*')
-        .eq('group_id', context.groupId)
         .order('created_at', { ascending: false });
 
       if (error) {

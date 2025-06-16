@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 interface GroupMember {
   name: string
-  role: 'adventurer' | 'follower'
+  role: 'adventurer' | 'party member'
 }
 
 function generateAccessCode(): string {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'At least one member is required' }, { status: 400 })
     }
 
-    // Ensure first member is an adventurer (leader)
+    // Ensure first member is an adventurer
     const validMembers = members.filter(m => m.name.trim())
     if (validMembers[0].role !== 'adventurer') {
       validMembers[0].role = 'adventurer'
@@ -100,12 +100,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to add group members' }, { status: 500 })
     }
 
-    // Find the leader (adventurer) member ID and update the group's created_by field
-    const leaderMember = insertedMembers.find(member => member.role === 'adventurer')
-    if (leaderMember) {
+    // Find the adventurer member ID and update the group's created_by field
+    const adventurerMember = insertedMembers.find(member => member.role === 'adventurer')
+    if (adventurerMember) {
       await supabase
         .from('travel_groups')
-        .update({ created_by: leaderMember.id })
+        .update({ created_by: adventurerMember.id })
         .eq('id', group.id)
     }
 

@@ -8,7 +8,7 @@ import { Copy, Check, AlertCircle } from 'lucide-react'
 interface AccessCodeConfirmationProps {
   groupName: string
   accessCode: string
-  leaderName: string
+  adventurerName: string
   onContinue: () => void
   className?: string
 }
@@ -16,7 +16,7 @@ interface AccessCodeConfirmationProps {
 export function AccessCodeConfirmation({
   groupName,
   accessCode,
-  leaderName,
+  adventurerName,
   onContinue,
   className = ''
 }: AccessCodeConfirmationProps) {
@@ -103,7 +103,7 @@ export function AccessCodeConfirmation({
               <h4 className="font-semibold text-blue-900">Group Details</h4>
               <div className="text-sm text-blue-800 space-y-1">
                 <p><strong>Group Name:</strong> {groupName}</p>
-                <p><strong>Group Leader:</strong> {leaderName}</p>
+                <p><strong>Group Adventurer:</strong> {adventurerName}</p>
                 <p><strong>Access Code:</strong> <span className="font-mono">{accessCode}</span></p>
               </div>
             </div>

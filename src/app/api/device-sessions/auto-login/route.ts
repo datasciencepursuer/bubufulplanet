@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { createUnifiedSession } from '@/lib/unified-session'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export async function POST(request: NextRequest) {
@@ -55,40 +55,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create new authentication session
-    const sessionId = `group-${groupId}-${Date.now()}`
-    
-    const cookieStore = await cookies()
-    cookieStore.set('vacation-planner-session', sessionId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/'
-    })
-    
-    cookieStore.set('vacation-planner-group-id', groupId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/'
-    })
-    
-    cookieStore.set('vacation-planner-traveler-name', travelerName, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/'
-    })
+    // Create unified session (handles both cookies and device session)
+    const sessionResult = await createUnifiedSession(
+      groupId, 
+      travelerName, 
+      deviceFingerprint,
+      request.headers.get('user-agent') || undefined
+    )
 
-    // Update the device session's last login time
-    await supabase.rpc('refresh_device_session', {
-      p_device_fingerprint: deviceFingerprint,
-      p_group_id: groupId,
-      p_traveler_name: travelerName
-    })
+    if (!sessionResult.success) {
+      return NextResponse.json(
+        { error: sessionResult.error || 'Failed to create session' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({
       success: true,

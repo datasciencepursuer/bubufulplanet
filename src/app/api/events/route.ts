@@ -19,15 +19,11 @@ export async function GET(request: NextRequest) {
           *,
           trip_days!inner(
             id,
-            trip_id,
-            trips!inner(
-              group_id
-            )
+            trip_id
           ),
           expenses(*)
         `)
-        // Always filter by group to ensure isolation
-        .eq('trip_days.trips.group_id', context.groupId)
+        // RLS automatically filters by session group
 
       if (dayId) {
         query = query.eq('day_id', dayId)
@@ -74,17 +70,11 @@ export async function POST(request: NextRequest) {
         traveler: context.travelerName
       })
 
-      // Verify trip day exists and belongs to user's group
+      // Verify trip day exists (RLS automatically filters by session group)
       const { data: tripDay, error: tripDayError } = await supabase
         .from('trip_days')
-        .select(`
-          id,
-          trips!inner(
-            group_id
-          )
-        `)
+        .select('id')
         .eq('id', event.day_id)
-        .eq('trips.group_id', context.groupId)
         .single()
 
       if (tripDayError || !tripDay) {

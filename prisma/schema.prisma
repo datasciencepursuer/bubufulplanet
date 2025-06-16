@@ -57,10 +57,13 @@ model Event {
   title     String    @db.VarChar(255)
   startTime DateTime  @map("start_time") @db.Time(6)
   endTime   DateTime? @map("end_time") @db.Time(6)
+  startDate DateTime  @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
   location  String?   @db.VarChar(255)
   notes     String?   @db.Text
   weather   String?   @db.VarChar(255)
   loadout   String?   @db.Text
+  color     String    @default("#3B82F6") @db.VarChar(7)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   day      TripDay   @relation(fields: [dayId], references: [id], onDelete: Cascade)
@@ -124,7 +127,7 @@ model GroupMember {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   groupId      String   @map("group_id") @db.Uuid
   travelerName String   @map("traveler_name") @db.VarChar(255)
-  role         String   @default("follower") @db.VarChar(50)
+  role         String   @default("party member") @db.VarChar(50)
   permissions  Json     @default("{\"read\": true, \"create\": false, \"modify\": false}")
   joinedAt     DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
   createdBy    String?  @map("created_by") @db.Uuid
@@ -133,6 +136,8 @@ model GroupMember {
   createdGroups   TravelGroup[] @relation("GroupCreator")
 
   @@index([groupId], map: "idx_group_members_group_id")
+  @@index([groupId, travelerName], map: "idx_group_members_group_traveler")
+  @@unique([groupId, travelerName], name: "unique_group_traveler")
   @@map("group_members")
 }
 

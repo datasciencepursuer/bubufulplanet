@@ -17,12 +17,20 @@ pnpm run lint     # Run ESLint with Next.js strict configuration
 
 ## Architecture
 
-### Database Structure (Supabase)
+### Database Structure (Supabase + Prisma)
 Hierarchical data model with Row Level Security:
 - `trips` → `trip_days` → `events` → `expenses`
 - `packing_items` (linked to trips)
+- `travel_groups` → `group_members` + `device_sessions`
 
-All tables enforce user-based access control via `user_id` columns and RLS policies based on `auth.uid()`. The database schema is defined in `supabase-schema.sql`.
+All tables enforce group-based access control via RLS policies. Database schema is managed via Prisma migrations in `prisma/migrations/`.
+
+**CRITICAL: Schema Synchronization**
+- `prisma/schema.prisma` - Source of truth for database structure
+- `src/types/database.ts` - TypeScript types for Supabase client
+- **When updating either file, ALWAYS update the other to maintain sync**
+- Run `pnpm prisma db push` after schema changes to update database
+- Generate new migration with `pnpm prisma migrate dev` for production changes
 
 ### Supabase Client Strategy
 - **Browser Client** (`src/lib/supabase/client.ts`): Client components, uses `createBrowserClient`
@@ -50,7 +58,7 @@ All tables enforce user-based access control via `user_id` columns and RLS polic
 4. **Expense Integration**: Events can have multiple expenses (description, amount, category) saved via API
 5. **Real-time Updates**: Auth state changes trigger UI updates via `onAuthStateChange`
 6. **UI Components**: Limited shadcn/ui components (button, card, dialog) - extend as needed
-7. **TypeScript Types**: Database types in `src/types/database.ts` match actual schema
+7. **TypeScript Types**: Database types in `src/types/database.ts` must stay synchronized with `prisma/schema.prisma`
 
 ### API Pattern Example
 ```typescript
@@ -97,7 +105,8 @@ SUPABASE_SERVICE_ROLE_KEY=       # Service role key (keep secret!)
 - **Event/Expense Pattern**: Events and expenses are tightly coupled - expenses are created/updated via event endpoints
 - **Modal State Management**: Event editing uses `selectedEvent` state in `TripDetailClient` to pass data to `EventModal`
 - **Calendar Integration**: `WeeklyCalendarView` handles time-slot clicks and passes `dayId` + time to parent for event creation
-- **RLS Security**: All database queries automatically scope to `auth.uid()` - no manual user filtering needed in API routes
+- **RLS Security**: All database queries automatically scope to session-based group access - no manual group filtering needed in API routes
+- **Schema Maintenance**: When modifying `prisma/schema.prisma`, immediately update `src/types/database.ts` to match. When updating `database.ts` types, verify corresponding Prisma model exists and is accurate.
 
 ### Missing Features with Schema Support
 - **Packing Lists**: `packing_items` table exists but needs `/api/packing` endpoints and UI components

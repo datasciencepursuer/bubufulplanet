@@ -201,6 +201,44 @@ export interface Database {
           created_by?: string | null
         }
       }
+      device_sessions: {
+        Row: {
+          id: string
+          device_fingerprint: string
+          group_id: string
+          traveler_name: string
+          session_data: Json | null
+          user_agent: string | null
+          ip_address: string | null
+          is_active: boolean
+          last_used: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          device_fingerprint: string
+          group_id: string
+          traveler_name: string
+          session_data?: Json | null
+          user_agent?: string | null
+          ip_address?: string | null
+          is_active?: boolean
+          last_used?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          device_fingerprint?: string
+          group_id?: string
+          traveler_name?: string
+          session_data?: Json | null
+          user_agent?: string | null
+          ip_address?: string | null
+          is_active?: boolean
+          last_used?: string
+          created_at?: string
+        }
+      }
       group_members: {
         Row: {
           id: string
@@ -210,6 +248,7 @@ export interface Database {
           permissions: Json
           joined_at: string
           created_by: string | null
+          auth_user_id: string | null
         }
         Insert: {
           id?: string
@@ -219,6 +258,7 @@ export interface Database {
           permissions?: Json
           joined_at?: string
           created_by?: string | null
+          auth_user_id?: string | null
         }
         Update: {
           id?: string
@@ -228,6 +268,7 @@ export interface Database {
           permissions?: Json
           joined_at?: string
           created_by?: string | null
+          auth_user_id?: string | null
         }
       }
     }

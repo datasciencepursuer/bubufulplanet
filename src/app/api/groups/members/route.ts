@@ -35,7 +35,7 @@ export async function GET() {
   }
 }
 
-// Update member permissions (leaders only)
+// Update member permissions (adventurers only)
 export async function PUT(request: NextRequest) {
   try {
     const { memberId, permissions }: { memberId: string; permissions: { read: boolean; create: boolean; modify: boolean } } = await request.json()
@@ -50,7 +50,7 @@ export async function PUT(request: NextRequest) {
 
     const supabase = createServiceClient()
 
-    // Check if current user is a leader
+    // Check if current user is an adventurer
     const { data: currentMember } = await supabase
       .from('group_members')
       .select('role')
@@ -59,7 +59,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (!currentMember || currentMember.role !== 'adventurer') {
-      return NextResponse.json({ error: 'Only group leaders can update permissions' }, { status: 403 })
+      return NextResponse.json({ error: 'Only group adventurers can update permissions' }, { status: 403 })
     }
 
     // Update member permissions
@@ -82,10 +82,10 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// Add new member to group (leaders only)
+// Add new member to group (adventurers only)
 export async function POST(request: NextRequest) {
   try {
-    const { travelerName, role = 'follower' }: { travelerName: string; role?: 'adventurer' | 'follower' } = await request.json()
+    const { travelerName, role = 'party member' }: { travelerName: string; role?: 'adventurer' | 'party member' } = await request.json()
 
     const cookieStore = await cookies()
     const groupId = cookieStore.get('vacation-planner-group-id')?.value
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient()
 
-    // Check if current user is a leader
+    // Check if current user is an adventurer
     const { data: currentMember } = await supabase
       .from('group_members')
       .select('role')
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!currentMember || currentMember.role !== 'adventurer') {
-      return NextResponse.json({ error: 'Only group leaders can add members' }, { status: 403 })
+      return NextResponse.json({ error: 'Only group adventurers can add members' }, { status: 403 })
     }
 
     // Check if traveler name already exists in group

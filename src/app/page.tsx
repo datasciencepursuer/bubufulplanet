@@ -12,7 +12,7 @@ type Mode = 'select' | 'create' | 'join' | 'confirm'
 
 interface GroupMember {
   name: string
-  role: 'adventurer' | 'follower'
+  role: 'adventurer' | 'party member'
 }
 
 export default function Home() {
@@ -33,11 +33,11 @@ export default function Home() {
   const [createdGroup, setCreatedGroup] = useState<{
     name: string
     accessCode: string
-    leaderName: string
+    adventurerName: string
   } | null>(null)
 
   const addMember = () => {
-    setMembers([...members, { name: '', role: 'follower' }])
+    setMembers([...members, { name: '', role: 'party member' }])
   }
 
   const updateMember = (index: number, field: keyof GroupMember, value: string) => {
@@ -79,7 +79,7 @@ export default function Home() {
         setCreatedGroup({
           name: data.group.name,
           accessCode: data.group.accessCode,
-          leaderName: data.currentMember.name
+          adventurerName: data.currentMember.name
         })
         setMode('confirm')
       } else {
@@ -344,7 +344,7 @@ export default function Home() {
               <AccessCodeConfirmation
                 groupName={createdGroup.name}
                 accessCode={createdGroup.accessCode}
-                leaderName={createdGroup.leaderName}
+                adventurerName={createdGroup.adventurerName}
                 onContinue={handleContinueToApp}
               />
             )}
