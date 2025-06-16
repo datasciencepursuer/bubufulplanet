@@ -20,12 +20,15 @@ model Trip {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   userId      String   @map("user_id") @db.VarChar(255)
+  groupId     String?  @map("group_id") @db.Uuid
 
   tripDays     TripDay[]
   packingItems PackingItem[]
+  travelGroup  TravelGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@index([userId], map: "idx_trips_user_id")
   @@index([startDate, endDate], map: "idx_trips_dates")
+  @@index([groupId], map: "idx_trips_group_id")
   @@map("trips")
 }
 
@@ -98,4 +101,57 @@ model PackingItem {
 
   @@index([tripId], map: "idx_packing_items_trip_id")
   @@map("packing_items")
+}
+
+model TravelGroup {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @db.VarChar(255)
+  accessCode  String   @unique @map("access_code") @db.VarChar(50)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy   String?  @map("created_by") @db.Uuid
+
+  trips          Trip[]
+  groupMembers   GroupMember[]
+  deviceSessions DeviceSession[]
+  createdByMember GroupMember? @relation("GroupCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([accessCode], map: "idx_travel_groups_access_code")
+  @@map("travel_groups")
+}
+
+model GroupMember {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId      String   @map("group_id") @db.Uuid
+  travelerName String   @map("traveler_name") @db.VarChar(255)
+  role         String   @default("follower") @db.VarChar(50)
+  permissions  Json     @default("{\"read\": true, \"create\": false, \"modify\": false}")
+  joinedAt     DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
+  createdBy    String?  @map("created_by") @db.Uuid
+
+  travelGroup     TravelGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdGroups   TravelGroup[] @relation("GroupCreator")
+
+  @@index([groupId], map: "idx_group_members_group_id")
+  @@map("group_members")
+}
+
+model DeviceSession {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deviceFingerprint String    @map("device_fingerprint") @db.VarChar(255)
+  groupId           String    @map("group_id") @db.Uuid
+  travelerName      String    @map("traveler_name") @db.VarChar(255)
+  sessionData       Json?     @map("session_data")
+  userAgent         String?   @map("user_agent") @db.Text
+  ipAddress         String?   @map("ip_address") @db.VarChar(45)
+  isActive          Boolean   @default(true) @map("is_active")
+  lastUsed          DateTime  @default(now()) @map("last_used") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  travelGroup TravelGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([deviceFingerprint], map: "idx_device_sessions_fingerprint")
+  @@index([groupId], map: "idx_device_sessions_group_id")
+  @@index([isActive], map: "idx_device_sessions_active")
+  @@map("device_sessions")
 }

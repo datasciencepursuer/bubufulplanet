@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
       .eq('group_id', groupId)
       .eq('traveler_name', travelerName)
       .eq('is_active', true)
-      .gt('expires_at', new Date().toISOString())
       .single()
 
     if (sessionError || !session) {

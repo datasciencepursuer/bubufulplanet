@@ -22,12 +22,11 @@ export async function POST(request: NextRequest) {
         id,
         group_id,
         traveler_name,
-        last_login_at
+        last_used
       `)
       .eq('device_fingerprint', deviceFingerprint)
       .eq('is_active', true)
-      .gt('expires_at', new Date().toISOString())
-      .order('last_login_at', { ascending: false })
+      .order('last_used', { ascending: false })
 
     if (error) {
       console.error('Error checking device sessions:', error)
@@ -63,7 +62,7 @@ export async function POST(request: NextRequest) {
           travelerName: session.traveler_name,
           role: member.role,
           permissions: member.permissions,
-          lastLogin: session.last_login_at
+          lastLogin: session.last_used
         })
       }
     }
