@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { createServiceClient } from '@/lib/supabase/service'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,28 +18,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Traveler name is required' }, { status: 400 })
     }
 
-    const supabase = createServiceClient()
+    // Find the group by access code using Prisma
+    const group = await prisma.travelGroup.findUnique({
+      where: { accessCode: accessCode.trim().toUpperCase() },
+      include: {
+        groupMembers: {
+          where: { travelerName: travelerName.trim() }
+        }
+      }
+    })
 
-    // Find the group by access code
-    const { data: group, error: groupError } = await supabase
-      .from('travel_groups')
-      .select('id, name, access_code')
-      .eq('access_code', accessCode.trim().toUpperCase())
-      .single()
-
-    if (groupError || !group) {
+    if (!group) {
       return NextResponse.json({ error: 'Invalid access code' }, { status: 401 })
     }
 
     // Check if the traveler name exists in this group
-    const { data: member, error: memberError } = await supabase
-      .from('group_members')
-      .select('traveler_name, role, permissions')
-      .eq('group_id', group.id)
-      .eq('traveler_name', travelerName.trim())
-      .single()
-
-    if (memberError || !member) {
+    const member = group.groupMembers[0]
+    if (!member) {
       return NextResponse.json({ error: 'Traveler name not found in this group' }, { status: 401 })
     }
 
@@ -77,19 +72,37 @@ export async function POST(request: NextRequest) {
         const ip = forwardedFor?.split(',')[0] || realIp || '127.0.0.1'
 
         // First, deactivate any existing sessions for this device
-        await supabase
-          .from('device_sessions')
-          .update({ is_active: false })
-          .eq('device_fingerprint', deviceFingerprint)
-          .eq('is_active', true)
+        await prisma.deviceSession.updateMany({
+          where: {
+            deviceFingerprint,
+            isActive: true
+          },
+          data: {
+            isActive: false
+          }
+        })
 
         // Then create/update the session for the current group
-        await supabase.rpc('refresh_device_session', {
-          p_device_fingerprint: deviceFingerprint,
-          p_group_id: group.id,
-          p_traveler_name: travelerName.trim(),
-          p_user_agent: userAgent,
-          p_ip_address: ip
+        await prisma.deviceSession.upsert({
+          where: {
+            deviceFingerprint
+          },
+          update: {
+            groupId: group.id,
+            travelerName: travelerName.trim(),
+            userAgent,
+            ipAddress: ip,
+            isActive: true,
+            lastUsed: new Date()
+          },
+          create: {
+            deviceFingerprint,
+            groupId: group.id,
+            travelerName: travelerName.trim(),
+            userAgent,
+            ipAddress: ip,
+            isActive: true
+          }
         })
       } catch (error) {
         // Don't fail the login if device session save fails
@@ -102,10 +115,10 @@ export async function POST(request: NextRequest) {
       group: {
         id: group.id,
         name: group.name,
-        accessCode: group.access_code
+        accessCode: group.accessCode
       },
       currentMember: {
-        name: member.traveler_name,
+        name: member.travelerName,
         role: member.role,
         permissions: member.permissions
       }

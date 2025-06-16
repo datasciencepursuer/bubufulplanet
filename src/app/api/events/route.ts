@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { Database } from '@/types/database'
-import { withSessionContext, requirePermission } from '@/lib/supabase/session'
-
-type EventInsert = Database['public']['Tables']['events']['Insert']
-type ExpenseInsert = Database['public']['Tables']['expenses']['Insert']
+import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -12,31 +8,41 @@ export async function GET(request: NextRequest) {
   const tripId = searchParams.get('tripId')
 
   try {
-    return await withSessionContext(async (context, supabase) => {
-      let query = supabase
-        .from('events')
-        .select(`
-          *,
-          trip_days!inner(
-            id,
-            trip_id
-          ),
-          expenses(*)
-        `)
-        // RLS automatically filters by session group
-
+    return await withUnifiedSessionContext(async (context) => {
+      let whereClause: any = {}
+      
       if (dayId) {
-        query = query.eq('day_id', dayId)
+        whereClause.dayId = dayId
       } else if (tripId) {
-        query = query.eq('trip_days.trip_id', tripId)
+        whereClause.day = {
+          trip: {
+            groupId: context.groupId
+          }
+        }
+      } else {
+        // Default to all events for the user's group
+        whereClause.day = {
+          trip: {
+            groupId: context.groupId
+          }
+        }
       }
 
-      const { data: events, error } = await query.order('start_time')
-
-      if (error) {
-        console.error('Error fetching events:', error)
-        return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 })
-      }
+      const events = await prisma.event.findMany({
+        where: whereClause,
+        include: {
+          day: {
+            select: {
+              id: true,
+              tripId: true
+            }
+          },
+          expenses: true
+        },
+        orderBy: {
+          startTime: 'asc'
+        }
+      })
 
       return NextResponse.json({ events })
     })
@@ -55,14 +61,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { event, expenses }: { 
-      event: EventInsert
-      expenses?: Omit<ExpenseInsert, 'day_id' | 'event_id'>[] 
-    } = body
+    const { event, expenses } = body
 
-    return await withSessionContext(async (context, supabase) => {
+    return await withUnifiedSessionContext(async (context) => {
       // Check create permission
-      requirePermission(context, 'create')
+      requireUnifiedPermission(context, 'create')
 
       console.log('Creating event with data:', {
         event,
@@ -70,58 +73,57 @@ export async function POST(request: NextRequest) {
         traveler: context.travelerName
       })
 
-      // Verify trip day exists (RLS automatically filters by session group)
-      const { data: tripDay, error: tripDayError } = await supabase
-        .from('trip_days')
-        .select('id')
-        .eq('id', event.day_id)
-        .single()
+      // Verify trip day exists and belongs to user's group
+      const tripDay = await prisma.tripDay.findFirst({
+        where: {
+          id: event.dayId,
+          trip: {
+            groupId: context.groupId
+          }
+        }
+      })
 
-      if (tripDayError || !tripDay) {
+      if (!tripDay) {
         console.error('Trip day verification failed:', {
-          dayId: event.day_id,
-          error: tripDayError,
-          tripDay
+          dayId: event.dayId,
+          groupId: context.groupId
         })
         return NextResponse.json({ 
           error: 'Trip day not found or access denied',
-          details: tripDayError?.message || 'Trip day does not exist or you do not have access'
+          details: 'Trip day does not exist or you do not have access'
         }, { status: 404 })
       }
 
       // Create the event
-      const { data: newEvent, error: eventError } = await supabase
-        .from('events')
-        .insert(event)
-        .select()
-        .single()
-
-      if (eventError) {
-        console.error('Error creating event:', {
-          error: eventError,
-          errorMessage: eventError.message,
-          errorDetails: eventError.details,
-          eventData: event
-        })
-        return NextResponse.json({ 
-          error: eventError.message || 'Failed to create event',
-          details: eventError.details || eventError.hint || 'Database error occurred'
-        }, { status: 500 })
-      }
+      const newEvent = await prisma.event.create({
+        data: {
+          dayId: event.dayId,
+          title: event.title,
+          startTime: new Date(event.startTime),
+          endTime: event.endTime ? new Date(event.endTime) : null,
+          startDate: new Date(event.startDate),
+          endDate: event.endDate ? new Date(event.endDate) : null,
+          location: event.location,
+          notes: event.notes,
+          weather: event.weather,
+          loadout: event.loadout,
+          color: event.color || '#3B82F6'
+        }
+      })
 
       // Create associated expenses if provided
       if (expenses && expenses.length > 0) {
-        const expenseInserts: ExpenseInsert[] = expenses.map(expense => ({
-          ...expense,
-          day_id: event.day_id,
-          event_id: newEvent.id
-        }))
-
-        const { error: expenseError } = await supabase
-          .from('expenses')
-          .insert(expenseInserts)
-
-        if (expenseError) {
+        try {
+          await prisma.expense.createMany({
+            data: expenses.map((expense: any) => ({
+              eventId: newEvent.id,
+              dayId: event.dayId,
+              description: expense.description,
+              amount: expense.amount,
+              category: expense.category
+            }))
+          })
+        } catch (expenseError) {
           console.error('Error creating expenses:', expenseError)
           // Event was created successfully, but expenses failed
           // Return success but log the error

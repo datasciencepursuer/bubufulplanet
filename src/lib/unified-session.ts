@@ -8,8 +8,7 @@
  */
 
 import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
-import { createServiceClient } from '@/lib/supabase/service'
+import { prisma } from '@/lib/prisma'
 
 export interface UnifiedSessionContext {
   groupId: string
@@ -58,17 +57,15 @@ export async function validateUnifiedSession(): Promise<SessionValidation> {
       }
     }
 
-    const supabase = createServiceClient()
-    
-    // Get member details to validate session
-    const { data: member, error } = await supabase
-      .from('group_members')
-      .select('traveler_name, role, permissions')
-      .eq('group_id', groupIdCookie.value)
-      .eq('traveler_name', travelerNameCookie.value)
-      .single()
+    // Get member details to validate session using Prisma
+    const member = await prisma.groupMember.findFirst({
+      where: {
+        groupId: groupIdCookie.value,
+        travelerName: travelerNameCookie.value
+      }
+    })
 
-    if (error || !member) {
+    if (!member) {
       return { 
         isValid: false, 
         error: 'Member not found or invalid' 
@@ -81,7 +78,7 @@ export async function validateUnifiedSession(): Promise<SessionValidation> {
         groupId: groupIdCookie.value,
         travelerName: travelerNameCookie.value,
         role: member.role,
-        permissions: member.permissions || { read: true, create: false, modify: false },
+        permissions: (member.permissions as any) || { read: true, create: false, modify: false },
         sessionType: 'cookie'
       }
     }
@@ -105,17 +102,16 @@ export async function createUnifiedSession(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const cookieStore = await cookies()
-    const supabase = createServiceClient()
 
-    // Get member details for permissions
-    const { data: member, error: memberError } = await supabase
-      .from('group_members')
-      .select('role, permissions')
-      .eq('group_id', groupId)
-      .eq('traveler_name', travelerName)
-      .single()
+    // Get member details for permissions using Prisma
+    const member = await prisma.groupMember.findFirst({
+      where: {
+        groupId,
+        travelerName
+      }
+    })
 
-    if (memberError || !member) {
+    if (!member) {
       return { success: false, error: 'Member not found' }
     }
 
@@ -137,15 +133,27 @@ export async function createUnifiedSession(
 
     // Save device session if device info provided
     if (deviceFingerprint) {
-      const { error: deviceError } = await supabase.rpc('refresh_device_session', {
-        p_device_fingerprint: deviceFingerprint,
-        p_group_id: groupId,
-        p_traveler_name: travelerName,
-        p_user_agent: userAgent,
-        p_ip_address: '127.0.0.1' // Will be overridden by actual request
-      })
-
-      if (deviceError) {
+      try {
+        await prisma.deviceSession.upsert({
+          where: {
+            deviceFingerprint
+          },
+          update: {
+            groupId,
+            travelerName,
+            userAgent,
+            isActive: true,
+            lastUsed: new Date()
+          },
+          create: {
+            deviceFingerprint,
+            groupId,
+            travelerName,
+            userAgent,
+            isActive: true
+          }
+        })
+      } catch (deviceError) {
         console.warn('Failed to save device session:', deviceError)
         // Don't fail the entire session creation for device session issues
       }
@@ -159,62 +167,18 @@ export async function createUnifiedSession(
 }
 
 /**
- * Enhanced session context with RLS variable setting
+ * Enhanced session context for Prisma-based operations
  */
 export async function withUnifiedSessionContext<T>(
-  callback: (context: UnifiedSessionContext, supabase: any) => Promise<T>
+  callback: (context: UnifiedSessionContext) => Promise<T>
 ): Promise<T> {
   const validation = await validateUnifiedSession()
   
   if (!validation.isValid || !validation.context) {
     throw new Error(validation.error || 'Unauthorized')
   }
-
-  // Create RLS-enabled client with session context
-  const supabase = await createRLSClient(validation.context.groupId, validation.context.travelerName)
   
-  return await callback(validation.context, supabase)
-}
-
-/**
- * Create Supabase client with RLS session variables set
- */
-async function createRLSClient(groupId: string, travelerName: string) {
-  const cookieStore = await cookies()
-  
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        set() {},
-        remove() {},
-      },
-    }
-  )
-  
-  // Set session variables for RLS policies
-  const { error: groupError } = await supabase.rpc('set_session_variable', {
-    variable_name: 'app.current_group_id',
-    variable_value: groupId
-  })
-  
-  const { error: travelerError } = await supabase.rpc('set_session_variable', {
-    variable_name: 'app.current_traveler_name', 
-    variable_value: travelerName
-  })
-  
-  const error = groupError || travelerError
-  
-  if (error) {
-    console.error('Failed to set RLS session context:', error)
-    throw new Error('Failed to set session context')
-  }
-  
-  return supabase
+  return await callback(validation.context)
 }
 
 /**
@@ -223,7 +187,6 @@ async function createRLSClient(groupId: string, travelerName: string) {
 export async function unifiedLogout(deviceFingerprint?: string): Promise<boolean> {
   try {
     const cookieStore = await cookies()
-    const supabase = createServiceClient()
 
     // Clear session cookies
     cookieStore.delete('vacation-planner-session')
@@ -232,12 +195,17 @@ export async function unifiedLogout(deviceFingerprint?: string): Promise<boolean
 
     // Clear device sessions if device fingerprint provided
     if (deviceFingerprint) {
-      const { error } = await supabase
-        .from('device_sessions')
-        .update({ is_active: false })
-        .eq('device_fingerprint', deviceFingerprint)
-
-      if (error) {
+      try {
+        await prisma.deviceSession.updateMany({
+          where: {
+            deviceFingerprint,
+            isActive: true
+          },
+          data: {
+            isActive: false
+          }
+        })
+      } catch (error) {
         console.warn('Failed to clear device sessions:', error)
         // Don't fail logout for device session issues
       }

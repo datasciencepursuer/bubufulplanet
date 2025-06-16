@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withSessionContext, requirePermission } from '@/lib/supabase/session';
+import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session';
+import { prisma } from '@/lib/prisma';
 import { addDays, format } from 'date-fns';
 
 export async function POST(request: NextRequest) {
@@ -14,31 +15,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return await withSessionContext(async (context, supabase) => {
+    return await withUnifiedSessionContext(async (context) => {
       // Check create permission
-      requirePermission(context, 'create');
+      requireUnifiedPermission(context, 'create');
 
-      // Create trip - RLS will automatically set group_id based on session context
-      const { data: trip, error: tripError } = await supabase
-        .from('trips')
-        .insert({
+      // Create trip using Prisma
+      const trip = await prisma.trip.create({
+        data: {
           name,
-          start_date: startDate,
-          end_date: endDate,
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
           destination,
-          group_id: context.groupId, // Still need to explicitly set group_id for INSERT
-          user_id: null // No longer using user_id for group trips
-        })
-        .select()
-        .single();
-
-      if (tripError) {
-        console.error('Error creating trip:', tripError);
-        return NextResponse.json(
-          { error: 'Failed to create trip' },
-          { status: 500 }
-        );
-      }
+          groupId: context.groupId,
+          userId: '' // Legacy field, set to empty string
+        }
+      });
 
       // Create trip_days for each day in the range
       const start = new Date(startDate);
@@ -48,22 +39,22 @@ export async function POST(request: NextRequest) {
 
       for (let date = start; date <= end; date = addDays(date, 1)) {
         tripDays.push({
-          trip_id: trip.id,
-          day_number: dayNumber,
-          date: format(date, 'yyyy-MM-dd')
+          tripId: trip.id,
+          dayNumber,
+          date: new Date(date)
         });
         dayNumber++;
       }
 
       if (tripDays.length > 0) {
-        const { error: daysError } = await supabase
-          .from('trip_days')
-          .insert(tripDays);
-
-        if (daysError) {
+        try {
+          await prisma.tripDay.createMany({
+            data: tripDays
+          });
+        } catch (daysError) {
           console.error('Error creating trip days:', daysError);
           // Trip was created but days failed - clean up
-          await supabase.from('trips').delete().eq('id', trip.id);
+          await prisma.trip.delete({ where: { id: trip.id } });
           return NextResponse.json(
             { error: 'Failed to create trip days' },
             { status: 500 }
@@ -90,20 +81,16 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    return await withSessionContext(async (context, supabase) => {
-      // RLS automatically filters by session group - no manual filtering needed
-      const { data: trips, error } = await supabase
-        .from('trips')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching trips:', error);
-        return NextResponse.json(
-          { error: 'Failed to fetch trips' },
-          { status: 500 }
-        );
-      }
+    return await withUnifiedSessionContext(async (context) => {
+      // Fetch trips filtered by group using Prisma
+      const trips = await prisma.trip.findMany({
+        where: {
+          groupId: context.groupId
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
 
       return NextResponse.json({ trips });
     });
