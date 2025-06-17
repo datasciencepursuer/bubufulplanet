@@ -28,8 +28,8 @@ export default function EventPropertiesPanel({
   }
 
   const eventColor = getEventColor(selectedEvent.color || '#fbf2c4')
-  const eventExpenses = expenses.filter(expense => expense.event_id === selectedEvent.id)
-  const totalExpenses = eventExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const eventExpenses = expenses.filter(expense => expense.eventId === selectedEvent.id)
+  const totalExpenses = eventExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0)
 
   const formatTime = (time: string) => {
     return format(new Date(`2000-01-01T${time}`), 'h:mm a')
@@ -101,13 +101,13 @@ export default function EventPropertiesPanel({
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-gray-700">
               <Calendar className="h-4 w-4 text-gray-500" />
-              <span>{formatDate(selectedEvent.start_date)}</span>
+              <span>{formatDate(new Date(selectedEvent.startDate).toISOString().split('T')[0])}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-700">
               <Clock className="h-4 w-4 text-gray-500" />
               <span>
-                {formatTime(selectedEvent.start_time)}
-                {selectedEvent.end_time && ` - ${formatTime(selectedEvent.end_time)}`}
+                {formatTime(new Date(selectedEvent.startTime).toTimeString().slice(0, 8))}
+                {selectedEvent.endTime && ` - ${formatTime(new Date(selectedEvent.endTime).toTimeString().slice(0, 8))}`}
               </span>
             </div>
           </div>
