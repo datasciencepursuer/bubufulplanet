@@ -3,7 +3,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import AppMonthlyCalendar from '@/components/AppMonthlyCalendar'
 import TripForm from '@/components/TripForm'
-import SupplyManagementModal from '@/components/SupplyManagement/SupplyManagementModal'
+import AllTripsView from '@/components/TripUtilities/AllTripsView'
+import ExpensesView from '@/components/TripUtilities/ExpensesView'
+import PointsOfInterestView from '@/components/TripUtilities/PointsOfInterestView'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,7 +22,6 @@ export default function AppPage() {
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
   const [groupInfo, setGroupInfo] = useState<{name: string, accessCode: string} | null>(null)
   const [accessCodeCopied, setAccessCodeCopied] = useState(false)
-  const [showSupplyManagement, setShowSupplyManagement] = useState(false)
   const router = useRouter()
   const { logout } = useDeviceSession()
 
@@ -375,30 +376,20 @@ export default function AppPage() {
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Supply Management</CardTitle>
-                <CardDescription>Manage your trips, expenses, and destinations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start gap-2"
-                  onClick={() => setShowSupplyManagement(true)}
-                >
-                  <Settings className="w-4 h-4" /> 
-                  Open Supply Management
-                </Button>
-                <div className="mt-4 text-sm text-gray-600">
-                  <p>Access:</p>
-                  <ul className="mt-1 space-y-1 text-xs">
-                    <li>• View all trips</li>
-                    <li>• Track expenses</li>
-                    <li>• Manage saved destinations</li>
-                  </ul>
+            {/* Trip Utilities */}
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Trip Utilities</h3>
+                <div className="space-y-4">
+                  <AllTripsView 
+                    trips={trips} 
+                    onTripsChange={loadTrips}
+                  />
+                  <ExpensesView />
+                  <PointsOfInterestView />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             <Card className="bg-blue-50 border-blue-200">
               <CardHeader>
@@ -425,14 +416,6 @@ export default function AppPage() {
           open={showTripForm}
         />
       )}
-
-      {/* Supply Management Modal */}
-      <SupplyManagementModal
-        isOpen={showSupplyManagement}
-        onClose={() => setShowSupplyManagement(false)}
-        trips={trips}
-        onTripsChange={loadTrips}
-      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
