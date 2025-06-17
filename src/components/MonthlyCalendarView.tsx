@@ -87,7 +87,7 @@ export default function MonthlyCalendarView({
   const tripDaysByDate = useMemo(() => {
     const byDate: Record<string, TripDay> = {}
     tripDays.forEach(td => {
-      byDate[td.date] = td
+      byDate[new Date(td.date).toISOString().split('T')[0]] = td
     })
     return byDate
   }, [tripDays])
@@ -95,10 +95,10 @@ export default function MonthlyCalendarView({
   const eventsByDay = useMemo(() => {
     const byDay: Record<string, Event[]> = {}
     events.forEach(event => {
-      if (!byDay[event.day_id]) {
-        byDay[event.day_id] = []
+      if (!byDay[event.dayId]) {
+        byDay[event.dayId] = []
       }
-      byDay[event.day_id].push(event)
+      byDay[event.dayId].push(event)
     })
     return byDay
   }, [events])
@@ -178,7 +178,7 @@ export default function MonthlyCalendarView({
                   </span>
                   {tripDay && isWithinTrip && (
                     <span className="text-xs text-blue-600 bg-blue-100 px-1 rounded">
-                      Day {tripDay.day_number}
+                      Day {tripDay.dayNumber}
                     </span>
                   )}
                 </div>
