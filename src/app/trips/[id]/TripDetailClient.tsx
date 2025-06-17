@@ -91,7 +91,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   // Helper function to get date from dayId
   const getDateForDayId = (dayId: string): string => {
     const day = tripDays.find(d => d.id === dayId)
-    return day?.date || new Date().toISOString().split('T')[0]
+    return day?.date ? new Date(day.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
   }
 
 
