@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import WeeklyCalendarView from '@/components/WeeklyCalendarView'
 import DailyCalendarView from '@/components/DailyCalendarView'
 import EventModal from '@/components/EventModal'
+import PersistentEventModal from '@/components/PersistentEventModal'
 import EventPropertiesPanel from '@/components/EventPropertiesPanel'
 import type { Trip, TripDay, Event, Expense } from '@prisma/client'
 
@@ -29,6 +30,10 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set())
   const [selectedEventForPanel, setSelectedEventForPanel] = useState<Event | null>(null)
   const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(null)
+  
+  // Persistent modal state for daily view
+  const [persistentModalEvent, setPersistentModalEvent] = useState<Event | null>(null)
+  const [isEditMode, setIsEditMode] = useState(false)
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -136,12 +141,23 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     // Format end time
     const endTime = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
     
-    setSelectedDayId(dayId)
-    setSelectedTime(time)
-    setSelectedEndTime(endTime)
-    setSelectedEvent(null)
-    setCurrentDate(getDateForDayId(dayId))
-    setIsModalOpen(true)
+    if (calendarView === 'daily') {
+      // For daily view, clear any selected event and enter creation mode in persistent modal
+      setPersistentModalEvent(null)
+      setIsEditMode(true)
+      setSelectedDayId(dayId)
+      setSelectedTime(time)
+      setSelectedEndTime(endTime)
+      setCurrentDate(getDateForDayId(dayId))
+    } else {
+      // For weekly view, use the regular modal
+      setSelectedDayId(dayId)
+      setSelectedTime(time)
+      setSelectedEndTime(endTime)
+      setSelectedEvent(null)
+      setCurrentDate(getDateForDayId(dayId))
+      setIsModalOpen(true)
+    }
   }
 
   const handleTimeRangeSelect = (dayId: string, startTime: string, endTime: string, endDate?: string) => {
@@ -151,34 +167,63 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       alert('Error: Cannot create event - no day selected')
       return
     }
-    setSelectedDayId(dayId)
-    setSelectedTime(startTime)
-    setSelectedEndTime(endTime)
-    setSelectedEvent(null)
     
     // Set the date for the event
     const startDateStr = getDateForDayId(dayId)
-    setCurrentDate(startDateStr)
     
-    // If endDate is provided (multi-day event), we'll need to handle it in the modal
-    if (endDate) {
-      setSelectedEndDate(endDate)
+    if (calendarView === 'daily') {
+      // For daily view, clear any selected event and enter creation mode in persistent modal
+      setPersistentModalEvent(null)
+      setIsEditMode(true)
+      setSelectedDayId(dayId)
+      setSelectedTime(startTime)
+      setSelectedEndTime(endTime)
+      setCurrentDate(startDateStr)
+      if (endDate) {
+        setSelectedEndDate(endDate)
+      }
+    } else {
+      // For weekly view, use the regular modal
+      setSelectedDayId(dayId)
+      setSelectedTime(startTime)
+      setSelectedEndTime(endTime)
+      setSelectedEvent(null)
+      setCurrentDate(startDateStr)
+      
+      // If endDate is provided (multi-day event), we'll need to handle it in the modal
+      if (endDate) {
+        setSelectedEndDate(endDate)
+      }
+      setIsModalOpen(true)
     }
-    setIsModalOpen(true)
   }
 
   const handleEventClick = (event: Event) => {
-    setSelectedEvent(event)
-    setSelectedDayId(event.dayId)
-    setSelectedTime('')
-    setSelectedEndTime('')
-    setCurrentDate(event.startDate ? new Date(event.startDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
-    setIsModalOpen(true)
+    if (calendarView === 'daily') {
+      // For daily view, set the event for persistent modal and enter edit mode
+      setPersistentModalEvent(event)
+      setIsEditMode(true)
+    } else {
+      // For weekly view, use the regular modal
+      setSelectedEvent(event)
+      setSelectedDayId(event.dayId)
+      setSelectedTime('')
+      setSelectedEndTime('')
+      setCurrentDate(event.startDate ? new Date(event.startDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
+      setIsModalOpen(true)
+    }
   }
 
   const handleEventSelect = (event: Event, position: { top: number; left: number }) => {
-    setSelectedEventForPanel(event)
-    setPanelPosition(position)
+    if (calendarView === 'daily') {
+      // For daily view, set the event for persistent modal preview (not edit mode)
+      setPersistentModalEvent(event)
+      setIsEditMode(false)
+    } else {
+      // For weekly view, use the floating panel
+      setSelectedEventForPanel(event)
+      setPanelPosition(position)
+    }
   }
 
   const handleClearSelection = () => {
@@ -420,55 +465,76 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             onDayHeaderClick={handleDayHeaderClick}
           />
         ) : (
-          <DailyCalendarView
-            key={`daily-${trip.id}`}
-            tripStartDate={trip.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : ''}
-            tripEndDate={trip.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : ''}
-            tripDays={tripDays}
-            events={events}
-            selectedEventId={selectedEventForPanel?.id}
-            newEventIds={newEventIds}
-            onTimeSlotClick={handleTimeSlotClick}
-            onTimeRangeSelect={handleTimeRangeSelect}
-            onEventClick={handleEventClick}
-            onEventSelect={handleEventSelect}
-            initialDate={selectedDailyDate}
-          />
+          <div className="grid grid-cols-2 gap-6 h-full">
+            <DailyCalendarView
+              key={`daily-${trip.id}`}
+              tripStartDate={trip.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : ''}
+              tripEndDate={trip.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : ''}
+              tripDays={tripDays}
+              events={events}
+              selectedEventId={persistentModalEvent?.id}
+              newEventIds={newEventIds}
+              onTimeSlotClick={handleTimeSlotClick}
+              onTimeRangeSelect={handleTimeRangeSelect}
+              onEventClick={handleEventClick}
+              onEventSelect={handleEventSelect}
+              initialDate={selectedDailyDate}
+            />
+            <PersistentEventModal
+              selectedEvent={persistentModalEvent}
+              expenses={expenses}
+              onSave={handleSaveEvent}
+              onDelete={handleDeleteEvent}
+              dayId={selectedDayId}
+              selectedTime={selectedTime}
+              selectedEndTime={selectedEndTime}
+              currentDate={currentDate}
+              selectedEndDate={selectedEndDate}
+              tripStartDate={trip?.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : undefined}
+              tripEndDate={trip?.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : undefined}
+              isEditMode={isEditMode}
+              onEditModeChange={setIsEditMode}
+            />
+          </div>
         )}
       </div>
 
-      {/* Floating Event Properties Panel */}
-      <EventPropertiesPanel
-        selectedEvent={selectedEventForPanel}
-        expenses={expenses}
-        position={panelPosition}
-        onEditEvent={handleEventClick}
-        onClearSelection={handleClearSelection}
-      />
+      {/* Floating Event Properties Panel - Only for weekly view */}
+      {calendarView === 'weekly' && (
+        <EventPropertiesPanel
+          selectedEvent={selectedEventForPanel}
+          expenses={expenses}
+          position={panelPosition}
+          onEditEvent={handleEventClick}
+          onClearSelection={handleClearSelection}
+        />
+      )}
 
-      {/* Event Modal */}
-      <EventModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setSelectedEvent(null)
-          setSelectedDayId('')
-          setSelectedTime('')
-          setSelectedEndTime('')
-          setCurrentDate('')
-          setSelectedEndDate('')
-        }}
-        onSave={handleSaveEvent}
-        onDelete={handleDeleteEvent}
-        event={selectedEvent}
-        dayId={selectedDayId}
-        selectedTime={selectedTime}
-        selectedEndTime={selectedEndTime}
-        currentDate={currentDate}
-        selectedEndDate={selectedEndDate}
-        tripStartDate={trip?.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : undefined}
-        tripEndDate={trip?.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : undefined}
-      />
+      {/* Event Modal - Only for weekly view */}
+      {calendarView === 'weekly' && (
+        <EventModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false)
+            setSelectedEvent(null)
+            setSelectedDayId('')
+            setSelectedTime('')
+            setSelectedEndTime('')
+            setCurrentDate('')
+            setSelectedEndDate('')
+          }}
+          onSave={handleSaveEvent}
+          onDelete={handleDeleteEvent}
+          event={selectedEvent}
+          dayId={selectedDayId}
+          selectedTime={selectedTime}
+          selectedEndTime={selectedEndTime}
+          currentDate={currentDate}
+          selectedEndDate={selectedEndDate}
+          tripStartDate={trip?.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : undefined}
+          tripEndDate={trip?.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : undefined}
+        />
+      )}
     </div>
   )
 }
