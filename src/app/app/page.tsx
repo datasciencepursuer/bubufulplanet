@@ -265,25 +265,27 @@ export default function AppPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 flex justify-between items-center">
-          <div className="flex-1">
+        <div className="mb-8 flex justify-between items-start">
+          <div className="flex-1 pl-4">
             <h2 className="text-3xl font-bold mb-2">
               {groupInfo ? `${groupInfo.name} - Plan Your Trips` : 'Plan Your Trips'}
             </h2>
             {groupInfo && groupInfo.travelerName && (
-              <p className="text-lg text-teal-700 font-medium mb-2">
-                Welcome {groupInfo.role || 'Traveler'} {groupInfo.travelerName}!
-              </p>
+              <div className="mb-2">
+                <p className="text-lg text-teal-700 font-medium">
+                  Welcome {groupInfo.role || 'Traveler'} {groupInfo.travelerName}!
+                </p>
+              </div>
             )}
             <p className="text-gray-600">Select dates on the calendar to create a new trip</p>
           </div>
           
-          {/* Banner Image */}
-          <div className="flex-1 flex justify-center px-8">
+          {/* Banner Image - Between title and Pro Tips */}
+          <div className="flex justify-center px-6">
             <img 
               src="/banner.jpg" 
               alt="Travel Banner" 
-              className="max-h-32 w-auto object-contain"
+              className="max-h-28 w-auto object-contain"
             />
           </div>
           
