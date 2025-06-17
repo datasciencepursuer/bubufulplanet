@@ -265,58 +265,30 @@ export default function AppPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 flex justify-between items-start">
-          <div className="flex-1 pl-4">
-            <h2 className="text-3xl font-bold mb-2">
-              {groupInfo ? `${groupInfo.name} - Plan Your Trips` : 'Plan Your Trips'}
-            </h2>
-            {groupInfo && groupInfo.travelerName && (
-              <div className="mb-2">
-                <p className="text-lg text-teal-700 font-medium">
-                  Welcome {groupInfo.role || 'Traveler'} {groupInfo.travelerName}!
-                </p>
-              </div>
-            )}
-            <p className="text-gray-600">Select dates on the calendar to create a new trip</p>
-          </div>
-          
-          {/* Banner Image - Between title and Pro Tips */}
-          <div className="flex justify-center px-6">
-            <div className="relative">
-              <img 
-                src="/banner.jpg" 
-                alt="Travel Banner" 
-                className="max-h-28 w-auto object-contain"
-                onError={(e) => {
-                  console.error('Banner image failed to load');
-                  // Fallback: show a colored div instead
-                  const fallback = document.createElement('div');
-                  fallback.className = 'max-h-28 w-48 bg-gradient-to-r from-teal-400 to-blue-500 rounded-lg flex items-center justify-center text-white font-bold';
-                  fallback.textContent = 'Travel Banner';
-                  e.currentTarget.parentNode?.replaceChild(fallback, e.currentTarget);
-                }}
-                onLoad={() => console.log('Banner image loaded successfully')}
-              />
-            </div>
-          </div>
-          
-          {/* Pro Tips */}
-          <Card className="bg-blue-50 border-blue-200 max-w-sm flex-shrink-0">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-blue-900 text-base">Pro Tips</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Click and drag to select multiple days</li>
-                <li>• Double-click a date for single day trips</li>
-                <li>• Use keyboard shortcuts for faster planning</li>
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
+            {/* Group Title and Welcome */}
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-3xl font-bold mb-2">
+                  {groupInfo ? `${groupInfo.name} - Plan Your Trips` : 'Plan Your Trips'}
+                </h2>
+                <p className="text-gray-600">Drag and select dates on the calendar to create a new trip</p>
+              </div>
+              
+              {/* Welcome Card */}
+              {groupInfo && groupInfo.travelerName && (
+                <Card className="bg-teal-50 border-teal-200 max-w-sm flex-shrink-0">
+                  <CardContent className="pt-4">
+                    <p className="text-lg text-teal-700 font-medium">
+                      Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'} {groupInfo.travelerName}!
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+            
             {/* Next Trip Card - Moved from utility cards */}
             <AllTripsView 
               trips={trips} 

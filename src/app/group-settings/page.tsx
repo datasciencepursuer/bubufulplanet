@@ -113,7 +113,7 @@ export default function GroupSettings() {
   }
 
   const currentUserRole = members.find(m => m.traveler_name === currentTravelerName)?.role || 'party member'
-  const isLeader = currentUserRole === 'adventurer'
+  const isAdventurer = currentUserRole === 'adventurer'
 
   if (loading) {
     return (
@@ -140,7 +140,7 @@ export default function GroupSettings() {
               <CardTitle className="text-2xl font-bold text-teal-800">Group Settings</CardTitle>
               <CardDescription>
                 Manage group members and their permissions
-                {!isLeader && " (View Only - Leaders can modify permissions)"}
+                {!isAdventurer && " (View Only - Adventurers can modify permissions)"}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -152,7 +152,7 @@ export default function GroupSettings() {
           </div>
         )}
 
-        {isLeader && (
+        {isAdventurer && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="text-lg">Add New Member</CardTitle>
@@ -196,13 +196,13 @@ export default function GroupSettings() {
                     <div>
                       <h3 className="font-medium text-gray-900">{member.traveler_name}</h3>
                       <p className="text-sm text-gray-500">
-                        {member.role === 'adventurer' ? 'Leader' : 'Follower'} • 
+                        {member.role === 'adventurer' ? 'Adventurer' : 'Party Member'} • 
                         Joined {new Date(member.joined_at).toLocaleDateString()}
                       </p>
                     </div>
                     {member.role === 'adventurer' && (
                       <span className="px-2 py-1 bg-teal-100 text-teal-800 text-xs rounded-full">
-                        Leader
+                        Adventurer
                       </span>
                     )}
                   </div>
@@ -219,7 +219,7 @@ export default function GroupSettings() {
                               ...member.permissions,
                               read: e.target.checked
                             })}
-                            disabled={!isLeader}
+                            disabled={!isAdventurer}
                             className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
                           />
                           <span className="text-sm text-gray-700">Read</span>
@@ -232,7 +232,7 @@ export default function GroupSettings() {
                               ...member.permissions,
                               create: e.target.checked
                             })}
-                            disabled={!isLeader}
+                            disabled={!isAdventurer}
                             className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
                           />
                           <span className="text-sm text-gray-700">Create</span>
@@ -245,7 +245,7 @@ export default function GroupSettings() {
                               ...member.permissions,
                               modify: e.target.checked
                             })}
-                            disabled={!isLeader}
+                            disabled={!isAdventurer}
                             className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
                           />
                           <span className="text-sm text-gray-700">Modify</span>

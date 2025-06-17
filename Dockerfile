@@ -73,9 +73,6 @@ COPY package.json .
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/.next ./.next
 
-# Copy public folder for static assets
-COPY --from=build /usr/src/app/public ./public
-
 # Copy Prisma files for migrations and client
 COPY --from=build /usr/src/app/prisma ./prisma
 
