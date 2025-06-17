@@ -626,7 +626,22 @@ export default function WeeklyCalendarView({
                 </div>
                 {tripDay && isWithinTripDates(date) ? (
                   <div className="text-xs text-green-700 mt-1">
-                    Day {differenceInDays(date, startDate) + 1}
+                    Day {(() => {
+                      // Simple calculation: compare date strings
+                      const currentDateStr = format(date, 'yyyy-MM-dd')
+                      const startDateStr = tripStartDate
+                      
+                      // If they're the same date, it's Day 1
+                      if (currentDateStr === startDateStr) return 1
+                      
+                      // Otherwise calculate difference in days
+                      const current = new Date(currentDateStr)
+                      const start = new Date(startDateStr)
+                      const diffTime = current.getTime() - start.getTime()
+                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                      
+                      return diffDays + 1
+                    })()}
                   </div>
                 ) : date >= tripRangeStart && date <= tripRangeEnd ? (
                   <div className="text-xs text-amber-600 mt-1">
