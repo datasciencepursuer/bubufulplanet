@@ -466,6 +466,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         selectedEndTime={selectedEndTime}
         currentDate={currentDate}
         selectedEndDate={selectedEndDate}
+        tripStartDate={trip?.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : undefined}
+        tripEndDate={trip?.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : undefined}
       />
     </div>
   )

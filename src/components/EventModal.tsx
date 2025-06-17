@@ -7,6 +7,7 @@ import { Trash2, Palette } from 'lucide-react'
 import ConfirmDialog from './ConfirmDialog'
 import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
+import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 type ExpenseInsert = { description: string; amount: number; category?: string }
@@ -72,6 +73,8 @@ interface EventModalProps {
   selectedEndTime?: string
   currentDate?: string
   selectedEndDate?: string
+  tripStartDate?: string
+  tripEndDate?: string
 }
 
 export default function EventModal({ 
@@ -84,7 +87,9 @@ export default function EventModal({
   selectedTime,
   selectedEndTime,
   currentDate,
-  selectedEndDate
+  selectedEndDate,
+  tripStartDate,
+  tripEndDate
 }: EventModalProps) {
   const [formData, setFormData] = useState<EventFormData>({
     day_id: dayId,
@@ -264,6 +269,21 @@ export default function EventModal({
 
           <div>
             <label className="block text-sm font-medium mb-2">Start Time & Date *</label>
+            {tripStartDate && tripEndDate && formData.start_date && (
+              <div className="mb-2 text-sm text-gray-600">
+                {(() => {
+                  const dateInfo = getTripDateInfo(new Date(formData.start_date), tripStartDate, tripEndDate)
+                  const styles = getTripDateStyles(dateInfo)
+                  
+                  return styles.dayLabel.show && (
+                    <span className={styles.dayLabel.className}>
+                      {styles.dayLabel.text}{dateInfo.dateType === 'trip-day' ? ' of trip' : ''}
+                    </span>
+                  )
+                })()
+                }
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="flex gap-2">
@@ -300,6 +320,21 @@ export default function EventModal({
           
           <div>
             <label className="block text-sm font-medium mb-2">End Time & Date</label>
+            {tripStartDate && tripEndDate && formData.end_date && (
+              <div className="mb-2 text-sm text-gray-600">
+                {(() => {
+                  const dateInfo = getTripDateInfo(new Date(formData.end_date), tripStartDate, tripEndDate)
+                  const styles = getTripDateStyles(dateInfo)
+                  
+                  return styles.dayLabel.show && (
+                    <span className={styles.dayLabel.className}>
+                      {styles.dayLabel.text}{dateInfo.dateType === 'trip-day' ? ' of trip' : ''}
+                    </span>
+                  )
+                })()
+                }
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="flex gap-2">
