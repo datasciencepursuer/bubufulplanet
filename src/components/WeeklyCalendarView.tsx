@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { format, eachDayOfInterval, addDays, subDays, isSameDay, parseISO, min, max, addWeeks, subWeeks } from 'date-fns'
+import { format, eachDayOfInterval, addDays, subDays, isSameDay, parseISO, min, max, addWeeks, subWeeks, differenceInDays } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, ChevronsLeft, ChevronsRight, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Event, TripDay } from '@prisma/client'
@@ -626,7 +626,7 @@ export default function WeeklyCalendarView({
                 </div>
                 {tripDay && isWithinTripDates(date) ? (
                   <div className="text-xs text-green-700 mt-1">
-                    Day {tripDay.dayNumber}
+                    Day {differenceInDays(date, startDate) + 1}
                   </div>
                 ) : date >= tripRangeStart && date <= tripRangeEnd ? (
                   <div className="text-xs text-amber-600 mt-1">
