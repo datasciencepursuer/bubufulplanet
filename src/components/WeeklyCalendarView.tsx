@@ -65,7 +65,11 @@ export default function WeeklyCalendarView({
   const tripDaysMap = useMemo(() => {
     const map = new Map()
     tripDays.forEach(td => {
-      map.set(td.date, td)
+      // Ensure date is formatted consistently as yyyy-MM-dd string
+      const dateStr = td.date instanceof Date 
+        ? format(td.date, 'yyyy-MM-dd')
+        : format(new Date(td.date), 'yyyy-MM-dd')
+      map.set(dateStr, td)
     })
     return map
   }, [tripDays])
@@ -600,7 +604,11 @@ export default function WeeklyCalendarView({
                 }`}
                 onClick={() => {
                   if (tripDay && onDayHeaderClick) {
-                    onDayHeaderClick(tripDay.date)
+                    // Ensure consistent date format for onDayHeaderClick
+                    const dateStr = tripDay.date instanceof Date 
+                      ? format(tripDay.date, 'yyyy-MM-dd')
+                      : format(new Date(tripDay.date), 'yyyy-MM-dd')
+                    onDayHeaderClick(dateStr)
                   }
                 }}
               >
@@ -617,8 +625,8 @@ export default function WeeklyCalendarView({
                   {format(date, 'd')}
                 </div>
                 {tripDay ? (
-                  <div className="text-xs text-blue-600 mt-1">
-                    Day {tripDay.day_number}
+                  <div className="text-xs text-green-700 mt-1">
+                    Day {tripDay.dayNumber}
                   </div>
                 ) : date >= tripRangeStart && date <= tripRangeEnd ? (
                   <div className="text-xs text-amber-600 mt-1">
@@ -785,7 +793,7 @@ export default function WeeklyCalendarView({
       <div className="p-4 border-t bg-gray-50 text-sm text-gray-600">
         <div className="flex items-center space-x-4 flex-wrap">
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-blue-600 border rounded"></div>
+            <div className="w-3 h-3 bg-green-700 border rounded"></div>
             <span>Trip Days</span>
           </div>
           <div className="flex items-center space-x-2">

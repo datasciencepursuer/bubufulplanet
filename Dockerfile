@@ -90,8 +90,10 @@ USER node
 # Expose the port that the application listens on.
 EXPOSE 3000
 
-# Add health check for Coolify
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+# Add health check for Docker and Coolify
+# localhost works within the container's network namespace
+# Increased start-period to allow for migration time
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Run Prisma migrations and start the application

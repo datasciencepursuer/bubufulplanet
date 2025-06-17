@@ -4,14 +4,14 @@ import { prisma } from '@/lib/prisma'
 export async function GET() {
   try {
     // Test database connection using Prisma
-    const tripsCount = await prisma.trip.count()
+    await prisma.$queryRaw`SELECT 1`
     
     return NextResponse.json({
       status: 'ok',
       database: true,
-      tripsCount,
       orm: 'Prisma',
-      hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV,
     })
   } catch (error) {
     return NextResponse.json({
@@ -19,6 +19,7 @@ export async function GET() {
       database: false,
       message: error instanceof Error ? error.message : 'Unknown error',
       orm: 'Prisma',
+      timestamp: new Date().toISOString(),
     }, { status: 500 })
   }
 }
