@@ -5,6 +5,20 @@ import type { Event, Expense } from '@prisma/client'
 type EventUpdate = Partial<Omit<Event, 'id' | 'createdAt'>>
 type ExpenseInsert = Omit<Expense, 'id' | 'createdAt' | 'dayId' | 'eventId'>
 
+// API input interface with snake_case naming
+interface EventUpdateInput {
+  title?: string
+  start_time?: string
+  end_time?: string | null
+  start_date?: string
+  end_date?: string | null
+  location?: string | null
+  notes?: string | null
+  weather?: string | null
+  loadout?: string | null
+  color?: string
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -75,7 +89,7 @@ export async function PUT(
   try {
     const body = await request.json()
     const { event, expenses }: { 
-      event: EventUpdate
+      event: EventUpdateInput
       expenses?: Omit<ExpenseInsert, 'day_id' | 'event_id'>[] 
     } = body
 
