@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Event, TripDay } from '@prisma/client'
 import { EVENT_COLORS, getEventColor } from '@/lib/eventColors'
+import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
 
 interface DailyCalendarViewProps {
   tripStartDate: string
@@ -259,7 +260,8 @@ export default function DailyCalendarView({
   }
 
   const isWithinTripDates = (): boolean => {
-    return currentDate >= startDate && currentDate <= endDate
+    const dateInfo = getTripDateInfo(currentDate, tripStartDate, tripEndDate)
+    return dateInfo.isWithinTripDates
   }
 
   const handleEventClick = useCallback((event: Event, e: React.MouseEvent) => {
@@ -319,11 +321,16 @@ export default function DailyCalendarView({
           <h2 className="text-xl font-semibold">
             {format(currentDate, 'EEEE, MMMM d, yyyy')}
           </h2>
-          {currentTripDay && (
-            <p className="text-sm text-blue-600 mt-1">
-              Day {currentTripDay.dayNumber} of trip
-            </p>
-          )}
+          {(() => {
+            const dateInfo = getTripDateInfo(currentDate, tripStartDate, tripEndDate)
+            const styles = getTripDateStyles(dateInfo)
+            
+            return styles.dayLabel.show && (
+              <p className={styles.dayLabel.className}>
+                {styles.dayLabel.text}{dateInfo.dateType === 'trip-day' ? ' of trip' : ''}
+              </p>
+            )
+          })()}
         </div>
         
         <Button 

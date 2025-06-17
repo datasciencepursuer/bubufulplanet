@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Plus, ChevronsLeft, ChevronsRight, CalendarD
 import { Button } from '@/components/ui/button'
 import type { Event, TripDay } from '@prisma/client'
 import { EVENT_COLORS, getEventColor } from '@/lib/eventColors'
+import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
 
 interface WeeklyCalendarViewProps {
   tripStartDate: string
@@ -615,39 +616,23 @@ export default function WeeklyCalendarView({
                 <div className="text-sm font-medium">
                   {format(date, 'EEE')}
                 </div>
-                <div className={`text-lg ${
-                  isWithinTripDates(date) 
-                    ? 'text-gray-900' 
-                    : date >= tripRangeStart && date <= tripRangeEnd
-                    ? 'text-amber-600'
-                    : 'text-gray-400'
-                }`}>
-                  {format(date, 'd')}
-                </div>
-                {tripDay && isWithinTripDates(date) ? (
-                  <div className="text-xs text-green-700 mt-1">
-                    Day {(() => {
-                      // Simple calculation: compare date strings
-                      const currentDateStr = format(date, 'yyyy-MM-dd')
-                      const startDateStr = tripStartDate
-                      
-                      // If they're the same date, it's Day 1
-                      if (currentDateStr === startDateStr) return 1
-                      
-                      // Otherwise calculate difference in days
-                      const current = new Date(currentDateStr)
-                      const start = new Date(startDateStr)
-                      const diffTime = current.getTime() - start.getTime()
-                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-                      
-                      return diffDays + 1
-                    })()}
-                  </div>
-                ) : date >= tripRangeStart && date <= tripRangeEnd ? (
-                  <div className="text-xs text-amber-600 mt-1">
-                    {date < startDate ? 'Before' : 'After'}
-                  </div>
-                ) : null}
+                {(() => {
+                  const dateInfo = getTripDateInfo(date, tripStartDate, tripEndDate)
+                  const styles = getTripDateStyles(dateInfo)
+                  
+                  return (
+                    <>
+                      <div className={`text-lg ${styles.dateNumber}`}>
+                        {format(date, 'd')}
+                      </div>
+                      {styles.dayLabel.show && (
+                        <div className={styles.dayLabel.className}>
+                          {styles.dayLabel.text}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             ))}
           </div>
