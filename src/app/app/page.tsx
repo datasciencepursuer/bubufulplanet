@@ -109,7 +109,8 @@ export default function AppPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to create trip')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       const { trip } = await response.json()
@@ -118,7 +119,8 @@ export default function AppPage() {
       router.push(`/trips/${trip.id}`)
     } catch (error) {
       console.error('Error creating trip:', error)
-      alert('Failed to create trip. Please check your configuration.')
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      alert(`Failed to create trip: ${errorMessage}`)
     }
   }
 
