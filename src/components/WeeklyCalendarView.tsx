@@ -134,8 +134,12 @@ export default function WeeklyCalendarView({
     
     tripDaysInWeek.forEach(({ tripDay }) => {
       if (tripDay) {
-        eventsByDay[tripDay.id] = events.filter(event => event.day_id === tripDay.id)
-          .sort((a, b) => a.start_time.localeCompare(b.start_time))
+        eventsByDay[tripDay.id] = events.filter(event => event.dayId === tripDay.id)
+          .sort((a, b) => {
+            const aTime = new Date(a.startTime).toTimeString().slice(0, 8)
+            const bTime = new Date(b.startTime).toTimeString().slice(0, 8)
+            return aTime.localeCompare(bTime)
+          })
       }
     })
     

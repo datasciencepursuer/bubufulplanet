@@ -90,7 +90,7 @@ export default function DailyCalendarView({
 
   // Helper function to get trip day for a specific date
   const getTripDayForDate = useCallback((date: Date) => {
-    return tripDays.find(td => isSameDay(parseISO(td.date), date))
+    return tripDays.find(td => isSameDay(td.date instanceof Date ? td.date : new Date(td.date), date))
   }, [tripDays])
 
   // Helper function to get events for a specific date
@@ -321,7 +321,7 @@ export default function DailyCalendarView({
           </h2>
           {currentTripDay && (
             <p className="text-sm text-blue-600 mt-1">
-              Day {currentTripDay.day_number} of trip
+              Day {currentTripDay.dayNumber} of trip
             </p>
           )}
         </div>

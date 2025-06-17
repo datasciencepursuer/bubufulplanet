@@ -201,7 +201,22 @@ export default function EventModal({
       finalFormData.end_time = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
     }
     
-    onSave(finalFormData, expenses)
+    // Convert snake_case form data to camelCase EventInsert
+    const eventInsert: EventInsert = {
+      dayId: finalFormData.day_id,
+      title: finalFormData.title,
+      startTime: new Date(`2000-01-01T${finalFormData.start_time}`),
+      endTime: finalFormData.end_time ? new Date(`2000-01-01T${finalFormData.end_time}`) : null,
+      startDate: new Date(finalFormData.start_date),
+      endDate: finalFormData.end_date ? new Date(finalFormData.end_date) : null,
+      location: finalFormData.location,
+      notes: finalFormData.notes,
+      weather: finalFormData.weather,
+      loadout: finalFormData.loadout,
+      color: finalFormData.color
+    }
+    
+    onSave(eventInsert, expenses)
     onClose()
   }
 
