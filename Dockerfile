@@ -62,8 +62,8 @@ FROM base AS final
 # Use production node environment by default.
 ENV NODE_ENV="production"
 
-# Run the application as a non-root user.
-USER node
+# Install curl for health checks
+RUN apk add --no-cache curl
 
 # Copy package.json so that package manager commands can be used.
 COPY package.json .
@@ -76,11 +76,23 @@ COPY --from=build /usr/src/app/.next ./.next
 # Copy Prisma files for migrations and client
 COPY --from=build /usr/src/app/prisma ./prisma
 
-# Copy startup script
+# Copy startup script and make it executable
 COPY --from=build /usr/src/app/scripts ./scripts
+RUN chmod +x ./scripts/start.sh
+
+# Copy pnpm-lock.yaml for runtime if needed
+COPY pnpm-lock.yaml .
+
+# Change ownership to node user and then switch to it
+RUN chown -R node:node /usr/src/app
+USER node
 
 # Expose the port that the application listens on.
 EXPOSE 3000
+
+# Add health check for Coolify
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Run Prisma migrations and start the application
 CMD ["./scripts/start.sh"]

@@ -12,10 +12,10 @@ if [ -z "$DATABASE_URL" ]; then
 fi
 
 echo "Running Prisma migrations..."
-npm run db:migrate
+pnpm run db:migrate
 
 echo "Generating Prisma client..."
-npm run db:generate
+pnpm run db:generate
 
 echo "Starting Next.js application..."
 exec pnpm start
