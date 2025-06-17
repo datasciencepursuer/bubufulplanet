@@ -624,7 +624,7 @@ export default function WeeklyCalendarView({
                 }`}>
                   {format(date, 'd')}
                 </div>
-                {tripDay ? (
+                {tripDay && isWithinTripDates(date) ? (
                   <div className="text-xs text-green-700 mt-1">
                     Day {tripDay.dayNumber}
                   </div>
