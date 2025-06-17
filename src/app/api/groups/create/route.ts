@@ -107,26 +107,17 @@ export async function POST(request: NextRequest) {
     const sessionId = `group-${group.id}-${Date.now()}`
     
     const cookieStore = await cookies()
-    cookieStore.set('vacation-planner-session', sessionId, {
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
-    })
-    
-    cookieStore.set('vacation-planner-group-id', group.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
-    })
-    
-    cookieStore.set('vacation-planner-traveler-name', validMembers[0].name.trim(), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
-    })
+      sameSite: 'lax' as const,
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/'
+    }
+
+    cookieStore.set('vacation-planner-session', sessionId, cookieOptions)
+    cookieStore.set('vacation-planner-group-id', group.id, cookieOptions)
+    cookieStore.set('vacation-planner-traveler-name', validMembers[0].name.trim(), cookieOptions)
 
     // Save device session if fingerprint provided
     if (deviceFingerprint) {
