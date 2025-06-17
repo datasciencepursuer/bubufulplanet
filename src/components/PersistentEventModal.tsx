@@ -120,6 +120,37 @@ export default function PersistentEventModal({
   const [destinations, setDestinations] = useState<Destination[]>([])
   const [showDestinationDropdown, setShowDestinationDropdown] = useState(false)
 
+  const fetchDestinations = useCallback(async () => {
+    try {
+      const response = await fetch('/api/groups/current')
+      
+      if (response.ok) {
+        const data = await response.json()
+        const saved = data.group.savedDestinations
+        if (saved) {
+          // Handle both old string format and new JSON format
+          if (typeof saved === 'string') {
+            // Legacy format: comma-delimited strings
+            const legacyDestinations = saved.split(',').map((dest: string) => ({
+              name: dest.trim(),
+              link: undefined
+            })).filter((dest: Destination) => dest.name)
+            setDestinations(legacyDestinations)
+          } else if (Array.isArray(saved)) {
+            // New format: array of objects
+            setDestinations(saved.filter((dest: Destination) => dest.name))
+          } else {
+            setDestinations([])
+          }
+        } else {
+          setDestinations([])
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching destinations:', error)
+    }
+  }, [])
+
   const fetchExistingExpenses = useCallback(async (eventId: string) => {
     try {
       const response = await fetch(`/api/events/${eventId}`)
@@ -264,37 +295,6 @@ export default function PersistentEventModal({
   const removeExpense = (index: number) => {
     setExpenses(expenses.filter((_, i) => i !== index))
   }
-
-  const fetchDestinations = useCallback(async () => {
-    try {
-      const response = await fetch('/api/groups/current')
-      
-      if (response.ok) {
-        const data = await response.json()
-        const saved = data.group.savedDestinations
-        if (saved) {
-          // Handle both old string format and new JSON format
-          if (typeof saved === 'string') {
-            // Legacy format: comma-delimited strings
-            const legacyDestinations = saved.split(',').map((dest: string) => ({
-              name: dest.trim(),
-              link: undefined
-            })).filter((dest: Destination) => dest.name)
-            setDestinations(legacyDestinations)
-          } else if (Array.isArray(saved)) {
-            // New format: array of objects
-            setDestinations(saved.filter((dest: Destination) => dest.name))
-          } else {
-            setDestinations([])
-          }
-        } else {
-          setDestinations([])
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching destinations:', error)
-    }
-  }, [])
 
   const handleDeleteConfirm = () => {
     if (!selectedEvent || !onDelete) return
