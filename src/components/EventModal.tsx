@@ -8,6 +8,9 @@ import ConfirmDialog from './ConfirmDialog'
 import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
 
+type EventInsert = Omit<Event, 'id' | 'createdAt'>
+type ExpenseInsert = { description: string; amount: number; category?: string }
+
 // API expects snake_case field names to match database columns
 type EventFormData = {
   day_id: string
@@ -61,7 +64,7 @@ const TIME_OPTIONS_12H = [
 interface EventModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (event: EventInsert, expenses: Omit<Database['public']['Tables']['expenses']['Insert'], 'day_id' | 'event_id'>[]) => void
+  onSave: (event: EventInsert, expenses: ExpenseInsert[]) => void
   onDelete?: (eventId: string) => void
   event?: Event | null
   dayId: string
@@ -101,7 +104,7 @@ export default function EventModal({
   const [startTime12, setStartTime12] = useState(() => to12HourComponents(selectedTime || '09:00'))
   const [endTime12, setEndTime12] = useState(() => to12HourComponents(selectedEndTime || ''))
 
-  const [expenses, setExpenses] = useState<Omit<Database['public']['Tables']['expenses']['Insert'], 'day_id' | 'event_id'>[]>([])
+  const [expenses, setExpenses] = useState<ExpenseInsert[]>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const fetchExistingExpenses = useCallback(async (eventId: string) => {
@@ -130,21 +133,26 @@ export default function EventModal({
 
   useEffect(() => {
     if (event) {
+      const startTimeStr = new Date(event.startTime).toTimeString().slice(0, 8)
+      const endTimeStr = event.endTime ? new Date(event.endTime).toTimeString().slice(0, 8) : ''
+      const startDateStr = new Date(event.startDate).toISOString().split('T')[0]
+      const endDateStr = event.endDate ? new Date(event.endDate).toISOString().split('T')[0] : startDateStr
+      
       setFormData({
-        day_id: event.day_id,
+        day_id: event.dayId,
         title: event.title,
-        start_time: event.start_time,
-        end_time: event.end_time || '',
-        start_date: event.start_date,
-        end_date: event.end_date || event.start_date,
+        start_time: startTimeStr,
+        end_time: endTimeStr,
+        start_date: startDateStr,
+        end_date: endDateStr,
         location: event.location || '',
         notes: event.notes || '',
         weather: event.weather || '',
         loadout: event.loadout || '',
         color: event.color || DEFAULT_EVENT_COLOR
       })
-      setStartTime12(to12HourComponents(event.start_time))
-      setEndTime12(to12HourComponents(event.end_time || ''))
+      setStartTime12(to12HourComponents(startTimeStr))
+      setEndTime12(to12HourComponents(endTimeStr))
       fetchExistingExpenses(event.id)
     } else {
       setFormData({
