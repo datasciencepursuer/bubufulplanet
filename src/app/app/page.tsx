@@ -288,41 +288,11 @@ export default function AppPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
-            {/* Current Trip Card - Only show if exists */}
-            {currentTrip && (
-              <Card className="border-green-200 bg-green-50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-green-900 text-base">
-                    <Clock className="w-4 h-4" />
-                    Current Trip
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div
-                    className="p-3 bg-white border border-green-200 rounded-lg hover:shadow-md cursor-pointer transition-all group"
-                    onClick={() => router.push(`/trips/${currentTrip.id}`)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-green-900">{currentTrip.name}</h4>
-                        <p className="text-sm text-green-700">{currentTrip.destination}</p>
-                        <p className="text-xs text-green-600 mt-1">
-                          {new Date(currentTrip.startDate).toLocaleDateString()} - {new Date(currentTrip.endDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity ml-2 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={(e) => handleDeleteTripClick(currentTrip.id, currentTrip.name, e)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Next Trip Card - Moved from utility cards */}
+            <AllTripsView 
+              trips={trips} 
+              onTripsChange={loadTrips}
+            />
             
             <AppMonthlyCalendar 
               onTripSelect={handleTripSelect} 
@@ -336,13 +306,8 @@ export default function AppPage() {
           </div>
           
           <div className="h-full flex flex-col space-y-4">
-            {/* Trip Utilities - Main Cards */}
+            {/* Remaining Utility Cards */}
             <div className="flex-1 flex flex-col space-y-4">
-              <AllTripsView 
-                trips={trips} 
-                onTripsChange={loadTrips}
-                className="flex-1"
-              />
               <ExpensesView className="flex-1" />
               <PointsOfInterestView className="flex-1" />
             </div>
