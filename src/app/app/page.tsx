@@ -287,19 +287,7 @@ export default function AppPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <AppMonthlyCalendar 
-              onTripSelect={handleTripSelect} 
-              existingTrips={trips.map(trip => ({
-                id: trip.id,
-                title: trip.name,
-                start: trip.startDate,
-                end: trip.endDate
-              }))}
-            />
-          </div>
-          
-          <div className="h-full flex flex-col space-y-4">
+          <div className="lg:col-span-2 space-y-4">
             {/* Current Trip Card - Only show if exists */}
             {currentTrip && (
               <Card className="border-green-200 bg-green-50">
@@ -336,6 +324,18 @@ export default function AppPage() {
               </Card>
             )}
             
+            <AppMonthlyCalendar 
+              onTripSelect={handleTripSelect} 
+              existingTrips={trips.map(trip => ({
+                id: trip.id,
+                title: trip.name,
+                start: trip.startDate,
+                end: trip.endDate
+              }))}
+            />
+          </div>
+          
+          <div className="h-full flex flex-col space-y-4">
             {/* Trip Utilities - Main Cards */}
             <div className="flex-1 flex flex-col space-y-4">
               <AllTripsView 
