@@ -197,11 +197,16 @@ export default function WeeklyCalendarView({
     return today >= startDate && today <= endDate
   }, [startDate, endDate])
 
+  // Helper function to convert Date to time string
+  const dateToTimeString = (date: Date): string => {
+    return new Date(date).toTimeString().slice(0, 8)
+  }
+
   const getEventForTimeSlot = (dayId: string, timeSlot: string): Event | null => {
     const dayEvents = eventsForWeek[dayId] || []
     return dayEvents.find(event => {
-      const eventStartTime = event.start_time
-      const eventEndTime = event.end_time || calculateDefaultEndTime(eventStartTime)
+      const eventStartTime = dateToTimeString(event.startTime)
+      const eventEndTime = event.endTime ? dateToTimeString(event.endTime) : calculateDefaultEndTime(eventStartTime)
       
       const slotMinutes = parseInt(timeSlot.split(':')[0]) * 60 + parseInt(timeSlot.split(':')[1])
       const startMinutes = parseInt(eventStartTime.split(':')[0]) * 60 + parseInt(eventStartTime.split(':')[1])
@@ -228,8 +233,8 @@ export default function WeeklyCalendarView({
     const event = getEventForTimeSlot(dayId, timeSlot)
     if (!event) return { event: null, isFirst: false, isLast: false, totalSlots: 0, durationMinutes: 0 }
 
-    const eventStartTime = event.start_time
-    const eventEndTime = event.end_time || calculateDefaultEndTime(eventStartTime)
+    const eventStartTime = dateToTimeString(event.startTime)
+    const eventEndTime = event.endTime ? dateToTimeString(event.endTime) : calculateDefaultEndTime(eventStartTime)
     
     const startMinutes = parseInt(eventStartTime.split(':')[0]) * 60 + parseInt(eventStartTime.split(':')[1])
     const endMinutes = parseInt(eventEndTime.split(':')[0]) * 60 + parseInt(eventEndTime.split(':')[1])
@@ -681,15 +686,16 @@ export default function WeeklyCalendarView({
                       
                       if (event) {
                         // There's an event in this time slot
-                        const eventStartMinutes = parseInt(event.start_time.split(':')[1])
-                        const eventEndTime = event.end_time || event.start_time
+                        const eventStartTime = dateToTimeString(event.startTime)
+                        const eventStartMinutes = parseInt(eventStartTime.split(':')[1])
+                        const eventEndTime = event.endTime ? dateToTimeString(event.endTime) : eventStartTime
                         const eventEndHour = parseInt(eventEndTime.split(':')[0])
                         const eventEndMinutes = parseInt(eventEndTime.split(':')[1])
                         const currentHour = parseInt(timeSlot.split(':')[0])
                         
                         // Check if event occupies the entire hour slot
-                        const eventStartsThisHour = parseInt(event.start_time.split(':')[0]) === currentHour
-                        const eventEndsAfterThisHour = eventEndHour > currentHour || (eventEndHour === currentHour && eventEndMinutes === 0 && eventEndHour > parseInt(event.start_time.split(':')[0]))
+                        const eventStartsThisHour = parseInt(eventStartTime.split(':')[0]) === currentHour
+                        const eventEndsAfterThisHour = eventEndHour > currentHour || (eventEndHour === currentHour && eventEndMinutes === 0 && eventEndHour > parseInt(eventStartTime.split(':')[0]))
                         
                         if (eventStartsThisHour && eventStartMinutes === 0 && eventEndsAfterThisHour) {
                           // Event fills the entire hour, don't create new event
@@ -736,7 +742,7 @@ export default function WeeklyCalendarView({
                           backgroundColor: event.color || EVENT_COLORS[0].color,
                           color: getEventColor(event.color || EVENT_COLORS[0].color).fontColor,
                           height: `${(durationMinutes / 60) * 60 - 4}px`,
-                          top: `${(parseInt(event.start_time.split(':')[1]) / 60) * 60}px`,
+                          top: `${(parseInt(dateToTimeString(event.startTime).split(':')[1]) / 60) * 60}px`,
                           zIndex: selectedEventId === event.id ? 15 : 10,
                           padding: '8px'
                         }}
@@ -744,7 +750,7 @@ export default function WeeklyCalendarView({
                         {durationMinutes <= 30 ? (
                           // Ultra-compact view for 30-minute events - title only with better typography
                           <div className="flex items-center h-full">
-                            <div className="font-medium text-left leading-tight text-xs truncate" title={`${event.title}${event.location ? ` • ${event.location}` : ''} • ${format(new Date(`2000-01-01T${event.start_time}`), 'h:mm a')}${event.end_time ? ` - ${format(new Date(`2000-01-01T${event.end_time}`), 'h:mm a')}` : ''}`}>
+                            <div className="font-medium text-left leading-tight text-xs truncate" title={`${event.title}${event.location ? ` • ${event.location}` : ''} • ${format(new Date(`2000-01-01T${dateToTimeString(event.startTime)}`), 'h:mm a')}${event.endTime ? ` - ${format(new Date(`2000-01-01T${dateToTimeString(event.endTime)}`), 'h:mm a')}` : ''}`}>
                               {event.title}
                             </div>
                           </div>
@@ -753,8 +759,8 @@ export default function WeeklyCalendarView({
                           <div className="flex flex-col justify-center h-full gap-1">
                             <div className="font-medium text-left truncate text-sm">{event.title}</div>
                             <div className="text-xs opacity-75 text-left truncate">
-                              {format(new Date(`2000-01-01T${event.start_time}`), 'h:mm a')}
-                              {event.end_time && ` - ${format(new Date(`2000-01-01T${event.end_time}`), 'h:mm a')}`}
+                              {format(new Date(`2000-01-01T${dateToTimeString(event.startTime)}`), 'h:mm a')}
+                              {event.endTime && ` - ${format(new Date(`2000-01-01T${dateToTimeString(event.endTime)}`), 'h:mm a')}`}
                             </div>
                           </div>
                         ) : (
@@ -767,8 +773,8 @@ export default function WeeklyCalendarView({
                               )}
                             </div>
                             <div className="text-xs opacity-75 text-left">
-                              {format(new Date(`2000-01-01T${event.start_time}`), 'h:mm a')}
-                              {event.end_time && ` - ${format(new Date(`2000-01-01T${event.end_time}`), 'h:mm a')}`}
+                              {format(new Date(`2000-01-01T${dateToTimeString(event.startTime)}`), 'h:mm a')}
+                              {event.endTime && ` - ${format(new Date(`2000-01-01T${dateToTimeString(event.endTime)}`), 'h:mm a')}`}
                             </div>
                           </div>
                         )}

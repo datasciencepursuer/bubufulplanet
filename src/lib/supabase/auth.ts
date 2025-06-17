@@ -1,10 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
-import { Database } from '@/types/database'
 import { DEFAULT_USER_ID } from '@/lib/constants'
 
 // Create a special client that bypasses RLS for server operations
 export function createServiceClient() {
-  return createClient<Database>(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!, // Service role key bypasses RLS
     {
@@ -18,7 +17,7 @@ export function createServiceClient() {
 
 // Create an authenticated client with the default user
 export async function createAuthenticatedClient() {
-  const supabase = createClient<Database>(
+  const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {

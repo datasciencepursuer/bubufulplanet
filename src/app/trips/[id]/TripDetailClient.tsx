@@ -169,10 +169,10 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
 
   const handleEventClick = (event: Event) => {
     setSelectedEvent(event)
-    setSelectedDayId(event.day_id)
+    setSelectedDayId(event.dayId)
     setSelectedTime('')
     setSelectedEndTime('')
-    setCurrentDate(event.start_date)
+    setCurrentDate(event.startDate ? new Date(event.startDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
     setIsModalOpen(true)
   }
 
@@ -188,7 +188,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
 
   const handleSaveEvent = async (
     eventData: EventInsert, 
-    expenses: Omit<Database['public']['Tables']['expenses']['Insert'], 'day_id' | 'event_id'>[]
+    expenses: { description: string; amount: number; category?: string }[]
   ) => {
     try {
       if (selectedEvent) {
@@ -365,7 +365,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             )}
             <div className="flex items-center">
               <Calendar className="h-4 w-4 mr-1" />
-              {new Date(trip.start_date).toLocaleDateString()} - {new Date(trip.end_date).toLocaleDateString()}
+              {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
             </div>
             <div className="flex items-center">
               <Users className="h-4 w-4 mr-1" />
@@ -407,8 +407,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         {calendarView === 'weekly' ? (
           <WeeklyCalendarView
             key={`weekly-${trip.id}`}
-            tripStartDate={trip.start_date}
-            tripEndDate={trip.end_date}
+            tripStartDate={trip.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : ''}
+            tripEndDate={trip.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : ''}
             tripDays={tripDays}
             events={events}
             selectedEventId={selectedEventForPanel?.id}
@@ -422,8 +422,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         ) : (
           <DailyCalendarView
             key={`daily-${trip.id}`}
-            tripStartDate={trip.start_date}
-            tripEndDate={trip.end_date}
+            tripStartDate={trip.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : ''}
+            tripEndDate={trip.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : ''}
             tripDays={tripDays}
             events={events}
             selectedEventId={selectedEventForPanel?.id}

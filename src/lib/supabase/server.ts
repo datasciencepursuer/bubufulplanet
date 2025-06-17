@@ -1,12 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { Database } from '@/types/database'
 
 export async function createClient() {
   const cookieStore = await cookies()
 
   // Use service role key to bypass RLS since we're using custom auth
-  return createServerClient<Database>(
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!, // Service role bypasses RLS
     {

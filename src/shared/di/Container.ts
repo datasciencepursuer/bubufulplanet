@@ -1,5 +1,4 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Database } from '../../types/database';
 
 // Repositories
 import { ITripRepository } from '../../domain/repositories/ITripRepository';
@@ -41,7 +40,7 @@ export class DIContainer {
     return factory();
   }
 
-  initialize(supabase: SupabaseClient<Database>): void {
+  initialize(supabase: SupabaseClient): void {
     // Register repositories
     this.register<ITripRepository>('ITripRepository', () => 
       new SupabaseTripRepository(supabase)

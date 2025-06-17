@@ -97,9 +97,18 @@ export default function DailyCalendarView({
   const getEventsForDate = useCallback((date: Date) => {
     const tripDay = getTripDayForDate(date)
     if (!tripDay) return []
-    return events.filter(event => event.day_id === tripDay.id)
-      .sort((a, b) => a.start_time.localeCompare(b.start_time))
+    return events.filter(event => event.dayId === tripDay.id)
+      .sort((a, b) => {
+        const aTime = new Date(a.startTime).toTimeString().slice(0, 8)
+        const bTime = new Date(b.startTime).toTimeString().slice(0, 8)
+        return aTime.localeCompare(bTime)
+      })
   }, [events, getTripDayForDate])
+
+  // Helper function to convert Date to time string
+  const dateToTimeString = (date: Date): string => {
+    return new Date(date).toTimeString().slice(0, 8)
+  }
 
   const currentTripDay = useMemo(() => getTripDayForDate(currentDate), [getTripDayForDate, currentDate])
   const eventsForDay = useMemo(() => getEventsForDate(currentDate), [getEventsForDate, currentDate])
@@ -216,8 +225,8 @@ export default function DailyCalendarView({
 
   const getEventForTimeSlot = (timeSlot: string): Event | null => {
     return eventsForDay.find(event => {
-      const eventStartTime = event.start_time
-      const eventEndTime = event.end_time || calculateDefaultEndTime(eventStartTime)
+      const eventStartTime = dateToTimeString(event.startTime)
+      const eventEndTime = event.endTime ? dateToTimeString(event.endTime) : calculateDefaultEndTime(eventStartTime)
       
       const slotMinutes = parseInt(timeSlot.split(':')[0]) * 60 + parseInt(timeSlot.split(':')[1])
       const startMinutes = parseInt(eventStartTime.split(':')[0]) * 60 + parseInt(eventStartTime.split(':')[1])
@@ -231,8 +240,8 @@ export default function DailyCalendarView({
     const event = getEventForTimeSlot(timeSlot)
     if (!event) return { event: null, isFirst: false, isLast: false, totalSlots: 0, durationMinutes: 0 }
 
-    const eventStartTime = event.start_time
-    const eventEndTime = event.end_time || calculateDefaultEndTime(eventStartTime)
+    const eventStartTime = dateToTimeString(event.startTime)
+    const eventEndTime = event.endTime ? dateToTimeString(event.endTime) : calculateDefaultEndTime(eventStartTime)
     
     const startMinutes = parseInt(eventStartTime.split(':')[0]) * 60 + parseInt(eventStartTime.split(':')[1])
     const endMinutes = parseInt(eventEndTime.split(':')[0]) * 60 + parseInt(eventEndTime.split(':')[1])
@@ -381,15 +390,16 @@ export default function DailyCalendarView({
                     
                     if (event) {
                       // There's an event in this time slot
-                      const eventStartMinutes = parseInt(event.start_time.split(':')[1])
-                      const eventEndTime = event.end_time || event.start_time
+                      const eventStartTime = dateToTimeString(event.startTime)
+                      const eventStartMinutes = parseInt(eventStartTime.split(':')[1])
+                      const eventEndTime = event.endTime ? dateToTimeString(event.endTime) : eventStartTime
                       const eventEndHour = parseInt(eventEndTime.split(':')[0])
                       const eventEndMinutes = parseInt(eventEndTime.split(':')[1])
                       const currentHour = parseInt(timeSlot.split(':')[0])
                       
                       // Check if event occupies the entire hour slot
-                      const eventStartsThisHour = parseInt(event.start_time.split(':')[0]) === currentHour
-                      const eventEndsAfterThisHour = eventEndHour > currentHour || (eventEndHour === currentHour && eventEndMinutes === 0 && eventEndHour > parseInt(event.start_time.split(':')[0]))
+                      const eventStartsThisHour = parseInt(eventStartTime.split(':')[0]) === currentHour
+                      const eventEndsAfterThisHour = eventEndHour > currentHour || (eventEndHour === currentHour && eventEndMinutes === 0 && eventEndHour > parseInt(eventStartTime.split(':')[0]))
                       
                       if (eventStartsThisHour && eventStartMinutes === 0 && eventEndsAfterThisHour) {
                         // Event fills the entire hour, don't create new event
@@ -430,14 +440,14 @@ export default function DailyCalendarView({
                         backgroundColor: event.color || EVENT_COLORS[0].color,
                         color: getEventColor(event.color || EVENT_COLORS[0].color).fontColor,
                         height: `${(durationMinutes / 60) * 80 - 16}px`,
-                        top: `${(parseInt(event.start_time.split(':')[1]) / 60) * 80 + 8}px`,
+                        top: `${(parseInt(dateToTimeString(event.startTime).split(':')[1]) / 60) * 80 + 8}px`,
                         zIndex: selectedEventId === event.id ? 15 : 10
                       }}
                     >
                       {durationMinutes <= 30 ? (
                         // Compact view for 30-minute events - title only with tooltip
                         <div className="flex items-center h-full">
-                          <div className="font-medium text-left text-sm truncate" title={`${event.title}${event.location ? ` • ${event.location}` : ''} • ${format(new Date(`2000-01-01T${event.start_time}`), 'h:mm a')}${event.end_time ? ` - ${format(new Date(`2000-01-01T${event.end_time}`), 'h:mm a')}` : ''}`}>
+                          <div className="font-medium text-left text-sm truncate" title={`${event.title}${event.location ? ` • ${event.location}` : ''} • ${format(new Date(`2000-01-01T${dateToTimeString(event.startTime)}`), 'h:mm a')}${event.endTime ? ` - ${format(new Date(`2000-01-01T${dateToTimeString(event.endTime)}`), 'h:mm a')}` : ''}`}>
                             {event.title}
                           </div>
                         </div>
@@ -446,8 +456,8 @@ export default function DailyCalendarView({
                         <div className="flex flex-col justify-center h-full gap-1">
                           <div className="font-medium text-left text-lg truncate">{event.title}</div>
                           <div className="text-sm opacity-75 text-left">
-                            {format(new Date(`2000-01-01T${event.start_time}`), 'h:mm a')}
-                            {event.end_time && ` - ${format(new Date(`2000-01-01T${event.end_time}`), 'h:mm a')}`}
+                            {format(new Date(`2000-01-01T${dateToTimeString(event.startTime)}`), 'h:mm a')}
+                            {event.endTime && ` - ${format(new Date(`2000-01-01T${dateToTimeString(event.endTime)}`), 'h:mm a')}`}
                           </div>
                         </div>
                       ) : (
@@ -461,8 +471,8 @@ export default function DailyCalendarView({
                           </div>
                           <div>
                             <div className="text-sm opacity-75 text-left">
-                              {format(new Date(`2000-01-01T${event.start_time}`), 'h:mm a')}
-                              {event.end_time && ` - ${format(new Date(`2000-01-01T${event.end_time}`), 'h:mm a')}`}
+                              {format(new Date(`2000-01-01T${dateToTimeString(event.startTime)}`), 'h:mm a')}
+                              {event.endTime && ` - ${format(new Date(`2000-01-01T${dateToTimeString(event.endTime)}`), 'h:mm a')}`}
                             </div>
                             {event.notes && (
                               <div className="text-sm text-left opacity-90 mt-2 line-clamp-2">{event.notes}</div>

@@ -7,12 +7,11 @@ import { Expense } from '../../domain/entities/Expense';
 import { UserId } from '../../domain/value-objects/UserId';
 import { DateRange } from '../../domain/value-objects/DateRange';
 import { Money } from '../../domain/value-objects/Money';
-import { Database } from '../../types/database';
 import { EventColor } from '../../domain/entities/Event';
 import { ExpenseCategory } from '../../domain/entities/Expense';
 
 export class SupabaseTripRepository implements ITripRepository {
-  constructor(private readonly supabase: SupabaseClient<Database>) {}
+  constructor(private readonly supabase: SupabaseClient) {}
 
   async findById(id: string): Promise<Trip | null> {
     const { data: tripData, error: tripError } = await this.supabase
