@@ -20,7 +20,7 @@ export default function AppPage() {
   const [trips, setTrips] = useState<any[]>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
-  const [groupInfo, setGroupInfo] = useState<{name: string, accessCode: string} | null>(null)
+  const [groupInfo, setGroupInfo] = useState<{name: string, accessCode: string, travelerName?: string, role?: string} | null>(null)
   const [accessCodeCopied, setAccessCodeCopied] = useState(false)
   const router = useRouter()
   const { logout } = useDeviceSession()
@@ -49,7 +49,9 @@ export default function AppPage() {
         const data = await response.json()
         setGroupInfo({
           name: data.group.name,
-          accessCode: data.group.accessCode
+          accessCode: data.group.accessCode,
+          travelerName: data.travelerName,
+          role: data.role
         })
       }
     } catch (error) {
@@ -263,16 +265,30 @@ export default function AppPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 flex justify-between items-start">
-          <div>
+        <div className="mb-8 flex justify-between items-center">
+          <div className="flex-1">
             <h2 className="text-3xl font-bold mb-2">
               {groupInfo ? `${groupInfo.name} - Plan Your Trips` : 'Plan Your Trips'}
             </h2>
+            {groupInfo && groupInfo.travelerName && (
+              <p className="text-lg text-teal-700 font-medium mb-2">
+                Welcome {groupInfo.role || 'Traveler'} {groupInfo.travelerName}!
+              </p>
+            )}
             <p className="text-gray-600">Select dates on the calendar to create a new trip</p>
           </div>
           
+          {/* Banner Image */}
+          <div className="flex-1 flex justify-center px-8">
+            <img 
+              src="/banner.jpg" 
+              alt="Travel Banner" 
+              className="max-h-32 w-auto object-contain"
+            />
+          </div>
+          
           {/* Pro Tips */}
-          <Card className="bg-blue-50 border-blue-200 max-w-sm">
+          <Card className="bg-blue-50 border-blue-200 max-w-sm flex-shrink-0">
             <CardHeader className="pb-3">
               <CardTitle className="text-blue-900 text-base">Pro Tips</CardTitle>
             </CardHeader>
@@ -306,10 +322,10 @@ export default function AppPage() {
           </div>
           
           <div className="h-full flex flex-col space-y-4">
-            {/* Remaining Utility Cards */}
+            {/* Remaining Utility Cards - Swapped order */}
             <div className="flex-1 flex flex-col space-y-4">
-              <ExpensesView className="flex-1" />
               <PointsOfInterestView className="flex-1" />
+              <ExpensesView className="flex-1" />
             </div>
           </div>
         </div>
