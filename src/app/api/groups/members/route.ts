@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { createServiceClient } from '@/lib/supabase/service'
+import { prisma } from '@/lib/prisma'
 
 // Get group members
 export async function GET() {
@@ -13,21 +13,33 @@ export async function GET() {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const supabase = createServiceClient()
+    // Get group members using Prisma
+    const members = await prisma.groupMember.findMany({
+      where: {
+        groupId
+      },
+      select: {
+        id: true,
+        travelerName: true,
+        role: true,
+        permissions: true,
+        joinedAt: true
+      },
+      orderBy: {
+        joinedAt: 'asc'
+      }
+    })
 
-    // Get group members
-    const { data: members, error } = await supabase
-      .from('group_members')
-      .select('id, traveler_name, role, permissions, joined_at')
-      .eq('group_id', groupId)
-      .order('joined_at', { ascending: true })
+    // Transform to match expected format
+    const transformedMembers = members.map(member => ({
+      id: member.id,
+      traveler_name: member.travelerName,
+      role: member.role,
+      permissions: member.permissions,
+      joined_at: member.joinedAt.toISOString()
+    }))
 
-    if (error) {
-      console.error('Error fetching members:', error)
-      return NextResponse.json({ error: 'Failed to fetch group members' }, { status: 500 })
-    }
-
-    return NextResponse.json({ members })
+    return NextResponse.json({ members: transformedMembers })
 
   } catch (error) {
     console.error('Error in members GET:', error)
@@ -48,31 +60,31 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const supabase = createServiceClient()
-
-    // Check if current user is an adventurer
-    const { data: currentMember } = await supabase
-      .from('group_members')
-      .select('role')
-      .eq('group_id', groupId)
-      .eq('traveler_name', travelerName)
-      .single()
+    // Check if current user is an adventurer using Prisma
+    const currentMember = await prisma.groupMember.findFirst({
+      where: {
+        groupId,
+        travelerName
+      },
+      select: {
+        role: true
+      }
+    })
 
     if (!currentMember || currentMember.role !== 'adventurer') {
       return NextResponse.json({ error: 'Only group adventurers can update permissions' }, { status: 403 })
     }
 
-    // Update member permissions
-    const { error } = await supabase
-      .from('group_members')
-      .update({ permissions })
-      .eq('id', memberId)
-      .eq('group_id', groupId) // Ensure we're only updating members in the same group
-
-    if (error) {
-      console.error('Error updating permissions:', error)
-      return NextResponse.json({ error: 'Failed to update permissions' }, { status: 500 })
-    }
+    // Update member permissions using Prisma
+    await prisma.groupMember.update({
+      where: {
+        id: memberId,
+        groupId // Ensure we're only updating members in the same group
+      },
+      data: {
+        permissions
+      }
+    })
 
     return NextResponse.json({ success: true })
 
@@ -99,49 +111,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Traveler name is required' }, { status: 400 })
     }
 
-    const supabase = createServiceClient()
-
-    // Check if current user is an adventurer
-    const { data: currentMember } = await supabase
-      .from('group_members')
-      .select('role')
-      .eq('group_id', groupId)
-      .eq('traveler_name', currentTravelerName)
-      .single()
+    // Check if current user is an adventurer using Prisma
+    const currentMember = await prisma.groupMember.findFirst({
+      where: {
+        groupId,
+        travelerName: currentTravelerName
+      },
+      select: {
+        role: true
+      }
+    })
 
     if (!currentMember || currentMember.role !== 'adventurer') {
       return NextResponse.json({ error: 'Only group adventurers can add members' }, { status: 403 })
     }
 
-    // Check if traveler name already exists in group
-    const { data: existingMember } = await supabase
-      .from('group_members')
-      .select('id')
-      .eq('group_id', groupId)
-      .eq('traveler_name', travelerName.trim())
-      .single()
+    // Check if traveler name already exists in group using Prisma
+    const existingMember = await prisma.groupMember.findFirst({
+      where: {
+        groupId,
+        travelerName: travelerName.trim()
+      },
+      select: {
+        id: true
+      }
+    })
 
     if (existingMember) {
       return NextResponse.json({ error: 'Traveler name already exists in this group' }, { status: 400 })
     }
 
-    // Add new member
-    const { error } = await supabase
-      .from('group_members')
-      .insert({
-        group_id: groupId,
-        traveler_name: travelerName.trim(),
+    // Add new member using Prisma
+    await prisma.groupMember.create({
+      data: {
+        groupId,
+        travelerName: travelerName.trim(),
         role,
         permissions: role === 'adventurer' 
           ? { read: true, create: true, modify: true }
-          : { read: true, create: false, modify: false },
-        created_by: currentTravelerName
-      })
-
-    if (error) {
-      console.error('Error adding member:', error)
-      return NextResponse.json({ error: 'Failed to add member' }, { status: 500 })
-    }
+          : { read: true, create: false, modify: false }
+      }
+    })
 
     return NextResponse.json({ success: true })
 

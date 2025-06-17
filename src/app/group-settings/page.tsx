@@ -23,9 +23,22 @@ export default function GroupSettings() {
   const [error, setError] = useState('')
   const [newMemberName, setNewMemberName] = useState('')
   const [isAdding, setIsAdding] = useState(false)
+  const [currentTravelerName, setCurrentTravelerName] = useState('')
   const router = useRouter()
 
   useEffect(() => {
+    // Get current traveler name from cookies
+    const getCookie = (name: string) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(';').shift();
+    }
+    
+    const travelerName = getCookie('vacation-planner-traveler-name')
+    if (travelerName) {
+      setCurrentTravelerName(travelerName)
+    }
+    
     fetchMembers()
   }, [])
 
@@ -99,7 +112,7 @@ export default function GroupSettings() {
     }
   }
 
-  const currentUserRole = members.find(m => m.traveler_name === 'current')?.role || 'follower'
+  const currentUserRole = members.find(m => m.traveler_name === currentTravelerName)?.role || 'party member'
   const isLeader = currentUserRole === 'adventurer'
 
   if (loading) {

@@ -1,46 +1,59 @@
 import { NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/service'
+import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   try {
-    const supabase = createServiceClient()
+    const tableStatus: Record<string, { exists: boolean; error?: string; count?: number }> = {}
     
-    // Check if trips table exists by trying to select from it
-    const { data: trips, error: tripsError } = await supabase
-      .from('trips')
-      .select('count(*)')
-      .limit(1)
+    // Check each table using Prisma
+    try {
+      const tripsCount = await prisma.trip.count()
+      tableStatus.trips = { exists: true, count: tripsCount }
+    } catch (error) {
+      tableStatus.trips = { exists: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
 
-    // Check if trip_days table exists
-    const { data: tripDays, error: tripDaysError } = await supabase
-      .from('trip_days')
-      .select('count(*)')
-      .limit(1)
+    try {
+      const tripDaysCount = await prisma.tripDay.count()
+      tableStatus.trip_days = { exists: true, count: tripDaysCount }
+    } catch (error) {
+      tableStatus.trip_days = { exists: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
 
-    // Check if events table exists
-    const { data: events, error: eventsError } = await supabase
-      .from('events')
-      .select('count(*)')
-      .limit(1)
+    try {
+      const eventsCount = await prisma.event.count()
+      tableStatus.events = { exists: true, count: eventsCount }
+    } catch (error) {
+      tableStatus.events = { exists: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
 
-    // Check if expenses table exists
-    const { data: expenses, error: expensesError } = await supabase
-      .from('expenses')
-      .select('count(*)')
-      .limit(1)
+    try {
+      const expensesCount = await prisma.expense.count()
+      tableStatus.expenses = { exists: true, count: expensesCount }
+    } catch (error) {
+      tableStatus.expenses = { exists: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
 
-    // Check if packing_items table exists
-    const { data: packingItems, error: packingItemsError } = await supabase
-      .from('packing_items')
-      .select('count(*)')
-      .limit(1)
+    try {
+      const packingItemsCount = await prisma.packingItem.count()
+      tableStatus.packing_items = { exists: true, count: packingItemsCount }
+    } catch (error) {
+      tableStatus.packing_items = { exists: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
 
-    const tableStatus = {
-      trips: tripsError ? { exists: false, error: tripsError.message } : { exists: true, data: trips },
-      trip_days: tripDaysError ? { exists: false, error: tripDaysError.message } : { exists: true, data: tripDays },
-      events: eventsError ? { exists: false, error: eventsError.message } : { exists: true, data: events },
-      expenses: expensesError ? { exists: false, error: expensesError.message } : { exists: true, data: expenses },
-      packing_items: packingItemsError ? { exists: false, error: packingItemsError.message } : { exists: true, data: packingItems }
+    // Check group tables too
+    try {
+      const groupsCount = await prisma.travelGroup.count()
+      tableStatus.travel_groups = { exists: true, count: groupsCount }
+    } catch (error) {
+      tableStatus.travel_groups = { exists: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+
+    try {
+      const membersCount = await prisma.groupMember.count()
+      tableStatus.group_members = { exists: true, count: membersCount }
+    } catch (error) {
+      tableStatus.group_members = { exists: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
 
     const allTablesExist = Object.values(tableStatus).every(status => status.exists)
@@ -49,8 +62,9 @@ export async function GET() {
       databaseSetup: allTablesExist,
       tables: tableStatus,
       message: allTablesExist 
-        ? 'All database tables exist and are accessible'
-        : 'Some database tables are missing or inaccessible. Please run the database setup.'
+        ? 'All database tables exist and are accessible via Prisma'
+        : 'Some database tables are missing or inaccessible. Please run the database setup.',
+      orm: 'Prisma'
     })
 
   } catch (error) {

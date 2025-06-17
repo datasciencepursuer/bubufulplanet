@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createUnifiedSession } from '@/lib/unified-session'
-import { createServiceClient } from '@/lib/supabase/service'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,41 +14,47 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createServiceClient()
+    // Verify the device session exists and is valid using Prisma
+    const session = await prisma.deviceSession.findFirst({
+      where: {
+        deviceFingerprint,
+        groupId,
+        travelerName,
+        isActive: true
+      },
+      select: { id: true }
+    })
 
-    // Verify the device session exists and is valid
-    const { data: session, error: sessionError } = await supabase
-      .from('device_sessions')
-      .select('id')
-      .eq('device_fingerprint', deviceFingerprint)
-      .eq('group_id', groupId)
-      .eq('traveler_name', travelerName)
-      .eq('is_active', true)
-      .single()
-
-    if (sessionError || !session) {
+    if (!session) {
       return NextResponse.json(
         { error: 'Invalid or expired device session' },
         { status: 401 }
       )
     }
 
-    // Get group info
-    const { data: group, error: groupError } = await supabase
-      .from('travel_groups')
-      .select('id, name, access_code')
-      .eq('id', groupId)
-      .single()
+    // Get group info using Prisma
+    const group = await prisma.travelGroup.findUnique({
+      where: { id: groupId },
+      select: {
+        id: true,
+        name: true,
+        accessCode: true
+      }
+    })
 
-    // Get member info
-    const { data: member, error: memberError } = await supabase
-      .from('group_members')
-      .select('role, permissions')
-      .eq('group_id', groupId)
-      .eq('traveler_name', travelerName)
-      .single()
+    // Get member info using Prisma
+    const member = await prisma.groupMember.findFirst({
+      where: {
+        groupId,
+        travelerName
+      },
+      select: {
+        role: true,
+        permissions: true
+      }
+    })
 
-    if (groupError || !group || memberError || !member) {
+    if (!group || !member) {
       return NextResponse.json(
         { error: 'Group or member not found' },
         { status: 404 }
@@ -75,7 +81,7 @@ export async function POST(request: NextRequest) {
       group: {
         id: group.id,
         name: group.name,
-        accessCode: group.access_code
+        accessCode: group.accessCode
       },
       currentMember: {
         name: travelerName,

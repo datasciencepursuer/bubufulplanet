@@ -1,22 +1,20 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
     const { id: tripId } = await params
 
     // Verify trip exists
-    const { data: trip, error: tripError } = await supabase
-      .from('trips')
-      .select('id')
-      .eq('id', tripId)
-      .single()
+    const trip = await prisma.trip.findUnique({
+      where: { id: tripId },
+      select: { id: true }
+    })
 
-    if (tripError || !trip) {
+    if (!trip) {
       return NextResponse.json(
         { error: 'Trip not found' },
         { status: 404 }
@@ -24,12 +22,9 @@ export async function DELETE(
     }
 
     // Delete the trip (cascade deletes will handle trip_days, events, expenses)
-    const { error: deleteError } = await supabase
-      .from('trips')
-      .delete()
-      .eq('id', tripId)
-
-    if (deleteError) throw deleteError
+    await prisma.trip.delete({
+      where: { id: tripId }
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

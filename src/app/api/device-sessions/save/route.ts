@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/service'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,33 +13,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createServiceClient()
-
     // Get client IP address
     const forwardedFor = request.headers.get('x-forwarded-for')
     const realIp = request.headers.get('x-real-ip')
     const ip = forwardedFor?.split(',')[0] || realIp || '127.0.0.1'
 
-    // Save/update device session using the stored procedure
-    const { data: sessionId, error } = await supabase.rpc('refresh_device_session', {
-      p_device_fingerprint: deviceFingerprint,
-      p_group_id: groupId,
-      p_traveler_name: travelerName,
-      p_user_agent: userAgent,
-      p_ip_address: ip
+    // First, deactivate any existing sessions for this device/group/traveler combo
+    await prisma.deviceSession.updateMany({
+      where: {
+        deviceFingerprint,
+        groupId,
+        travelerName,
+        isActive: true
+      },
+      data: {
+        isActive: false
+      }
     })
 
-    if (error) {
-      console.error('Error saving device session:', error)
-      return NextResponse.json(
-        { error: 'Failed to save device session' },
-        { status: 500 }
-      )
-    }
+    // Create new active session
+    const session = await prisma.deviceSession.create({
+      data: {
+        deviceFingerprint,
+        groupId,
+        travelerName,
+        userAgent,
+        ipAddress: ip,
+        isActive: true,
+        lastUsed: new Date()
+      }
+    })
 
     return NextResponse.json({
       success: true,
-      sessionId
+      sessionId: session.id
     })
 
   } catch (error) {

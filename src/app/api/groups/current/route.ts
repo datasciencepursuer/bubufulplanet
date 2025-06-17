@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { createServiceClient } from '@/lib/supabase/service'
+import { prisma } from '@/lib/prisma'
 
 // Get current user's group information
 export async function GET() {
@@ -13,60 +13,78 @@ export async function GET() {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const supabase = createServiceClient()
+    // Get group details using Prisma
+    const group = await prisma.travelGroup.findUnique({
+      where: { id: groupId },
+      select: {
+        id: true,
+        name: true,
+        accessCode: true,
+        createdAt: true
+      }
+    })
 
-    // Get group details
-    const { data: group, error: groupError } = await supabase
-      .from('travel_groups')
-      .select('id, name, access_code, created_at')
-      .eq('id', groupId)
-      .single()
-
-    if (groupError || !group) {
-      console.error('Error fetching group:', groupError)
+    if (!group) {
       return NextResponse.json({ error: 'Group not found' }, { status: 404 })
     }
 
-    // Get current user's member info
-    const { data: member, error: memberError } = await supabase
-      .from('group_members')
-      .select('id, traveler_name, role, permissions, joined_at')
-      .eq('group_id', groupId)
-      .eq('traveler_name', travelerName)
-      .single()
+    // Get current user's member info using Prisma
+    const member = await prisma.groupMember.findFirst({
+      where: {
+        groupId,
+        travelerName
+      },
+      select: {
+        id: true,
+        travelerName: true,
+        role: true,
+        permissions: true,
+        joinedAt: true
+      }
+    })
 
-    if (memberError || !member) {
-      console.error('Error fetching member:', memberError)
+    if (!member) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 })
     }
 
-    // Get all group members
-    const { data: allMembers, error: allMembersError } = await supabase
-      .from('group_members')
-      .select('id, traveler_name, role, permissions, joined_at')
-      .eq('group_id', groupId)
-      .order('joined_at', { ascending: true })
-
-    if (allMembersError) {
-      console.error('Error fetching all members:', allMembersError)
-      return NextResponse.json({ error: 'Failed to fetch group members' }, { status: 500 })
-    }
+    // Get all group members using Prisma
+    const allMembers = await prisma.groupMember.findMany({
+      where: {
+        groupId
+      },
+      select: {
+        id: true,
+        travelerName: true,
+        role: true,
+        permissions: true,
+        joinedAt: true
+      },
+      orderBy: {
+        joinedAt: 'asc'
+      }
+    })
 
     return NextResponse.json({
       group: {
         id: group.id,
         name: group.name,
-        accessCode: group.access_code,
-        createdAt: group.created_at
+        accessCode: group.accessCode,
+        createdAt: group.createdAt.toISOString()
       },
       currentMember: {
         id: member.id,
-        name: member.traveler_name,
+        name: member.travelerName,
         role: member.role,
         permissions: member.permissions,
-        joinedAt: member.joined_at
+        joinedAt: member.joinedAt.toISOString()
       },
-      allMembers: allMembers || []
+      allMembers: allMembers.map(m => ({
+        id: m.id,
+        traveler_name: m.travelerName,
+        role: m.role,
+        permissions: m.permissions,
+        joined_at: m.joinedAt.toISOString()
+      }))
     })
 
   } catch (error) {
