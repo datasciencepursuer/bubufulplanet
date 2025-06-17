@@ -265,14 +265,6 @@ export default function PersistentEventModal({
     setExpenses(expenses.filter((_, i) => i !== index))
   }
 
-  const handleDeleteConfirm = () => {
-    if (!selectedEvent || !onDelete) return
-    onDelete(selectedEvent.id)
-    if (onEditModeChange) {
-      onEditModeChange(false)
-    }
-  }
-
   const fetchDestinations = useCallback(async () => {
     try {
       const response = await fetch('/api/groups/current')
@@ -303,6 +295,14 @@ export default function PersistentEventModal({
       console.error('Error fetching destinations:', error)
     }
   }, [])
+
+  const handleDeleteConfirm = () => {
+    if (!selectedEvent || !onDelete) return
+    onDelete(selectedEvent.id)
+    if (onEditModeChange) {
+      onEditModeChange(false)
+    }
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
