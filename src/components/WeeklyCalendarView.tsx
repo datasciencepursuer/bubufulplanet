@@ -50,22 +50,8 @@ export default function WeeklyCalendarView({
   
   // Current view shows 7 days starting from this date
   const [currentStartDate, setCurrentStartDate] = useState(() => {
-    const today = new Date()
-    
-    // If today is within the trip dates, show the week containing today
-    if (today >= startDate && today <= endDate) {
-      // Find the Sunday of the current week
-      const dayOfWeek = today.getDay()
-      const weekStart = subDays(today, dayOfWeek)
-      
-      // Ensure the week start is within trip bounds
-      if (weekStart < tripRangeStart) {
-        return tripRangeStart
-      }
-      return weekStart
-    }
-    
-    // Otherwise, start from the beginning of the trip
+    // Always start from the beginning of the trip range (trip start - 1 day)
+    // This provides a full week view starting one day before the trip
     return tripRangeStart
   })
   const [isAnimating, setIsAnimating] = useState(false)
