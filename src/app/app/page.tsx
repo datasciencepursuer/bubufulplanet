@@ -282,11 +282,22 @@ export default function AppPage() {
           
           {/* Banner Image - Between title and Pro Tips */}
           <div className="flex justify-center px-6">
-            <img 
-              src="/banner.jpg" 
-              alt="Travel Banner" 
-              className="max-h-28 w-auto object-contain"
-            />
+            <div className="relative">
+              <img 
+                src="/banner.jpg" 
+                alt="Travel Banner" 
+                className="max-h-28 w-auto object-contain"
+                onError={(e) => {
+                  console.error('Banner image failed to load');
+                  // Fallback: show a colored div instead
+                  const fallback = document.createElement('div');
+                  fallback.className = 'max-h-28 w-48 bg-gradient-to-r from-teal-400 to-blue-500 rounded-lg flex items-center justify-center text-white font-bold';
+                  fallback.textContent = 'Travel Banner';
+                  e.currentTarget.parentNode?.replaceChild(fallback, e.currentTarget);
+                }}
+                onLoad={() => console.log('Banner image loaded successfully')}
+              />
+            </div>
           </div>
           
           {/* Pro Tips */}
