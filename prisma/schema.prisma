@@ -110,7 +110,7 @@ model TravelGroup {
   id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name              String   @db.VarChar(255)
   accessCode        String   @unique @map("access_code") @db.VarChar(50)
-  savedDestinations String?  @map("saved_destinations") @db.Text
+  savedDestinations Json?    @map("saved_destinations")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy         String?  @map("created_by") @db.Uuid

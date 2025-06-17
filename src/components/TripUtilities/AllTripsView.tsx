@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MapPin, Calendar, Trash2, Clock, ExternalLink, ChevronRight } from 'lucide-react'
+import { MapPin, Calendar, Trash2, Clock, ExternalLink, ChevronRight, X } from 'lucide-react'
 import ConfirmDialog from '../ConfirmDialog'
 
 interface Trip {
@@ -25,7 +25,7 @@ interface AllTripsViewProps {
 export default function AllTripsView({ trips, onTripsChange, className }: AllTripsViewProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
-  const [showAll, setShowAll] = useState(false)
+  const [showAllModal, setShowAllModal] = useState(false)
   const router = useRouter()
 
   const categorizeTrips = () => {
@@ -55,8 +55,13 @@ export default function AllTripsView({ trips, onTripsChange, className }: AllTri
   }
 
   const { current, upcoming, past } = categorizeTrips()
+  
+  // For the main card, show next upcoming trip or current trip
+  const nextTrip = current[0] || upcoming[0]
+  const hasMoreTrips = trips.length > 1
+  
+  // For the modal, show all trips categorized
   const allTrips = [...current, ...upcoming, ...past]
-  const displayTrips = showAll ? allTrips : allTrips.slice(0, 4)
 
   const handleDeleteTripClick = (tripId: string, tripName: string, event: React.MouseEvent) => {
     event.stopPropagation()
@@ -110,21 +115,21 @@ export default function AllTripsView({ trips, onTripsChange, className }: AllTri
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-blue-600" />
-                All Trips
+                Next Trip
               </CardTitle>
               <CardDescription>
                 {trips.length} trip{trips.length !== 1 ? 's' : ''} total
               </CardDescription>
             </div>
-            {trips.length > 4 && (
+            {hasMoreTrips && (
               <Button
-                onClick={() => setShowAll(!showAll)}
+                onClick={() => setShowAllModal(true)}
                 variant="ghost"
                 size="sm"
                 className="gap-1"
               >
-                {showAll ? 'Show Less' : `View All ${trips.length}`}
-                <ChevronRight className={`w-4 h-4 transition-transform ${showAll ? 'rotate-90' : ''}`} />
+                View All Trips
+                <ChevronRight className="w-4 h-4" />
               </Button>
             )}
           </div>
@@ -135,64 +140,141 @@ export default function AllTripsView({ trips, onTripsChange, className }: AllTri
               <Calendar className="w-8 h-8 mx-auto text-gray-400 mb-2" />
               <p className="text-sm text-gray-600">No trips yet</p>
             </div>
-          ) : (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {displayTrips.map((trip) => {
-                const { status, color, icon: StatusIcon } = getTripStatus(trip)
-                
-                return (
-                  <div
-                    key={trip.id}
-                    className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
-                    onClick={() => router.push(`/trips/${trip.id}`)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <StatusIcon className={`w-3 h-3 ${color}`} />
-                          <h4 className="font-medium text-sm truncate">{trip.name}</h4>
-                        </div>
-                        {trip.destination && (
-                          <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
-                            <MapPin className="w-2.5 h-2.5" />
-                            <span className="truncate">{trip.destination}</span>
-                          </div>
-                        )}
-                        <p className="text-xs text-gray-500">
-                          {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 h-auto"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            router.push(`/trips/${trip.id}`)
-                          }}
-                          title="Open trip"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
-                          onClick={(e) => handleDeleteTripClick(trip.id, trip.name, e)}
-                          title="Delete trip"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
+          ) : nextTrip ? (
+            <div
+              className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
+              onClick={() => router.push(`/trips/${nextTrip.id}`)}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    {(() => {
+                      const { color, icon: StatusIcon } = getTripStatus(nextTrip)
+                      return <StatusIcon className={`w-4 h-4 ${color}`} />
+                    })()}
+                    <h4 className="font-medium truncate">{nextTrip.name}</h4>
                   </div>
-                )
-              })}
+                  {nextTrip.destination && (
+                    <div className="flex items-center gap-1 text-sm text-gray-600 mb-1">
+                      <MapPin className="w-3 h-3" />
+                      <span className="truncate">{nextTrip.destination}</span>
+                    </div>
+                  )}
+                  <p className="text-sm text-gray-500">
+                    {new Date(nextTrip.startDate).toLocaleDateString()} - {new Date(nextTrip.endDate).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 h-auto"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      router.push(`/trips/${nextTrip.id}`)
+                    }}
+                    title="Open trip"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
+                    onClick={(e) => handleDeleteTripClick(nextTrip.id, nextTrip.name, e)}
+                    title="Delete trip"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <Calendar className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+              <p className="text-sm text-gray-600">No upcoming trips</p>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* All Trips Modal */}
+      {showAllModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-600" />
+                All Trips
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllModal(false)}
+                className="p-1 h-auto"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
+              {trips.length === 0 ? (
+                <div className="text-center py-8">
+                  <Calendar className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+                  <p className="text-gray-600">No trips yet</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Current Trips */}
+                  {current.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium text-green-600 mb-3 flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Current Trip{current.length > 1 ? 's' : ''}
+                      </h3>
+                      <div className="space-y-2">
+                        {current.map((trip) => (
+                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Upcoming Trips */}
+                  {upcoming.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium text-blue-600 mb-3 flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Upcoming Trip{upcoming.length > 1 ? 's' : ''}
+                      </h3>
+                      <div className="space-y-2">
+                        {upcoming.map((trip) => (
+                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Past Trips */}
+                  {past.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-600 mb-3 flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Past Trip{past.length > 1 ? 's' : ''}
+                      </h3>
+                      <div className="space-y-2">
+                        {past.map((trip) => (
+                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
@@ -208,5 +290,78 @@ export default function AllTripsView({ trips, onTripsChange, className }: AllTri
         cancelText="Cancel"
       />
     </>
+  )
+}
+
+// Helper function moved outside component to avoid re-creation
+function getTripStatus(trip: Trip) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const startDate = new Date(trip.startDate)
+  const endDate = new Date(trip.endDate)
+  startDate.setHours(0, 0, 0, 0)
+  endDate.setHours(23, 59, 59, 999)
+  
+  if (today >= startDate && today <= endDate) {
+    return { status: 'current', color: 'text-green-600', icon: Clock }
+  } else if (startDate > today) {
+    return { status: 'upcoming', color: 'text-blue-600', icon: Calendar }
+  } else {
+    return { status: 'past', color: 'text-gray-600', icon: Calendar }
+  }
+}
+
+// Helper component for trip cards in the modal
+function TripCard({ trip, onDelete }: { trip: Trip; onDelete: (id: string, name: string, e: React.MouseEvent) => void }) {
+  const router = useRouter()
+  const { status, color, icon: StatusIcon } = getTripStatus(trip)
+  
+  return (
+    <div
+      className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
+      onClick={() => router.push(`/trips/${trip.id}`)}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <StatusIcon className={`w-4 h-4 ${color}`} />
+            <h4 className="font-medium truncate">{trip.name}</h4>
+          </div>
+          {trip.destination && (
+            <div className="flex items-center gap-1 text-sm text-gray-600 mb-1">
+              <MapPin className="w-3 h-3" />
+              <span className="truncate">{trip.destination}</span>
+            </div>
+          )}
+          <p className="text-sm text-gray-500">
+            {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 h-auto"
+            onClick={(e) => {
+              e.stopPropagation()
+              router.push(`/trips/${trip.id}`)
+            }}
+            title="Open trip"
+          >
+            <ExternalLink className="w-3 h-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
+            onClick={(e) => onDelete(trip.id, trip.name, e)}
+            title="Delete trip"
+          >
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }

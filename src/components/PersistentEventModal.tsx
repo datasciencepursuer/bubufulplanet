@@ -2,11 +2,16 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Trash2, Palette, MousePointer2, Edit } from 'lucide-react'
+import { Trash2, Palette, MousePointer2, Edit, ChevronDown } from 'lucide-react'
 import ConfirmDialog from './ConfirmDialog'
 import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
 import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
+
+interface Destination {
+  name: string
+  link?: string
+}
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 type ExpenseInsert = { description: string; amount: number; category?: string }
@@ -112,6 +117,8 @@ export default function PersistentEventModal({
 
   const [expenses, setExpenses] = useState<ExpenseInsert[]>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [destinations, setDestinations] = useState<Destination[]>([])
+  const [showDestinationDropdown, setShowDestinationDropdown] = useState(false)
 
   const fetchExistingExpenses = useCallback(async (eventId: string) => {
     try {
@@ -138,6 +145,8 @@ export default function PersistentEventModal({
   }, [])
 
   useEffect(() => {
+    fetchDestinations()
+    
     if (selectedEvent && isEditMode) {
       const startTimeStr = new Date(selectedEvent.startTime).toTimeString().slice(0, 8)
       const endTimeStr = selectedEvent.endTime ? new Date(selectedEvent.endTime).toTimeString().slice(0, 8) : ''
@@ -178,7 +187,7 @@ export default function PersistentEventModal({
       setEndTime12(to12HourComponents(selectedEndTime || ''))
       setExpenses([])
     }
-  }, [selectedEvent, isEditMode, dayId, selectedTime, selectedEndTime, currentDate, selectedEndDate, fetchExistingExpenses])
+  }, [selectedEvent, isEditMode, dayId, selectedTime, selectedEndTime, currentDate, selectedEndDate, fetchExistingExpenses, fetchDestinations])
 
   // Update expenses from props
   useEffect(() => {
@@ -263,6 +272,50 @@ export default function PersistentEventModal({
       onEditModeChange(false)
     }
   }
+
+  const fetchDestinations = useCallback(async () => {
+    try {
+      const response = await fetch('/api/groups/current')
+      
+      if (response.ok) {
+        const data = await response.json()
+        const saved = data.group.savedDestinations
+        if (saved) {
+          // Handle both old string format and new JSON format
+          if (typeof saved === 'string') {
+            // Legacy format: comma-delimited strings
+            const legacyDestinations = saved.split(',').map((dest: string) => ({
+              name: dest.trim(),
+              link: undefined
+            })).filter((dest: Destination) => dest.name)
+            setDestinations(legacyDestinations)
+          } else if (Array.isArray(saved)) {
+            // New format: array of objects
+            setDestinations(saved.filter((dest: Destination) => dest.name))
+          } else {
+            setDestinations([])
+          }
+        } else {
+          setDestinations([])
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching destinations:', error)
+    }
+  }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (showDestinationDropdown && !target.closest('.location-dropdown-container')) {
+        setShowDestinationDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showDestinationDropdown])
 
   const handleEditToggle = () => {
     if (onEditModeChange) {
@@ -535,13 +588,53 @@ export default function PersistentEventModal({
 
         <div>
           <label className="block text-sm font-medium mb-2">Location</label>
-          <input
-            type="text"
-            value={formData.location || ''}
-            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-            className="w-full p-2 border rounded-md"
-            placeholder="Event location"
-          />
+          <div className="relative location-dropdown-container">
+            <input
+              type="text"
+              value={formData.location || ''}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              onFocus={() => setShowDestinationDropdown(true)}
+              className="w-full p-2 pr-8 border rounded-md"
+              placeholder="Event location or select from Points of Interest"
+            />
+            {destinations.length > 0 && (
+              <ChevronDown 
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 cursor-pointer"
+                onClick={() => setShowDestinationDropdown(!showDestinationDropdown)}
+              />
+            )}
+            
+            {/* Dropdown for Points of Interest */}
+            {showDestinationDropdown && destinations.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                <div className="p-2 text-xs text-gray-500 border-b">
+                  Points of Interest ({destinations.length})
+                </div>
+                {destinations.map((destination, index) => (
+                  <div
+                    key={index}
+                    className="p-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    onClick={() => {
+                      setFormData({ ...formData, location: destination.name })
+                      setShowDestinationDropdown(false)
+                    }}
+                  >
+                    <div className="font-medium text-sm">{destination.name}</div>
+                    {destination.link && (
+                      <div className="text-xs text-gray-500 truncate mt-1">
+                        {destination.link}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {destinations.length === 0 && (
+            <div className="text-xs text-gray-500 mt-1">
+              Add destinations to Points of Interest to see them here
+            </div>
+          )}
         </div>
 
         <div>

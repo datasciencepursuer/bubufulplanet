@@ -3,19 +3,25 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MapPin, Plus, Edit2, Trash2, X } from 'lucide-react'
+import { MapPin, Plus, Edit2, Trash2, X, Link, ExternalLink } from 'lucide-react'
+
+interface Destination {
+  name: string
+  link?: string
+}
 
 interface PointsOfInterestViewProps {
   className?: string
 }
 
 export default function PointsOfInterestView({ className }: PointsOfInterestViewProps) {
-  const [destinations, setDestinations] = useState<string[]>([])
+  const [destinations, setDestinations] = useState<Destination[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [newDestination, setNewDestination] = useState('')
+  const [newLink, setNewLink] = useState('')
 
   useEffect(() => {
     loadDestinations()
@@ -30,7 +36,20 @@ export default function PointsOfInterestView({ className }: PointsOfInterestView
         const data = await response.json()
         const saved = data.group.savedDestinations
         if (saved) {
-          setDestinations(saved.split(',').map((dest: string) => dest.trim()).filter(Boolean))
+          // Handle both old string format and new JSON format
+          if (typeof saved === 'string') {
+            // Legacy format: comma-delimited strings
+            const legacyDestinations = saved.split(',').map((dest: string) => ({
+              name: dest.trim(),
+              link: undefined
+            })).filter((dest: Destination) => dest.name)
+            setDestinations(legacyDestinations)
+          } else if (Array.isArray(saved)) {
+            // New format: array of objects
+            setDestinations(saved.filter((dest: Destination) => dest.name))
+          } else {
+            setDestinations([])
+          }
         } else {
           setDestinations([])
         }
@@ -45,17 +64,16 @@ export default function PointsOfInterestView({ className }: PointsOfInterestView
     }
   }
 
-  const saveDestinations = async (newDestinations: string[]) => {
+  const saveDestinations = async (newDestinations: Destination[]) => {
     try {
       setSaving(true)
-      const destinationsString = newDestinations.join(', ')
       
       const response = await fetch('/api/groups/destinations', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ savedDestinations: destinationsString }),
+        body: JSON.stringify({ savedDestinations: newDestinations }),
       })
 
       if (!response.ok) {
@@ -65,6 +83,7 @@ export default function PointsOfInterestView({ className }: PointsOfInterestView
       setDestinations(newDestinations)
       setIsEditing(false)
       setNewDestination('')
+      setNewLink('')
     } catch (error) {
       console.error('Error saving destinations:', error)
       alert('Failed to save points of interest. Please try again.')
@@ -74,8 +93,12 @@ export default function PointsOfInterestView({ className }: PointsOfInterestView
   }
 
   const addDestination = () => {
-    if (newDestination.trim() && !destinations.includes(newDestination.trim())) {
-      const updated = [...destinations, newDestination.trim()]
+    if (newDestination.trim() && !destinations.find(dest => dest.name === newDestination.trim())) {
+      const newDest: Destination = {
+        name: newDestination.trim(),
+        link: newLink.trim() || undefined
+      }
+      const updated = [...destinations, newDest]
       saveDestinations(updated)
     }
   }
@@ -83,6 +106,13 @@ export default function PointsOfInterestView({ className }: PointsOfInterestView
   const removeDestination = (index: number) => {
     const updated = destinations.filter((_, i) => i !== index)
     saveDestinations(updated)
+  }
+
+  const handleLinkClick = (link: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    // Ensure the link has a protocol
+    const url = link.startsWith('http') ? link : `https://${link}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -155,23 +185,33 @@ export default function PointsOfInterestView({ className }: PointsOfInterestView
         {/* Add New Destination */}
         {isEditing && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <div className="flex gap-2">
+            <div className="space-y-2">
               <input
                 type="text"
                 value={newDestination}
                 onChange={(e) => setNewDestination(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Enter destination..."
-                className="flex-1 p-2 text-sm border rounded-md"
+                placeholder="Enter destination name..."
+                className="w-full p-2 text-sm border rounded-md"
                 disabled={saving}
               />
-              <Button 
-                onClick={addDestination}
-                disabled={!newDestination.trim() || saving}
-                size="sm"
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={newLink}
+                  onChange={(e) => setNewLink(e.target.value)}
+                  placeholder="Enter link (optional)..."
+                  className="flex-1 p-2 text-sm border rounded-md"
+                  disabled={saving}
+                />
+                <Button 
+                  onClick={addDestination}
+                  disabled={!newDestination.trim() || saving}
+                  size="sm"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -192,18 +232,39 @@ export default function PointsOfInterestView({ className }: PointsOfInterestView
             {destinations.slice(0, isEditing ? destinations.length : 5).map((destination, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between p-2 border rounded hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between p-2 border rounded hover:bg-gray-50 transition-colors group"
               >
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-3 h-3 text-purple-600" />
-                  <span className="text-sm font-medium truncate">{destination}</span>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <MapPin className="w-3 h-3 text-purple-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium truncate">{destination.name}</span>
+                      {destination.link && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => handleLinkClick(destination.link!, e)}
+                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 h-auto opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Open link"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                    {destination.link && (
+                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                        <Link className="w-2.5 h-2.5" />
+                        <span className="truncate">{destination.link}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {isEditing && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => removeDestination(index)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto flex-shrink-0"
                     disabled={saving}
                   >
                     <Trash2 className="w-3 h-3" />

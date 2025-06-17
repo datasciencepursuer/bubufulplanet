@@ -263,11 +263,27 @@ export default function AppPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">
-            {groupInfo ? `${groupInfo.name} - Plan Your Trips` : 'Plan Your Trips'}
-          </h2>
-          <p className="text-gray-600">Select dates on the calendar to create a new trip</p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h2 className="text-3xl font-bold mb-2">
+              {groupInfo ? `${groupInfo.name} - Plan Your Trips` : 'Plan Your Trips'}
+            </h2>
+            <p className="text-gray-600">Select dates on the calendar to create a new trip</p>
+          </div>
+          
+          {/* Pro Tips */}
+          <Card className="bg-blue-50 border-blue-200 max-w-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-blue-900 text-base">Pro Tips</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Click and drag to select multiple days</li>
+                <li>• Double-click a date for single day trips</li>
+                <li>• Use keyboard shortcuts for faster planning</li>
+              </ul>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -283,16 +299,15 @@ export default function AppPage() {
             />
           </div>
           
-          <div className="space-y-6">
-            {/* Current Trip Card */}
+          <div className="h-full flex flex-col space-y-4">
+            {/* Current Trip Card - Only show if exists */}
             {currentTrip && (
               <Card className="border-green-200 bg-green-50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-green-900">
-                    <Clock className="w-5 h-5" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-green-900 text-base">
+                    <Clock className="w-4 h-4" />
                     Current Trip
                   </CardTitle>
-                  <CardDescription>You&apos;re currently on this trip!</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div
@@ -320,89 +335,17 @@ export default function AppPage() {
                 </CardContent>
               </Card>
             )}
-
-            {/* Upcoming Trips Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Upcoming Trips</CardTitle>
-                <CardDescription>Your next adventures</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {upcomingTrips.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {currentTrip 
-                      ? "No upcoming trips planned. Select dates on the calendar to plan your next adventure!"
-                      : "No trips yet. Select dates on the calendar to create your first trip!"
-                    }
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {upcomingTrips.slice(0, currentTrip ? 2 : 3).map((trip) => (
-                      <div
-                        key={trip.id}
-                        className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
-                        onClick={() => router.push(`/trips/${trip.id}`)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-medium">{trip.name}</h4>
-                            <p className="text-sm text-gray-600">{trip.destination}</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity ml-2 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={(e) => handleDeleteTripClick(trip.id, trip.name, e)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    {(upcomingTrips.length > (currentTrip ? 2 : 3) || pastTrips.length > 0) && (
-                      <Button
-                        variant="link"
-                        className="w-full text-sm"
-                        onClick={() => router.push('/trips')}
-                      >
-                        View all {trips.length} trips →
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
             
-            {/* Trip Utilities */}
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Trip Utilities</h3>
-                <div className="space-y-4">
-                  <AllTripsView 
-                    trips={trips} 
-                    onTripsChange={loadTrips}
-                  />
-                  <ExpensesView />
-                  <PointsOfInterestView />
-                </div>
-              </div>
+            {/* Trip Utilities - Main Cards */}
+            <div className="flex-1 flex flex-col space-y-4">
+              <AllTripsView 
+                trips={trips} 
+                onTripsChange={loadTrips}
+                className="flex-1"
+              />
+              <ExpensesView className="flex-1" />
+              <PointsOfInterestView className="flex-1" />
             </div>
-
-            <Card className="bg-blue-50 border-blue-200">
-              <CardHeader>
-                <CardTitle className="text-blue-900">Pro Tips</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="text-sm text-blue-800 space-y-2">
-                  <li>• Click and drag to select multiple days</li>
-                  <li>• Double-click a date for single day trips</li>
-                  <li>• Use keyboard shortcuts for faster planning</li>
-                </ul>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
