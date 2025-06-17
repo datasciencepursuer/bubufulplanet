@@ -5,12 +5,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Trash2, Palette } from 'lucide-react'
 import ConfirmDialog from './ConfirmDialog'
-import { Database } from '@/types/database'
+import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
 
-type Event = Database['public']['Tables']['events']['Row']
-type EventInsert = Database['public']['Tables']['events']['Insert']
-type Expense = Database['public']['Tables']['expenses']['Row']
+// API expects snake_case field names to match database columns
+type EventFormData = {
+  day_id: string
+  title: string
+  start_time: string
+  end_time: string | null
+  start_date: string
+  end_date: string | null
+  location: string | null
+  notes: string | null
+  weather: string | null
+  loadout: string | null
+  color: string
+}
 
 // Convert 24-hour time to 12-hour components
 const to12HourComponents = (time24: string): { time: string, period: 'AM' | 'PM' } => {
@@ -72,7 +83,7 @@ export default function EventModal({
   currentDate,
   selectedEndDate
 }: EventModalProps) {
-  const [formData, setFormData] = useState<EventInsert>({
+  const [formData, setFormData] = useState<EventFormData>({
     day_id: dayId,
     title: '',
     start_time: selectedTime || '09:00',
@@ -158,15 +169,15 @@ export default function EventModal({
   // Update 24-hour time when 12-hour components change
   useEffect(() => {
     const time24 = to24HourTime(startTime12.time, startTime12.period)
-    setFormData(prev => ({ ...prev, start_time: time24 }))
+    setFormData((prev: EventFormData) => ({ ...prev, start_time: time24 }))
   }, [startTime12])
 
   useEffect(() => {
     if (endTime12.time && endTime12.time !== '12:00') {
       const time24 = to24HourTime(endTime12.time, endTime12.period)
-      setFormData(prev => ({ ...prev, end_time: time24 }))
+      setFormData((prev: EventFormData) => ({ ...prev, end_time: time24 }))
     } else if (!endTime12.time) {
-      setFormData(prev => ({ ...prev, end_time: '' }))
+      setFormData((prev: EventFormData) => ({ ...prev, end_time: '' }))
     }
   }, [endTime12])
 

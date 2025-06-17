@@ -4,10 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, parseISO, isSameMonth, addDays, startOfWeek, endOfWeek } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Database } from '@/types/database'
-
-type TripDay = Database['public']['Tables']['trip_days']['Row']
-type Event = Database['public']['Tables']['events']['Row']
+import type { Event, TripDay } from '@prisma/client'
 
 interface MonthlyCalendarViewProps {
   tripStartDate: string

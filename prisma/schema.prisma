@@ -24,7 +24,7 @@ model Trip {
 
   tripDays     TripDay[]
   packingItems PackingItem[]
-  travelGroup  TravelGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  group        TravelGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@index([userId], map: "idx_trips_user_id")
   @@index([startDate, endDate], map: "idx_trips_dates")
@@ -114,9 +114,8 @@ model TravelGroup {
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy   String?  @map("created_by") @db.Uuid
 
-  trips          Trip[]
-  groupMembers   GroupMember[]
-  deviceSessions DeviceSession[]
+  trips           Trip[]
+  groupMembers    GroupMember[]
   createdByMember GroupMember? @relation("GroupCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@index([accessCode], map: "idx_travel_groups_access_code")
@@ -132,8 +131,8 @@ model GroupMember {
   joinedAt     DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
   createdBy    String?  @map("created_by") @db.Uuid
 
-  travelGroup     TravelGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdGroups   TravelGroup[] @relation("GroupCreator")
+  travelGroup   TravelGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdGroups TravelGroup[] @relation("GroupCreator")
 
   @@index([groupId], map: "idx_group_members_group_id")
   @@index([groupId, travelerName], map: "idx_group_members_group_traveler")
@@ -152,8 +151,6 @@ model DeviceSession {
   isActive          Boolean   @default(true) @map("is_active")
   lastUsed          DateTime  @default(now()) @map("last_used") @db.Timestamptz(6)
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  travelGroup TravelGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@index([deviceFingerprint], map: "idx_device_sessions_fingerprint")
   @@index([groupId], map: "idx_device_sessions_group_id")

@@ -13,41 +13,47 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find active device sessions for this fingerprint with related data
+    // Find active device sessions for this fingerprint
     const sessions = await prisma.deviceSession.findMany({
       where: {
         deviceFingerprint,
         isActive: true
-      },
-      include: {
-        group: {
-          select: {
-            id: true,
-            name: true,
-            accessCode: true
-          }
-        },
-        member: {
-          select: {
-            role: true,
-            permissions: true
-          }
-        }
       },
       orderBy: {
         lastUsed: 'desc'
       }
     })
 
-    const availableSessions = sessions.map(session => ({
-      groupId: session.groupId,
-      groupName: session.group.name,
-      accessCode: session.group.accessCode,
-      travelerName: session.travelerName,
-      role: session.member?.role,
-      permissions: session.member?.permissions,
-      lastLogin: session.lastUsed
-    }))
+    // Get additional data for each session manually
+    const availableSessions = []
+    for (const session of sessions) {
+      // Get group info
+      const group = await prisma.travelGroup.findUnique({
+        where: { id: session.groupId },
+        select: { id: true, name: true, accessCode: true }
+      })
+
+      // Get member info
+      const member = await prisma.groupMember.findFirst({
+        where: {
+          groupId: session.groupId,
+          travelerName: session.travelerName
+        },
+        select: { role: true, permissions: true }
+      })
+
+      if (group && member) {
+        availableSessions.push({
+          groupId: session.groupId,
+          groupName: group.name,
+          accessCode: group.accessCode,
+          travelerName: session.travelerName,
+          role: member.role,
+          permissions: member.permissions,
+          lastLogin: session.lastUsed
+        })
+      }
+    }
 
     return NextResponse.json({
       success: true,

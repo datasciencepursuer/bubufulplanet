@@ -4,11 +4,8 @@ import { format, parseISO } from 'date-fns'
 import { Calendar, Clock, MapPin, DollarSign, Palette, FileText, Edit, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Database } from '@/types/database'
+import type { Event, Expense } from '@prisma/client'
 import { getEventColor } from '@/lib/eventColors'
-
-type Event = Database['public']['Tables']['events']['Row']
-type Expense = Database['public']['Tables']['expenses']['Row']
 
 interface EventPropertiesPanelProps {
   selectedEvent: Event | null

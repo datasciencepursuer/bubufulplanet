@@ -4,11 +4,8 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { format, addDays, subDays, isSameDay, parseISO } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Database } from '@/types/database'
+import type { Event, TripDay } from '@prisma/client'
 import { EVENT_COLORS, getEventColor } from '@/lib/eventColors'
-
-type TripDay = Database['public']['Tables']['trip_days']['Row']
-type Event = Database['public']['Tables']['events']['Row']
 
 interface DailyCalendarViewProps {
   tripStartDate: string

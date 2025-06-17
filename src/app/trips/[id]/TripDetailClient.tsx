@@ -8,13 +8,9 @@ import WeeklyCalendarView from '@/components/WeeklyCalendarView'
 import DailyCalendarView from '@/components/DailyCalendarView'
 import EventModal from '@/components/EventModal'
 import EventPropertiesPanel from '@/components/EventPropertiesPanel'
-import { Database } from '@/types/database'
+import type { Trip, TripDay, Event, Expense } from '@prisma/client'
 
-type Trip = Database['public']['Tables']['trips']['Row']
-type TripDay = Database['public']['Tables']['trip_days']['Row']
-type Event = Database['public']['Tables']['events']['Row']
-type Expense = Database['public']['Tables']['expenses']['Row']
-type EventInsert = Database['public']['Tables']['events']['Insert']
+type EventInsert = Omit<Event, 'id' | 'createdAt'>
 
 interface TripDetailClientProps {
   tripId: string
