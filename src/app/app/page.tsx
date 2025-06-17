@@ -156,25 +156,25 @@ export default function AppPage() {
     today.setHours(0, 0, 0, 0)
     
     const sorted = [...trips].sort((a, b) => 
-      new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
     )
     
     const current = sorted.find(trip => {
-      const startDate = new Date(trip.start_date)
-      const endDate = new Date(trip.end_date)
+      const startDate = new Date(trip.startDate)
+      const endDate = new Date(trip.endDate)
       startDate.setHours(0, 0, 0, 0)
       endDate.setHours(23, 59, 59, 999)
       return today >= startDate && today <= endDate
     })
     
     const upcoming = sorted.filter(trip => {
-      const startDate = new Date(trip.start_date)
+      const startDate = new Date(trip.startDate)
       startDate.setHours(0, 0, 0, 0)
       return startDate > today && trip.id !== current?.id
     })
     
     const past = sorted.filter(trip => {
-      const endDate = new Date(trip.end_date)
+      const endDate = new Date(trip.endDate)
       endDate.setHours(23, 59, 59, 999)
       return endDate < today
     }).reverse() // Most recent past trips first
@@ -274,8 +274,8 @@ export default function AppPage() {
               existingTrips={trips.map(trip => ({
                 id: trip.id,
                 title: trip.name,
-                start: trip.start_date,
-                end: trip.end_date
+                start: trip.startDate,
+                end: trip.endDate
               }))}
             />
           </div>
@@ -301,7 +301,7 @@ export default function AppPage() {
                         <h4 className="font-medium text-green-900">{currentTrip.name}</h4>
                         <p className="text-sm text-green-700">{currentTrip.destination}</p>
                         <p className="text-xs text-green-600 mt-1">
-                          {new Date(currentTrip.start_date).toLocaleDateString()} - {new Date(currentTrip.end_date).toLocaleDateString()}
+                          {new Date(currentTrip.startDate).toLocaleDateString()} - {new Date(currentTrip.endDate).toLocaleDateString()}
                         </p>
                       </div>
                       <Button
@@ -345,7 +345,7 @@ export default function AppPage() {
                             <h4 className="font-medium">{trip.name}</h4>
                             <p className="text-sm text-gray-600">{trip.destination}</p>
                             <p className="text-xs text-gray-500 mt-1">
-                              {new Date(trip.start_date).toLocaleDateString()} - {new Date(trip.end_date).toLocaleDateString()}
+                              {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
                             </p>
                           </div>
                           <Button

@@ -81,12 +81,22 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const tripId = searchParams.get('id');
+
     return await withUnifiedSessionContext(async (context) => {
+      let whereClause: any = {
+        groupId: context.groupId
+      };
+
+      // If specific trip ID requested, add it to the filter
+      if (tripId) {
+        whereClause.id = tripId;
+      }
+
       // Fetch trips filtered by group using Prisma
       const trips = await prisma.trip.findMany({
-        where: {
-          groupId: context.groupId
-        },
+        where: whereClause,
         orderBy: {
           createdAt: 'desc'
         }
