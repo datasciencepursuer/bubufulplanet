@@ -17,7 +17,7 @@ interface DailyCalendarViewProps {
   selectedEventId?: string | null
   newEventIds?: Set<string>
   onTimeSlotClick: (dayId: string, time: string, date?: string) => void
-  onTimeRangeSelect: (dayId: string, startTime: string, endTime: string) => void
+  onTimeRangeSelect: (dayId: string, startTime: string, endTime: string, endDate?: string, startDate?: string) => void
   onEventClick: (event: Event) => void
   onEventSelect?: (event: Event, position: { top: number; left: number }) => void
   initialDate?: string | null
@@ -179,9 +179,11 @@ export default function DailyCalendarView({
       const endTime = endTimeIndex < TIME_SLOTS.length ? TIME_SLOTS[endTimeIndex] : '23:00'
       
       if (startTime !== endTime) {
-        onTimeRangeSelect(dragState.startDayId, startTime, endTime)
+        // For daily view, pass the current date as both start and end date since it's same-day only
+        const currentDateStr = normalizeDate(currentDate)
+        onTimeRangeSelect(dragState.startDayId, startTime, endTime, currentDateStr, currentDateStr)
       } else {
-        onTimeSlotClick(dragState.startDayId, startTime)
+        onTimeSlotClick(dragState.startDayId, startTime, normalizeDate(currentDate))
       }
     }
     
@@ -340,6 +342,7 @@ export default function DailyCalendarView({
             const eventSpan = getEventSpanInfo(timeSlot)
             const { event, isFirst, isLast, totalSlots, durationMinutes } = eventSpan
             const isClickable = currentTripDay && isWithinTripDates()
+            
             const isInSelection = isSlotInSelection(timeSlot)
             
             return (
