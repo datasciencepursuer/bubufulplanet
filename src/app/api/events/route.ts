@@ -74,9 +74,10 @@ export async function POST(request: NextRequest) {
       })
 
       // Verify trip day exists and belongs to user's group
+      const dayId = event.day_id || event.dayId
       const tripDay = await prisma.tripDay.findFirst({
         where: {
-          id: event.dayId,
+          id: dayId,
           trip: {
             groupId: context.groupId
           }
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
 
       if (!tripDay) {
         console.error('Trip day verification failed:', {
-          dayId: event.dayId,
+          dayId: dayId,
           groupId: context.groupId
         })
         return NextResponse.json({ 
@@ -94,21 +95,29 @@ export async function POST(request: NextRequest) {
         }, { status: 404 })
       }
 
+      // Handle both camelCase (legacy) and snake_case (new) event data
+      const startTime = event.start_time || event.startTime
+      const endTime = event.end_time || event.endTime
+      const startDate = event.start_date || event.startDate  
+      const endDate = event.end_date || event.endDate
+
+      const eventData = {
+        dayId: dayId,
+        title: event.title,
+        startTime: typeof startTime === 'string' ? new Date(`2000-01-01T${startTime}`) : new Date(startTime),
+        endTime: endTime ? (typeof endTime === 'string' ? new Date(`2000-01-01T${endTime}`) : new Date(endTime)) : null,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
+        location: event.location,
+        notes: event.notes,
+        weather: event.weather,
+        loadout: event.loadout,
+        color: event.color || '#3B82F6'
+      }
+
       // Create the event
       const newEvent = await prisma.event.create({
-        data: {
-          dayId: event.dayId,
-          title: event.title,
-          startTime: new Date(event.startTime),
-          endTime: event.endTime ? new Date(event.endTime) : null,
-          startDate: new Date(event.startDate),
-          endDate: event.endDate ? new Date(event.endDate) : null,
-          location: event.location,
-          notes: event.notes,
-          weather: event.weather,
-          loadout: event.loadout,
-          color: event.color || '#3B82F6'
-        }
+        data: eventData
       })
 
       // Create associated expenses if provided
@@ -117,7 +126,7 @@ export async function POST(request: NextRequest) {
           await prisma.expense.createMany({
             data: expenses.map((expense: any) => ({
               eventId: newEvent.id,
-              dayId: event.dayId,
+              dayId: dayId,
               description: expense.description,
               amount: expense.amount,
               category: expense.category

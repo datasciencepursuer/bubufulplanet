@@ -16,6 +16,7 @@ interface Destination {
 
 // API data format for events (snake_case)
 type EventApiData = {
+  day_id: string
   title: string
   start_time: string
   end_time: string | null
@@ -260,6 +261,7 @@ export default function EventModal({
     
     // For API, keep the snake_case format that the API expects
     const eventApiData = {
+      day_id: finalFormData.day_id,
       title: finalFormData.title,
       start_time: finalFormData.start_time,
       end_time: finalFormData.end_time,

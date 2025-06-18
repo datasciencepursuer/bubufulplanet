@@ -18,6 +18,7 @@ type ExpenseInsert = { description: string; amount: number; category?: string }
 
 // API data format for events (snake_case) - matches EventModal
 type EventApiData = {
+  day_id: string
   title: string
   start_time: string
   end_time: string | null
@@ -277,6 +278,7 @@ export default function PersistentEventModal({
     
     // For API, keep the snake_case format that the API expects
     const eventApiData: EventApiData = {
+      day_id: finalFormData.day_id,
       title: finalFormData.title,
       start_time: finalFormData.start_time,
       end_time: finalFormData.end_time,

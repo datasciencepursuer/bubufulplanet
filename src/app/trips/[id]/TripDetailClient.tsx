@@ -16,6 +16,7 @@ type EventInsert = Omit<Event, 'id' | 'createdAt'>
 
 // API data format for events (snake_case) - matches EventModal
 type EventApiData = {
+  day_id: string
   title: string
   start_time: string
   end_time: string | null
