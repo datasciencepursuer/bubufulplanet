@@ -6,8 +6,7 @@ import { Trash2, Palette, MousePointer2, Edit, ChevronDown } from 'lucide-react'
 import ConfirmDialog from './ConfirmDialog'
 import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
-import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
-import { normalizeDate, extractTimeString } from '@/lib/dateUtils'
+import { getTripDateInfo, getTripDateStyles, normalizeDate, extractTimeString } from '@/lib/tripDayUtils'
 
 interface Destination {
   name: string

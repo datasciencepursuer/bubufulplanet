@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import type { Event, Expense } from '@prisma/client'
 import { getEventColor } from '@/lib/eventColors'
-import { formatDateRange, extractTimeString, normalizeDate } from '@/lib/dateUtils'
+import { formatDateRange, extractTimeString, normalizeDate } from '@/lib/tripDayUtils'
 
 interface EventPropertiesPanelProps {
   selectedEvent: Event | null

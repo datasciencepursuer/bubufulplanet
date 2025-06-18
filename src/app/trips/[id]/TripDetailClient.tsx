@@ -10,7 +10,7 @@ import EventModal from '@/components/EventModal'
 import PersistentEventModal from '@/components/PersistentEventModal'
 import EventPropertiesPanel from '@/components/EventPropertiesPanel'
 import type { Trip, TripDay, Event, Expense } from '@prisma/client'
-import { normalizeDate } from '@/lib/dateUtils'
+import { normalizeDate } from '@/lib/tripDayUtils'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 
