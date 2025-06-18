@@ -134,7 +134,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   }
 
   const handleTimeSlotClick = (dayId: string, time: string, date?: string) => {
-    console.log('Time slot clicked:', { dayId, time, date })
+    console.log('TripDetailClient.handleTimeSlotClick received:', { dayId, time, date })
     if (!dayId) {
       console.error('No dayId provided for time slot click')
       alert('Error: Cannot create event - no day selected')
@@ -150,6 +150,13 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     
     if (calendarView === 'daily') {
       // For daily view, clear any selected event and enter creation mode in persistent modal
+      console.log('TripDetailClient: Setting up daily view event creation:', {
+        dayId,
+        time,
+        endTime,
+        clickedDate,
+        currentCalendarView: calendarView
+      })
       setPersistentModalEvent(null)
       setIsEditMode(true)
       setSelectedDayId(dayId)
@@ -168,7 +175,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   }
 
   const handleTimeRangeSelect = (dayId: string, startTime: string, endTime: string, endDate?: string, startDate?: string) => {
-    console.log('Time range selected:', { dayId, startTime, endTime, endDate, startDate })
+    console.log('TripDetailClient.handleTimeRangeSelect received:', { dayId, startTime, endTime, endDate, startDate })
     if (!dayId) {
       console.error('No dayId provided for time range select')
       alert('Error: Cannot create event - no day selected')

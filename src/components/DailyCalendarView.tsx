@@ -181,8 +181,20 @@ export default function DailyCalendarView({
       if (startTime !== endTime) {
         // For daily view, pass the current date as both start and end date since it's same-day only
         const currentDateStr = normalizeDate(currentDate)
+        console.log('DailyCalendarView calling onTimeRangeSelect:', {
+          dayId: dragState.startDayId,
+          startTime,
+          endTime,
+          endDate: currentDateStr,
+          startDate: currentDateStr
+        })
         onTimeRangeSelect(dragState.startDayId, startTime, endTime, currentDateStr, currentDateStr)
       } else {
+        console.log('DailyCalendarView calling onTimeSlotClick from drag:', {
+          dayId: dragState.startDayId,
+          startTime,
+          date: normalizeDate(currentDate)
+        })
         onTimeSlotClick(dragState.startDayId, startTime, normalizeDate(currentDate))
       }
     }
@@ -341,7 +353,21 @@ export default function DailyCalendarView({
           {TIME_SLOTS.map(timeSlot => {
             const eventSpan = getEventSpanInfo(timeSlot)
             const { event, isFirst, isLast, totalSlots, durationMinutes } = eventSpan
-            const isClickable = currentTripDay && isWithinTripDates()
+            const withinTripDates = isWithinTripDates()
+            const isClickable = currentTripDay && withinTripDates
+            
+            // Debug logging for every 5th time slot to avoid spam
+            if (timeSlot === '12:00' || timeSlot === '06:00' || timeSlot === '18:00') {
+              console.log('DailyCalendarView isClickable debug:', {
+                timeSlot,
+                currentDate: currentDate.toISOString(),
+                currentTripDay: currentTripDay ? { id: currentTripDay.id, date: currentTripDay.date } : null,
+                withinTripDates,
+                isClickable,
+                tripStartDate,
+                tripEndDate
+              })
+            }
             
             const isInSelection = isSlotInSelection(timeSlot)
             
@@ -374,6 +400,13 @@ export default function DailyCalendarView({
                     }
                   }}
                   onClick={(e) => {
+                    console.log('DailyCalendarView onClick:', { 
+                      timeSlot, 
+                      isClickable, 
+                      dragStateActive: dragState.isActive, 
+                      currentTripDay: !!currentTripDay,
+                      willEarlyReturn: !isClickable || dragState.isActive || !currentTripDay
+                    })
                     if (!isClickable || dragState.isActive || !currentTripDay) return
                     
                     // Get click position within the cell
@@ -423,6 +456,11 @@ export default function DailyCalendarView({
                       clickTime = timeSlot
                     }
                     
+                    console.log('DailyCalendarView calling onTimeSlotClick:', {
+                      dayId: currentTripDay.id,
+                      clickTime,
+                      date: normalizeDate(currentDate)
+                    })
                     onTimeSlotClick(currentTripDay.id, clickTime, normalizeDate(currentDate))
                   }}
                 >
