@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import type { Event, TripDay } from '@prisma/client'
 import { EVENT_COLORS, getEventColor } from '@/lib/eventColors'
 import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
-import { calculateDefaultEndTime } from '@/lib/dateTimeUtils'
+import { calculateDefaultEndTime, normalizeDate } from '@/lib/dateTimeUtils'
 
 interface DailyCalendarViewProps {
   tripStartDate: string
@@ -16,7 +16,7 @@ interface DailyCalendarViewProps {
   events: Event[]
   selectedEventId?: string | null
   newEventIds?: Set<string>
-  onTimeSlotClick: (dayId: string, time: string) => void
+  onTimeSlotClick: (dayId: string, time: string, date?: string) => void
   onTimeRangeSelect: (dayId: string, startTime: string, endTime: string) => void
   onEventClick: (event: Event) => void
   onEventSelect?: (event: Event, position: { top: number; left: number }) => void
@@ -420,7 +420,7 @@ export default function DailyCalendarView({
                       clickTime = isSecondHalf ? `${timeSlot.split(':')[0]}:30` : timeSlot
                     }
                     
-                    onTimeSlotClick(currentTripDay.id, clickTime)
+                    onTimeSlotClick(currentTripDay.id, clickTime, normalizeDate(currentDate))
                   }}
                 >
                   {event && isFirst ? (

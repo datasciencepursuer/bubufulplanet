@@ -16,7 +16,7 @@ interface WeeklyCalendarViewProps {
   events: Event[]
   selectedEventId?: string | null
   newEventIds?: Set<string>
-  onTimeSlotClick: (dayId: string, time: string) => void
+  onTimeSlotClick: (dayId: string, time: string, date?: string) => void
   onTimeRangeSelect: (dayId: string, startTime: string, endTime: string, endDate?: string, startDate?: string) => void
   onEventClick: (event: Event) => void
   onEventSelect?: (event: Event, position: { top: number; left: number }) => void
@@ -753,13 +753,7 @@ export default function WeeklyCalendarView({
                         clickTime = isSecondHalf ? `${timeSlot.split(':')[0]}:30` : timeSlot
                       }
                       
-                      console.log('WeeklyCalendarView: Clicking time slot', { 
-                        tripDayId: tripDay.id, 
-                        clickTime, 
-                        date: date.toISOString(),
-                        tripDay 
-                      })
-                      onTimeSlotClick(tripDay.id, clickTime)
+                      onTimeSlotClick(tripDay.id, clickTime, normalizeDate(date))
                     }}
                   >
                     {event && isFirst ? (

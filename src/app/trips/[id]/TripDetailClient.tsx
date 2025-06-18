@@ -133,13 +133,17 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     setIsModalOpen(true)
   }
 
-  const handleTimeSlotClick = (dayId: string, time: string) => {
-    console.log('Time slot clicked:', { dayId, time })
+  const handleTimeSlotClick = (dayId: string, time: string, date?: string) => {
+    console.log('Time slot clicked:', { dayId, time, date })
     if (!dayId) {
       console.error('No dayId provided for time slot click')
       alert('Error: Cannot create event - no day selected')
       return
     }
+    
+    // Use the provided date if available, otherwise fall back to dayId lookup
+    const clickedDate = date || getDateForDayId(dayId)
+    
     
     // Calculate default end time
     const endTime = calculateDefaultEndTime(time)
@@ -151,14 +155,14 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       setSelectedDayId(dayId)
       setSelectedTime(time)
       setSelectedEndTime(endTime)
-      setCurrentDate(getDateForDayId(dayId))
+      setCurrentDate(clickedDate)
     } else {
       // For weekly view, use the regular modal
       setSelectedDayId(dayId)
       setSelectedTime(time)
       setSelectedEndTime(endTime)
       setSelectedEvent(null)
-      setCurrentDate(getDateForDayId(dayId))
+      setCurrentDate(clickedDate)
       setIsModalOpen(true)
     }
   }
