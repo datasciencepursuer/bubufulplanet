@@ -529,10 +529,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           onDelete={handleDeleteEvent}
           event={selectedEvent}
           dayId={selectedDayId}
-          selectedTime={selectedTime}
-          selectedEndTime={selectedEndTime}
-          currentDate={currentDate}
-          selectedEndDate={selectedEndDate}
+          startSlot={selectedTime}
+          endSlot={selectedEndTime}
           tripStartDate={trip?.startDate ? normalizeDate(trip.startDate) : undefined}
           tripEndDate={trip?.endDate ? normalizeDate(trip.endDate) : undefined}
         />
