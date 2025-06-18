@@ -14,6 +14,20 @@ import { normalizeDate } from '@/lib/tripDayUtils'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 
+// API data format for events (snake_case) - matches EventModal
+type EventApiData = {
+  title: string
+  start_time: string
+  end_time: string | null
+  start_date: string
+  end_date: string | null
+  location: string | null
+  notes: string | null
+  weather: string | null
+  loadout: string | null
+  color: string
+}
+
 interface TripDetailClientProps {
   tripId: string
 }
@@ -233,7 +247,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   }
 
   const handleSaveEvent = async (
-    eventData: EventInsert, 
+    eventData: EventApiData, 
     expenses: { description: string; amount: number; category?: string }[]
   ) => {
     try {

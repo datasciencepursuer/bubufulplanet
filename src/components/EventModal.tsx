@@ -14,7 +14,19 @@ interface Destination {
   link?: string
 }
 
-type EventInsert = Omit<Event, 'id' | 'createdAt'>
+// API data format for events (snake_case)
+type EventApiData = {
+  title: string
+  start_time: string
+  end_time: string | null
+  start_date: string
+  end_date: string | null
+  location: string | null
+  notes: string | null
+  weather: string | null
+  loadout: string | null
+  color: string
+}
 type ExpenseInsert = { description: string; amount: number; category?: string }
 
 // API expects snake_case field names to match database columns
@@ -70,7 +82,7 @@ const TIME_OPTIONS_12H = [
 interface EventModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (event: EventInsert, expenses: ExpenseInsert[]) => void
+  onSave: (event: EventApiData, expenses: ExpenseInsert[]) => void
   onDelete?: (eventId: string) => void
   event?: Event | null
   dayId: string
@@ -246,14 +258,13 @@ export default function EventModal({
       finalFormData.end_time = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
     }
     
-    // Convert snake_case form data to camelCase EventInsert
-    const eventInsert: EventInsert = {
-      dayId: finalFormData.day_id,
+    // For API, keep the snake_case format that the API expects
+    const eventApiData = {
       title: finalFormData.title,
-      startTime: new Date(`2000-01-01T${finalFormData.start_time}`),
-      endTime: finalFormData.end_time ? new Date(`2000-01-01T${finalFormData.end_time}`) : null,
-      startDate: new Date(finalFormData.start_date),
-      endDate: finalFormData.end_date ? new Date(finalFormData.end_date) : null,
+      start_time: finalFormData.start_time,
+      end_time: finalFormData.end_time,
+      start_date: finalFormData.start_date,
+      end_date: finalFormData.end_date,
       location: finalFormData.location,
       notes: finalFormData.notes,
       weather: finalFormData.weather,
@@ -261,7 +272,7 @@ export default function EventModal({
       color: finalFormData.color
     }
     
-    onSave(eventInsert, expenses)
+    onSave(eventApiData, expenses)
     onClose()
   }
 
