@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
           day: {
             select: {
               id: true,
-              tripId: true
+              tripId: true,
+              date: true
             }
           },
           expenses: true

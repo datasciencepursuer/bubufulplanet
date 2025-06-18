@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
           eventTitle: expense.event!.title,
           tripName: expense.event!.day.trip.name,
           tripDestination: expense.event!.day.trip.destination || 'Unknown',
-          eventDate: expense.event!.startDate.toISOString().split('T')[0]
+          eventDate: expense.event!.day.date.toISOString().split('T')[0]
         }));
 
       return NextResponse.json({ expenses: formattedExpenses });

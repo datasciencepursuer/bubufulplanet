@@ -211,7 +211,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       setSelectedDayId(event.dayId)
       setSelectedTime('')
       setSelectedEndTime('')
-      setCurrentDate(event.startDate ? normalizeDate(event.startDate) : normalizeDate(new Date()))
+      setCurrentDate(event.day?.date ? normalizeDate(event.day.date) : normalizeDate(new Date()))
       setIsModalOpen(true)
     }
   }

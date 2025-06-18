@@ -99,12 +99,8 @@ export default function EventPropertiesPanel({
           <div className="flex items-start gap-2 text-sm text-gray-700">
             <Calendar className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
             <span className="break-words">
-              {formatDateRange(
-                normalizeDate(selectedEvent.startDate),
-                extractTimeString(new Date(selectedEvent.startTime)),
-                selectedEvent.endDate ? normalizeDate(selectedEvent.endDate) : undefined,
-                selectedEvent.endTime ? extractTimeString(new Date(selectedEvent.endTime)) : undefined
-              )}
+              {selectedEvent.startSlot}
+              {selectedEvent.endSlot && ` - ${selectedEvent.endSlot}`}
             </span>
           </div>
 

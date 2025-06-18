@@ -155,18 +155,16 @@ export default function PersistentEventModal({
     fetchDestinations()
     
     if (selectedEvent && isEditMode) {
-      const startTimeStr = extractTimeString(new Date(selectedEvent.startTime))
-      const endTimeStr = selectedEvent.endTime ? extractTimeString(new Date(selectedEvent.endTime)) : ''
-      const startDateStr = normalizeDate(selectedEvent.startDate)
-      const endDateStr = selectedEvent.endDate ? normalizeDate(selectedEvent.endDate) : startDateStr
+      const startTimeStr = selectedEvent.startSlot || '09:00'
+      const endTimeStr = selectedEvent.endSlot || ''
+      const startDateStr = selectedEvent.day?.date ? normalizeDate(selectedEvent.day.date) : normalizeDate(new Date())
+      const endDateStr = startDateStr
       
       setFormData({
-        day_id: selectedEvent.dayId,
+        dayId: selectedEvent.dayId,
         title: selectedEvent.title,
-        start_time: startTimeStr,
-        end_time: endTimeStr,
-        start_date: startDateStr,
-        end_date: endDateStr,
+        startSlot: startTimeStr,
+        endSlot: endTimeStr,
         location: selectedEvent.location || '',
         notes: selectedEvent.notes || '',
         weather: selectedEvent.weather || '',
@@ -178,12 +176,10 @@ export default function PersistentEventModal({
       fetchExistingExpenses(selectedEvent.id)
     } else if (!selectedEvent) {
       setFormData({
-        day_id: dayId,
+        dayId: dayId,
         title: '',
-        start_time: selectedTime || '09:00',
-        end_time: selectedEndTime || '',
-        start_date: currentDate || normalizeDate(new Date()),
-        end_date: selectedEndDate || currentDate || normalizeDate(new Date()),
+        startSlot: selectedTime || '09:00',
+        endSlot: selectedEndTime || '',
         location: '',
         notes: '',
         weather: '',
@@ -345,19 +341,15 @@ export default function PersistentEventModal({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Start</label>
               <div className="text-sm text-gray-900">
-                {new Date(selectedEvent.startTime).toLocaleTimeString([], { 
-                  hour: 'numeric', 
-                  minute: '2-digit', 
-                  hour12: true 
-                })}
+                {selectedEvent.startSlot || 'No start time'}
               </div>
               <div className="text-sm text-gray-600">
-                {new Date(selectedEvent.startDate).toLocaleDateString()}
+                {selectedEvent.day?.date ? new Date(selectedEvent.day.date).toLocaleDateString() : 'No date'}
               </div>
-              {tripStartDate && tripEndDate && (
+              {tripStartDate && tripEndDate && selectedEvent.day?.date && (
                 <div className="text-xs mt-1">
                   {(() => {
-                    const dateInfo = getTripDateInfo(new Date(selectedEvent.startDate), tripStartDate, tripEndDate)
+                    const dateInfo = getTripDateInfo(new Date(selectedEvent.day.date), tripStartDate, tripEndDate)
                     const styles = getTripDateStyles(dateInfo)
                     
                     return styles.dayLabel.show && (
@@ -372,14 +364,10 @@ export default function PersistentEventModal({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">End</label>
               <div className="text-sm text-gray-900">
-                {selectedEvent.endTime ? new Date(selectedEvent.endTime).toLocaleTimeString([], { 
-                  hour: 'numeric', 
-                  minute: '2-digit', 
-                  hour12: true 
-                }) : 'No end time'}
+                {selectedEvent.endSlot || 'No end time'}
               </div>
               <div className="text-sm text-gray-600">
-                {selectedEvent.endDate ? new Date(selectedEvent.endDate).toLocaleDateString() : ''}
+                {/* End date is same as start date for time slots */}
               </div>
             </div>
           </div>
