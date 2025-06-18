@@ -163,16 +163,17 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     }
   }
 
-  const handleTimeRangeSelect = (dayId: string, startTime: string, endTime: string, endDate?: string) => {
-    console.log('Time range selected:', { dayId, startTime, endTime, endDate })
+  const handleTimeRangeSelect = (dayId: string, startTime: string, endTime: string, endDate?: string, startDate?: string) => {
+    console.log('Time range selected:', { dayId, startTime, endTime, endDate, startDate })
     if (!dayId) {
       console.error('No dayId provided for time range select')
       alert('Error: Cannot create event - no day selected')
       return
     }
     
-    // Set the date for the event
-    const startDateStr = getDateForDayId(dayId)
+    // Use the provided startDate if available, otherwise fall back to dayId lookup
+    const startDateStr = startDate || getDateForDayId(dayId)
+    
     
     if (calendarView === 'daily') {
       // For daily view, clear any selected event and enter creation mode in persistent modal

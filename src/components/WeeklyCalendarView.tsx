@@ -17,7 +17,7 @@ interface WeeklyCalendarViewProps {
   selectedEventId?: string | null
   newEventIds?: Set<string>
   onTimeSlotClick: (dayId: string, time: string) => void
-  onTimeRangeSelect: (dayId: string, startTime: string, endTime: string, endDate?: string) => void
+  onTimeRangeSelect: (dayId: string, startTime: string, endTime: string, endDate?: string, startDate?: string) => void
   onEventClick: (event: Event) => void
   onEventSelect?: (event: Event, position: { top: number; left: number }) => void
   onDayHeaderClick?: (date: string) => void
@@ -442,7 +442,12 @@ export default function WeeklyCalendarView({
       
       // Call the parent handler with cross-day event information (normalize dates)
       if (onTimeRangeSelect) {
-        onTimeRangeSelect(actualStartDayId, actualStartTime, actualEndTime, normalizeDate(actualEndDate))
+        // Both dates need to be normalized to ensure consistent format
+        const normalizedStartDate = normalizeDate(actualStartDate)
+        const normalizedEndDate = normalizeDate(actualEndDate)
+        
+        
+        onTimeRangeSelect(actualStartDayId, actualStartTime, actualEndTime, normalizedEndDate, normalizedStartDate)
       }
     }
     
