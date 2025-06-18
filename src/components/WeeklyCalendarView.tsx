@@ -419,8 +419,8 @@ export default function WeeklyCalendarView({
       let actualStartTime: string
       let actualEndDayId: string
       let actualEndTime: string
-      let actualStartDate: string
-      let actualEndDate: string
+      let actualStartDate: Date
+      let actualEndDate: Date
       
       if (startDayIndex <= currentDayIndex) {
         // Forward drag
@@ -428,16 +428,16 @@ export default function WeeklyCalendarView({
         actualStartTime = dragState.startTimeSlot
         actualEndDayId = dragState.currentDayId
         actualEndTime = TIME_SLOTS[Math.min(getTimeSlotIndex(dragState.currentTimeSlot) + 1, TIME_SLOTS.length - 1)]
-        actualStartDate = tripDaysInWeek[startDayIndex].tripDay!.date
-        actualEndDate = tripDaysInWeek[currentDayIndex].tripDay!.date
+        actualStartDate = tripDaysInWeek[startDayIndex].date
+        actualEndDate = tripDaysInWeek[currentDayIndex].date
       } else {
         // Backward drag
         actualStartDayId = dragState.currentDayId
         actualStartTime = dragState.currentTimeSlot
         actualEndDayId = dragState.startDayId
         actualEndTime = TIME_SLOTS[Math.min(getTimeSlotIndex(dragState.startTimeSlot) + 1, TIME_SLOTS.length - 1)]
-        actualStartDate = tripDaysInWeek[currentDayIndex].tripDay!.date
-        actualEndDate = tripDaysInWeek[startDayIndex].tripDay!.date
+        actualStartDate = tripDaysInWeek[currentDayIndex].date
+        actualEndDate = tripDaysInWeek[startDayIndex].date
       }
       
       // Call the parent handler with cross-day event information (normalize dates)
@@ -749,8 +749,8 @@ export default function WeeklyCalendarView({
                           }
                         }
                       } else {
-                        // No event in this slot, create based on where clicked
-                        clickTime = isSecondHalf ? `${timeSlot.split(':')[0]}:30` : timeSlot
+                        // No event in this slot, always use the full hour time slot
+                        clickTime = timeSlot
                       }
                       
                       onTimeSlotClick(tripDay.id, clickTime, normalizeDate(date))

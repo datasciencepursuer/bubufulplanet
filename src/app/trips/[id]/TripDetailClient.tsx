@@ -179,6 +179,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     const startDateStr = startDate || getDateForDayId(dayId)
     
     
+    
     if (calendarView === 'daily') {
       // For daily view, clear any selected event and enter creation mode in persistent modal
       setPersistentModalEvent(null)

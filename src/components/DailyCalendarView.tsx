@@ -416,8 +416,8 @@ export default function DailyCalendarView({
                         }
                       }
                     } else {
-                      // No event in this slot, create based on where clicked
-                      clickTime = isSecondHalf ? `${timeSlot.split(':')[0]}:30` : timeSlot
+                      // No event in this slot, always use the full hour time slot
+                      clickTime = timeSlot
                     }
                     
                     onTimeSlotClick(currentTripDay.id, clickTime, normalizeDate(currentDate))
