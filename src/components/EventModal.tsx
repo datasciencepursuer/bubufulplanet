@@ -326,121 +326,6 @@ export default function EventModal({
             />
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Notes</label>
-            <textarea
-              value={formData.notes || ''}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full p-2 border rounded-md"
-              rows={3}
-              placeholder="Additional notes..."
-            />
-          </div>
-
-          {/* Start Date */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Start Date *</label>
-            {tripStartDate && tripEndDate && formData.start_date && (
-              <div className="mb-2 text-sm text-gray-600">
-                {(() => {
-                  const dateInfo = getTripDateInfo(new Date(formData.start_date), tripStartDate, tripEndDate)
-                  const styles = getTripDateStyles(dateInfo)
-                  
-                  return styles.dayLabel.show && (
-                    <span className={styles.dayLabel.className}>
-                      {styles.dayLabel.text}{dateInfo.dateType === 'trip-day' ? ' of trip' : ''}
-                    </span>
-                  )
-                })()
-                }
-              </div>
-            )}
-            <input
-              type="date"
-              required
-              value={formData.start_date}
-              onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-              className="w-full p-2 border rounded-md"
-            />
-          </div>
-
-          {/* End Date */}
-          <div>
-            <label className="block text-sm font-medium mb-2">End Date</label>
-            {tripStartDate && tripEndDate && formData.end_date && (
-              <div className="mb-2 text-sm text-gray-600">
-                {(() => {
-                  const dateInfo = getTripDateInfo(new Date(formData.end_date), tripStartDate, tripEndDate)
-                  const styles = getTripDateStyles(dateInfo)
-                  
-                  return styles.dayLabel.show && (
-                    <span className={styles.dayLabel.className}>
-                      {styles.dayLabel.text}{dateInfo.dateType === 'trip-day' ? ' of trip' : ''}
-                    </span>
-                  )
-                })()
-                }
-              </div>
-            )}
-            <input
-              type="date"
-              value={formData.end_date || ''}
-              onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-              className="w-full p-2 border rounded-md"
-            />
-          </div>
-
-          {/* Start Time */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Start Time *</label>
-            <div className="flex gap-2">
-              <select
-                value={startTime12.time}
-                onChange={(e) => setStartTime12({ ...startTime12, time: e.target.value })}
-                className="flex-1 p-2 border rounded-md"
-              >
-                {TIME_OPTIONS_12H.map(time => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
-              <select
-                value={startTime12.period}
-                onChange={(e) => setStartTime12({ ...startTime12, period: e.target.value as 'AM' | 'PM' })}
-                className="w-20 p-2 border rounded-md"
-              >
-                <option value="AM">AM</option>
-                <option value="PM">PM</option>
-              </select>
-            </div>
-          </div>
-          
-          {/* End Time */}
-          <div>
-            <label className="block text-sm font-medium mb-2">End Time</label>
-            <div className="flex gap-2">
-              <select
-                value={endTime12.time}
-                onChange={(e) => setEndTime12({ ...endTime12, time: e.target.value })}
-                className="flex-1 p-2 border rounded-md"
-              >
-                <option value="">--</option>
-                {TIME_OPTIONS_12H.map(time => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
-              <select
-                value={endTime12.period}
-                onChange={(e) => setEndTime12({ ...endTime12, period: e.target.value as 'AM' | 'PM' })}
-                className="w-20 p-2 border rounded-md"
-                disabled={!endTime12.time}
-              >
-                <option value="AM">AM</option>
-                <option value="PM">PM</option>
-              </select>
-            </div>
-          </div>
-
           {/* Location */}
           <div>
             <label className="block text-sm font-medium mb-2">Location</label>
@@ -491,6 +376,121 @@ export default function EventModal({
                 Add destinations to Points of Interest to see them here
               </div>
             )}
+          </div>
+
+          {/* Start Date */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Start Date *</label>
+            {tripStartDate && tripEndDate && formData.start_date && (
+              <div className="mb-2 text-sm text-gray-600">
+                {(() => {
+                  const dateInfo = getTripDateInfo(new Date(formData.start_date), tripStartDate, tripEndDate)
+                  const styles = getTripDateStyles(dateInfo)
+                  
+                  return styles.dayLabel.show && (
+                    <span className={styles.dayLabel.className}>
+                      {styles.dayLabel.text}{dateInfo.dateType === 'trip-day' ? ' of trip' : ''}
+                    </span>
+                  )
+                })()
+                }
+              </div>
+            )}
+            <input
+              type="date"
+              required
+              value={formData.start_date}
+              onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+              className="w-full p-2 border rounded-md"
+            />
+          </div>
+
+          {/* Start Time */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Start Time *</label>
+            <div className="flex gap-2">
+              <select
+                value={startTime12.time}
+                onChange={(e) => setStartTime12({ ...startTime12, time: e.target.value })}
+                className="flex-1 p-2 border rounded-md"
+              >
+                {TIME_OPTIONS_12H.map(time => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+              <select
+                value={startTime12.period}
+                onChange={(e) => setStartTime12({ ...startTime12, period: e.target.value as 'AM' | 'PM' })}
+                className="w-20 p-2 border rounded-md"
+              >
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+          </div>
+
+          {/* End Date */}
+          <div>
+            <label className="block text-sm font-medium mb-2">End Date</label>
+            {tripStartDate && tripEndDate && formData.end_date && (
+              <div className="mb-2 text-sm text-gray-600">
+                {(() => {
+                  const dateInfo = getTripDateInfo(new Date(formData.end_date), tripStartDate, tripEndDate)
+                  const styles = getTripDateStyles(dateInfo)
+                  
+                  return styles.dayLabel.show && (
+                    <span className={styles.dayLabel.className}>
+                      {styles.dayLabel.text}{dateInfo.dateType === 'trip-day' ? ' of trip' : ''}
+                    </span>
+                  )
+                })()
+                }
+              </div>
+            )}
+            <input
+              type="date"
+              value={formData.end_date || ''}
+              onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+              className="w-full p-2 border rounded-md"
+            />
+          </div>
+          
+          {/* End Time */}
+          <div>
+            <label className="block text-sm font-medium mb-2">End Time</label>
+            <div className="flex gap-2">
+              <select
+                value={endTime12.time}
+                onChange={(e) => setEndTime12({ ...endTime12, time: e.target.value })}
+                className="flex-1 p-2 border rounded-md"
+              >
+                <option value="">--</option>
+                {TIME_OPTIONS_12H.map(time => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+              <select
+                value={endTime12.period}
+                onChange={(e) => setEndTime12({ ...endTime12, period: e.target.value as 'AM' | 'PM' })}
+                className="w-20 p-2 border rounded-md"
+                disabled={!endTime12.time}
+              >
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Notes</label>
+            <textarea
+              value={formData.notes || ''}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full p-2 border rounded-md"
+              rows={3}
+              placeholder="Additional notes..."
+            />
           </div>
 
           {/* Event Color */}

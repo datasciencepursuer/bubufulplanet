@@ -83,7 +83,7 @@ export default function EventPropertiesPanel({
 
         {/* Event Content */}
         <div className="p-4 space-y-4">
-          {/* Event Color and Title */}
+          {/* Title */}
           <div className="flex items-start gap-3">
             <div
               className="w-4 h-4 rounded-full border border-gray-300 mt-1 flex-shrink-0"
@@ -91,24 +91,6 @@ export default function EventPropertiesPanel({
             />
             <div className="flex-1 min-w-0">
               <h4 className="text-lg font-medium text-gray-900 break-words">{selectedEvent.title}</h4>
-              {selectedEvent.notes && (
-                <p className="text-sm text-gray-600 mt-1 break-words">{selectedEvent.notes}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Date and Time */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-gray-700">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <span>{formatDate(new Date(selectedEvent.startDate).toISOString().split('T')[0])}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-gray-700">
-              <Clock className="h-4 w-4 text-gray-500" />
-              <span>
-                {formatTime(new Date(selectedEvent.startTime).toTimeString().slice(0, 8))}
-                {selectedEvent.endTime && ` - ${formatTime(new Date(selectedEvent.endTime).toTimeString().slice(0, 8))}`}
-              </span>
             </div>
           </div>
 
@@ -120,14 +102,44 @@ export default function EventPropertiesPanel({
             </div>
           )}
 
-          {/* Additional Notes Section */}
+          {/* Start Date & Time */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <Calendar className="h-4 w-4 text-gray-500" />
+              <span>Start: {formatDate(new Date(selectedEvent.startDate).toISOString().split('T')[0])}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <Clock className="h-4 w-4 text-gray-500" />
+              <span>{formatTime(new Date(selectedEvent.startTime).toTimeString().slice(0, 8))}</span>
+            </div>
+          </div>
+
+          {/* End Date & Time */}
+          {(selectedEvent.endDate || selectedEvent.endTime) && (
+            <div className="space-y-2">
+              {selectedEvent.endDate && (
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  <span>End: {formatDate(new Date(selectedEvent.endDate).toISOString().split('T')[0])}</span>
+                </div>
+              )}
+              {selectedEvent.endTime && (
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <Clock className="h-4 w-4 text-gray-500" />
+                  <span>{formatTime(new Date(selectedEvent.endTime).toTimeString().slice(0, 8))}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Notes */}
           {selectedEvent.notes && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                 <FileText className="h-4 w-4 text-gray-500" />
                 <span>Notes</span>
               </div>
-              <div className="pl-6 text-sm text-gray-600 break-words bg-gray-50 p-3 rounded">
+              <div className="text-sm text-gray-600 break-words bg-gray-50 p-3 rounded">
                 {selectedEvent.notes}
               </div>
             </div>
