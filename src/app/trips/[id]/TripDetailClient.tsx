@@ -134,7 +134,6 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   }
 
   const handleTimeSlotClick = (dayId: string, time: string, date?: string) => {
-    console.log('TripDetailClient.handleTimeSlotClick received:', { dayId, time, date })
     if (!dayId) {
       console.error('No dayId provided for time slot click')
       alert('Error: Cannot create event - no day selected')
@@ -144,19 +143,11 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     // Use the provided date if available, otherwise fall back to dayId lookup
     const clickedDate = date || getDateForDayId(dayId)
     
-    
     // Calculate default end time
     const endTime = calculateDefaultEndTime(time)
     
     if (calendarView === 'daily') {
       // For daily view, clear any selected event and enter creation mode in persistent modal
-      console.log('TripDetailClient: Setting up daily view event creation:', {
-        dayId,
-        time,
-        endTime,
-        clickedDate,
-        currentCalendarView: calendarView
-      })
       setPersistentModalEvent(null)
       setIsEditMode(true)
       setSelectedDayId(dayId)
@@ -175,7 +166,6 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   }
 
   const handleTimeRangeSelect = (dayId: string, startTime: string, endTime: string, endDate?: string, startDate?: string) => {
-    console.log('TripDetailClient.handleTimeRangeSelect received:', { dayId, startTime, endTime, endDate, startDate })
     if (!dayId) {
       console.error('No dayId provided for time range select')
       alert('Error: Cannot create event - no day selected')
@@ -184,8 +174,6 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     
     // Use the provided startDate if available, otherwise fall back to dayId lookup
     const startDateStr = startDate || getDateForDayId(dayId)
-    
-    
     
     if (calendarView === 'daily') {
       // For daily view, clear any selected event and enter creation mode in persistent modal

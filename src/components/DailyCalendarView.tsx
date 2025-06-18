@@ -92,13 +92,18 @@ export default function DailyCalendarView({
 
   // Helper function to get trip day for a specific date
   const getTripDayForDate = useCallback((date: Date) => {
-    return tripDays.find(td => isSameDay(td.date instanceof Date ? td.date : new Date(td.date), date))
+    const targetDateStr = normalizeDate(date)
+    return tripDays.find(td => {
+      const tripDayDateStr = td.date instanceof Date ? normalizeDate(td.date) : normalizeDate(new Date(td.date))
+      return targetDateStr === tripDayDateStr
+    })
   }, [tripDays])
 
   // Helper function to get events for a specific date
   const getEventsForDate = useCallback((date: Date) => {
     const tripDay = getTripDayForDate(date)
     if (!tripDay) return []
+    
     return events.filter(event => event.dayId === tripDay.id)
       .sort((a, b) => {
         const aTime = new Date(a.startTime).toTimeString().slice(0, 8)
@@ -181,20 +186,8 @@ export default function DailyCalendarView({
       if (startTime !== endTime) {
         // For daily view, pass the current date as both start and end date since it's same-day only
         const currentDateStr = normalizeDate(currentDate)
-        console.log('DailyCalendarView calling onTimeRangeSelect:', {
-          dayId: dragState.startDayId,
-          startTime,
-          endTime,
-          endDate: currentDateStr,
-          startDate: currentDateStr
-        })
         onTimeRangeSelect(dragState.startDayId, startTime, endTime, currentDateStr, currentDateStr)
       } else {
-        console.log('DailyCalendarView calling onTimeSlotClick from drag:', {
-          dayId: dragState.startDayId,
-          startTime,
-          date: normalizeDate(currentDate)
-        })
         onTimeSlotClick(dragState.startDayId, startTime, normalizeDate(currentDate))
       }
     }
@@ -356,18 +349,6 @@ export default function DailyCalendarView({
             const withinTripDates = isWithinTripDates()
             const isClickable = currentTripDay && withinTripDates
             
-            // Debug logging for every 5th time slot to avoid spam
-            if (timeSlot === '12:00' || timeSlot === '06:00' || timeSlot === '18:00') {
-              console.log('DailyCalendarView isClickable debug:', {
-                timeSlot,
-                currentDate: currentDate.toISOString(),
-                currentTripDay: currentTripDay ? { id: currentTripDay.id, date: currentTripDay.date } : null,
-                withinTripDates,
-                isClickable,
-                tripStartDate,
-                tripEndDate
-              })
-            }
             
             const isInSelection = isSlotInSelection(timeSlot)
             
@@ -400,13 +381,6 @@ export default function DailyCalendarView({
                     }
                   }}
                   onClick={(e) => {
-                    console.log('DailyCalendarView onClick:', { 
-                      timeSlot, 
-                      isClickable, 
-                      dragStateActive: dragState.isActive, 
-                      currentTripDay: !!currentTripDay,
-                      willEarlyReturn: !isClickable || dragState.isActive || !currentTripDay
-                    })
                     if (!isClickable || dragState.isActive || !currentTripDay) return
                     
                     // Get click position within the cell
@@ -456,11 +430,6 @@ export default function DailyCalendarView({
                       clickTime = timeSlot
                     }
                     
-                    console.log('DailyCalendarView calling onTimeSlotClick:', {
-                      dayId: currentTripDay.id,
-                      clickTime,
-                      date: normalizeDate(currentDate)
-                    })
                     onTimeSlotClick(currentTripDay.id, clickTime, normalizeDate(currentDate))
                   }}
                 >

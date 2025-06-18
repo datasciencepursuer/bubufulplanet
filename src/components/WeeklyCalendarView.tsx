@@ -128,15 +128,31 @@ export default function WeeklyCalendarView({
       if (tripDay) {
         eventsByDay[tripDay.id] = []
         
-        // Get all events that appear on this specific date
+        // Primary method: Direct dayId matching (same as DailyCalendarView)
         events.forEach(event => {
-          const eventStartDate = new Date(event.startDate)
-          const eventEndDate = event.endDate ? new Date(event.endDate) : eventStartDate
-          const currentDate = date
-          
-          // Check if the current date falls within the event's date range
-          if (currentDate >= eventStartDate && currentDate <= eventEndDate) {
+          if (event.dayId === tripDay.id) {
             eventsByDay[tripDay.id].push(event)
+          }
+        })
+        
+        // Secondary method: For cross-day events, check if this date falls within the event's range
+        events.forEach(event => {
+          // Skip if already added by dayId matching
+          if (event.dayId === tripDay.id) return
+          
+          // For cross-day events, check date overlap using normalized date strings
+          if (event.endDate && normalizeDate(event.startDate) !== normalizeDate(event.endDate)) {
+            const eventStartStr = normalizeDate(event.startDate)
+            const eventEndStr = normalizeDate(event.endDate)
+            const currentDateStr = normalizeDate(date)
+            
+            // Check if current date falls within the event's date range
+            if (currentDateStr >= eventStartStr && currentDateStr <= eventEndStr) {
+              // Only add if not already present
+              if (!eventsByDay[tripDay.id].find(e => e.id === event.id)) {
+                eventsByDay[tripDay.id].push(event)
+              }
+            }
           }
         })
         
