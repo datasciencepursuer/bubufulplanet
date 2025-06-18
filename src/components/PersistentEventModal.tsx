@@ -30,12 +30,14 @@ type EventApiData = {
   color: string
 }
 
-// Form data matches API format
+// Form data for internal use (includes date fields for UI)
 type EventFormData = {
   dayId: string
   title: string
   startSlot: string
   endSlot: string | null
+  startDate: string
+  endDate: string | null
   location: string | null
   notes: string | null
   weather: string | null
@@ -80,6 +82,8 @@ export default function PersistentEventModal({
     title: '',
     startSlot: selectedTime || '09:00',
     endSlot: selectedEndTime || '',
+    startDate: currentDate || normalizeDate(new Date()),
+    endDate: selectedEndDate || currentDate || normalizeDate(new Date()),
     location: '',
     notes: '',
     weather: '',
@@ -165,6 +169,8 @@ export default function PersistentEventModal({
         title: selectedEvent.title,
         startSlot: startTimeStr,
         endSlot: endTimeStr,
+        startDate: startDateStr,
+        endDate: endDateStr,
         location: selectedEvent.location || '',
         notes: selectedEvent.notes || '',
         weather: selectedEvent.weather || '',
@@ -180,6 +186,8 @@ export default function PersistentEventModal({
         title: '',
         startSlot: selectedTime || '09:00',
         endSlot: selectedEndTime || '',
+        startDate: currentDate || normalizeDate(new Date()),
+        endDate: selectedEndDate || currentDate || normalizeDate(new Date()),
         location: '',
         notes: '',
         weather: '',
@@ -444,10 +452,10 @@ export default function PersistentEventModal({
 
         <div>
           <label className="block text-sm font-medium mb-2">Start Time & Date *</label>
-          {tripStartDate && tripEndDate && formData.start_date && (
+          {tripStartDate && tripEndDate && formData.startDate && (
             <div className="mb-2 text-sm text-gray-600">
               {(() => {
-                const dateInfo = getTripDateInfo(new Date(formData.start_date), tripStartDate, tripEndDate)
+                const dateInfo = getTripDateInfo(new Date(formData.startDate), tripStartDate, tripEndDate)
                 const styles = getTripDateStyles(dateInfo)
                 
                 return styles.dayLabel.show && (
@@ -485,8 +493,8 @@ export default function PersistentEventModal({
               <input
                 type="date"
                 required
-                value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 className="w-full p-2 border rounded-md"
               />
             </div>
@@ -495,10 +503,10 @@ export default function PersistentEventModal({
         
         <div>
           <label className="block text-sm font-medium mb-2">End Time & Date</label>
-          {tripStartDate && tripEndDate && formData.end_date && (
+          {tripStartDate && tripEndDate && formData.endDate && (
             <div className="mb-2 text-sm text-gray-600">
               {(() => {
-                const dateInfo = getTripDateInfo(new Date(formData.end_date), tripStartDate, tripEndDate)
+                const dateInfo = getTripDateInfo(new Date(formData.endDate), tripStartDate, tripEndDate)
                 const styles = getTripDateStyles(dateInfo)
                 
                 return styles.dayLabel.show && (
@@ -537,8 +545,8 @@ export default function PersistentEventModal({
             <div>
               <input
                 type="date"
-                value={formData.end_date || ''}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                value={formData.endDate || ''}
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                 className="w-full p-2 border rounded-md"
               />
             </div>
