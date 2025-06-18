@@ -3,12 +3,13 @@ import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unifi
 import { prisma } from '@/lib/prisma'
 import { isValidTimeSlot, getNextTimeSlot } from '@/lib/timeSlotUtils'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     return await withUnifiedSessionContext(async (context) => {
       const event = await prisma.event.findFirst({
         where: {
-          id: params.id,
+          id: id,
           day: {
             trip: {
               groupId: context.groupId
@@ -41,8 +42,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const body = await request.json()
     const { event, expenses } = body
 
@@ -53,7 +55,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       // Verify event exists and belongs to user's group
       const existingEvent = await prisma.event.findFirst({
         where: {
-          id: params.id,
+          id: id,
           day: {
             trip: {
               groupId: context.groupId
@@ -105,7 +107,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
       // Update the event
       const updatedEvent = await prisma.event.update({
-        where: { id: params.id },
+        where: { id: id },
         data: eventData
       })
 
@@ -113,14 +115,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       if (expenses !== undefined) {
         // Delete existing expenses
         await prisma.expense.deleteMany({
-          where: { eventId: params.id }
+          where: { eventId: id }
         })
 
         // Create new expenses if provided
         if (expenses.length > 0) {
           await prisma.expense.createMany({
             data: expenses.map((expense: any) => ({
-              eventId: params.id,
+              eventId: id,
               dayId: existingEvent.dayId,
               description: expense.description,
               amount: expense.amount,
@@ -146,8 +148,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     return await withUnifiedSessionContext(async (context) => {
       // Check modify permission
       requireUnifiedPermission(context, 'modify')
@@ -155,7 +158,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       // Verify event exists and belongs to user's group
       const existingEvent = await prisma.event.findFirst({
         where: {
-          id: params.id,
+          id: id,
           day: {
             trip: {
               groupId: context.groupId
@@ -173,7 +176,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
       // Delete the event (expenses will be deleted automatically due to CASCADE)
       await prisma.event.delete({
-        where: { id: params.id }
+        where: { id: id }
       })
 
       return NextResponse.json({ message: 'Event deleted successfully' })

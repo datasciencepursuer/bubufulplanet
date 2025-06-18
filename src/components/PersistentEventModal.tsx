@@ -17,14 +17,12 @@ interface Destination {
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 type ExpenseInsert = { description: string; amount: number; category?: string }
 
-// API data format for events (snake_case) - matches EventModal
+// API data format for events (camelCase) - matches EventModal and backend API
 type EventApiData = {
-  day_id: string
+  dayId: string
   title: string
-  start_time: string
-  end_time: string | null
-  start_date: string
-  end_date: string | null
+  startSlot: string
+  endSlot: string | null
   location: string | null
   notes: string | null
   weather: string | null
@@ -32,14 +30,12 @@ type EventApiData = {
   color: string
 }
 
-// API expects snake_case field names to match database columns
+// Form data matches API format
 type EventFormData = {
-  day_id: string
+  dayId: string
   title: string
-  start_time: string
-  end_time: string | null
-  start_date: string
-  end_date: string | null
+  startSlot: string
+  endSlot: string | null
   location: string | null
   notes: string | null
   weather: string | null
@@ -80,12 +76,10 @@ export default function PersistentEventModal({
   onEditModeChange
 }: PersistentEventModalProps) {
   const [formData, setFormData] = useState<EventFormData>({
-    day_id: dayId,
+    dayId: dayId,
     title: '',
-    start_time: selectedTime || '09:00',
-    end_time: selectedEndTime || '',
-    start_date: currentDate || normalizeDate(new Date()),
-    end_date: selectedEndDate || currentDate || normalizeDate(new Date()),
+    startSlot: selectedTime || '09:00',
+    endSlot: selectedEndTime || '',
     location: '',
     notes: '',
     weather: '',

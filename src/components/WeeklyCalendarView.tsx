@@ -323,7 +323,15 @@ export default function WeeklyCalendarView({
                       <div
                         onClick={(e) => {
                           e.stopPropagation()
+                          // Call both event click and event select for properties panel
                           onEventClick(event)
+                          if (onEventSelect) {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            onEventSelect(event, { 
+                              top: rect.bottom + window.scrollY + 5, 
+                              left: rect.left + window.scrollX 
+                            })
+                          }
                         }}
                         className={`cursor-pointer hover:shadow-lg transition-all duration-200 rounded text-xs p-1 overflow-hidden ${
                           newEventIds?.has(event.id) ? 'event-grow-animation' : ''
