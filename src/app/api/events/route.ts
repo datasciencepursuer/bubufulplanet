@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session'
 import { prisma } from '@/lib/prisma'
-import { formatTimeForStorage, normalizeDate, validateDateRange } from '@/lib/dateTimeUtils'
+import { isValidTimeSlot, getNextTimeSlot } from '@/lib/timeSlotUtils'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
           expenses: true
         },
         orderBy: {
-          startTime: 'asc'
+          startSlot: 'asc'
         }
       })
 
@@ -69,14 +69,14 @@ export async function POST(request: NextRequest) {
       // Check create permission
       requireUnifiedPermission(context, 'create')
 
-      console.log('Creating event with data:', {
+      console.log('Creating event with simplified data:', {
         event,
         expenses,
         traveler: context.travelerName
       })
 
       // Verify trip day exists and belongs to user's group
-      const dayId = event.day_id || event.dayId
+      const dayId = event.dayId
       const tripDay = await prisma.tripDay.findFirst({
         where: {
           id: dayId,
@@ -97,42 +97,38 @@ export async function POST(request: NextRequest) {
         }, { status: 404 })
       }
 
-      // Handle both camelCase (legacy) and snake_case (new) event data
-      const startTime = event.start_time || event.startTime
-      const endTime = event.end_time || event.endTime
-      const startDate = event.start_date || event.startDate  
-      const endDate = event.end_date || event.endDate
-
-      // Validate input data
-      if (!startTime || !startDate) {
+      // Validate required fields
+      if (!event.title || !event.startSlot) {
         return NextResponse.json({ 
           error: 'Missing required fields',
-          details: 'start_time and start_date are required'
+          details: 'title and startSlot are required'
         }, { status: 400 })
       }
 
-      // Normalize and validate dates
-      const normalizedStartDate = normalizeDate(startDate)
-      const normalizedEndDate = endDate ? normalizeDate(endDate) : null
-
-      if (!validateDateRange(normalizedStartDate, normalizedEndDate || undefined)) {
+      // Validate time slots
+      if (!isValidTimeSlot(event.startSlot)) {
         return NextResponse.json({ 
-          error: 'Invalid date range',
-          details: 'End date cannot be before start date'
+          error: 'Invalid start time slot',
+          details: 'startSlot must be a valid time slot (e.g., "09:00")'
+        }, { status: 400 })
+      }
+
+      if (event.endSlot && !isValidTimeSlot(event.endSlot)) {
+        return NextResponse.json({ 
+          error: 'Invalid end time slot',
+          details: 'endSlot must be a valid time slot (e.g., "10:00")'
         }, { status: 400 })
       }
 
       const eventData = {
         dayId: dayId,
         title: event.title,
-        startTime: formatTimeForStorage(startTime),
-        endTime: endTime ? formatTimeForStorage(endTime) : null,
-        startDate: new Date(normalizedStartDate),
-        endDate: normalizedEndDate ? new Date(normalizedEndDate) : null,
-        location: event.location,
-        notes: event.notes,
-        weather: event.weather,
-        loadout: event.loadout,
+        startSlot: event.startSlot,
+        endSlot: event.endSlot || getNextTimeSlot(event.startSlot),
+        location: event.location || null,
+        notes: event.notes || null,
+        weather: event.weather || null,
+        loadout: event.loadout || null,
         color: event.color || '#3B82F6'
       }
 

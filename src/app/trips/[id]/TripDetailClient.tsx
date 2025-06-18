@@ -15,14 +15,12 @@ import { calculateDefaultEndTime } from '@/lib/dateTimeUtils'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 
-// API data format for events (snake_case) - matches EventModal
+// API data format for events (camelCase) - matches EventModal and API
 type EventApiData = {
-  day_id: string
+  dayId: string
   title: string
-  start_time: string
-  end_time: string | null
-  start_date: string
-  end_date: string | null
+  startSlot: string
+  endSlot: string | null
   location: string | null
   notes: string | null
   weather: string | null

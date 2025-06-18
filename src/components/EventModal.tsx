@@ -8,44 +8,27 @@ import ConfirmDialog from './ConfirmDialog'
 import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
 import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
-import { normalizeDate, extractTimeString, to12HourComponents, to24HourTime, TIME_OPTIONS_12H, calculateDefaultEndTime } from '@/lib/dateTimeUtils'
+import { TIME_SLOTS, formatTimeSlot, getNextTimeSlot } from '@/lib/timeSlotUtils'
 
 interface Destination {
   name: string
   link?: string
 }
 
-// API data format for events (snake_case)
+// API data format for events
 type EventApiData = {
-  day_id: string
+  dayId: string
   title: string
-  start_time: string
-  end_time: string | null
-  start_date: string
-  end_date: string | null
+  startSlot: string
+  endSlot: string | null
   location: string | null
   notes: string | null
   weather: string | null
   loadout: string | null
   color: string
 }
+
 type ExpenseInsert = { description: string; amount: number; category?: string }
-
-// API expects snake_case field names to match database columns
-type EventFormData = {
-  day_id: string
-  title: string
-  start_time: string
-  end_time: string | null
-  start_date: string
-  end_date: string | null
-  location: string | null
-  notes: string | null
-  weather: string | null
-  loadout: string | null
-  color: string
-}
-
 
 interface EventModalProps {
   isOpen: boolean
@@ -54,10 +37,8 @@ interface EventModalProps {
   onDelete?: (eventId: string) => void
   event?: Event | null
   dayId: string
-  selectedTime?: string
-  selectedEndTime?: string
-  currentDate?: string
-  selectedEndDate?: string
+  startSlot?: string
+  endSlot?: string
   tripStartDate?: string
   tripEndDate?: string
 }
@@ -69,30 +50,22 @@ export default function EventModal({
   onDelete,
   event, 
   dayId, 
-  selectedTime,
-  selectedEndTime,
-  currentDate,
-  selectedEndDate,
+  startSlot,
+  endSlot,
   tripStartDate,
   tripEndDate
 }: EventModalProps) {
-  const [formData, setFormData] = useState<EventFormData>({
-    day_id: dayId,
+  const [formData, setFormData] = useState<EventApiData>({
+    dayId: dayId,
     title: '',
-    start_time: selectedTime || '09:00',
-    end_time: selectedEndTime || '',
-    start_date: currentDate || normalizeDate(new Date()),
-    end_date: selectedEndDate || currentDate || normalizeDate(new Date()),
+    startSlot: startSlot || '09:00',
+    endSlot: endSlot || getNextTimeSlot(startSlot || '09:00'),
     location: '',
     notes: '',
     weather: '',
     loadout: '',
     color: DEFAULT_EVENT_COLOR
   })
-
-  // 12-hour time state
-  const [startTime12, setStartTime12] = useState(() => to12HourComponents(selectedTime || '09:00'))
-  const [endTime12, setEndTime12] = useState(() => to12HourComponents(selectedEndTime || ''))
 
   const [expenses, setExpenses] = useState<ExpenseInsert[]>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -158,87 +131,44 @@ export default function EventModal({
     fetchDestinations()
     
     if (event) {
-      const startTimeStr = extractTimeString(new Date(event.startTime))
-      const endTimeStr = event.endTime ? extractTimeString(new Date(event.endTime)) : ''
-      const startDateStr = normalizeDate(event.startDate)
-      const endDateStr = event.endDate ? normalizeDate(event.endDate) : startDateStr
-      
       setFormData({
-        day_id: event.dayId,
+        dayId: event.dayId,
         title: event.title,
-        start_time: startTimeStr,
-        end_time: endTimeStr,
-        start_date: startDateStr,
-        end_date: endDateStr,
+        startSlot: event.startSlot,
+        endSlot: event.endSlot,
         location: event.location || '',
         notes: event.notes || '',
         weather: event.weather || '',
         loadout: event.loadout || '',
         color: event.color || DEFAULT_EVENT_COLOR
       })
-      setStartTime12(to12HourComponents(startTimeStr))
-      setEndTime12(to12HourComponents(endTimeStr))
       fetchExistingExpenses(event.id)
     } else {
       setFormData({
-        day_id: dayId,
+        dayId: dayId,
         title: '',
-        start_time: selectedTime || '09:00',
-        end_time: selectedEndTime || '',
-        start_date: currentDate || normalizeDate(new Date()),
-        end_date: selectedEndDate || currentDate || normalizeDate(new Date()),
+        startSlot: startSlot || '09:00',
+        endSlot: endSlot || getNextTimeSlot(startSlot || '09:00'),
         location: '',
         notes: '',
         weather: '',
         loadout: '',
         color: DEFAULT_EVENT_COLOR
       })
-      setStartTime12(to12HourComponents(selectedTime || '09:00'))
-      setEndTime12(to12HourComponents(selectedEndTime || ''))
       setExpenses([])
     }
-  }, [event, dayId, selectedTime, selectedEndTime, currentDate, selectedEndDate, fetchExistingExpenses, fetchDestinations])
-
-  // Update 24-hour time when 12-hour components change
-  useEffect(() => {
-    const time24 = to24HourTime(startTime12.time, startTime12.period)
-    setFormData((prev: EventFormData) => ({ ...prev, start_time: time24 }))
-  }, [startTime12])
-
-  useEffect(() => {
-    if (endTime12.time && endTime12.time !== '12:00') {
-      const time24 = to24HourTime(endTime12.time, endTime12.period)
-      setFormData((prev: EventFormData) => ({ ...prev, end_time: time24 }))
-    } else if (!endTime12.time) {
-      setFormData((prev: EventFormData) => ({ ...prev, end_time: '' }))
-    }
-  }, [endTime12])
+  }, [event, dayId, startSlot, endSlot, fetchExistingExpenses, fetchDestinations])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Set default end time if not provided
+    // Ensure end slot is set
     let finalFormData = { ...formData }
-    if (!finalFormData.end_time) {
-      finalFormData.end_time = calculateDefaultEndTime(finalFormData.start_time)
+    if (!finalFormData.endSlot) {
+      finalFormData.endSlot = getNextTimeSlot(finalFormData.startSlot)
     }
     
-    // For API, keep the snake_case format that the API expects
-    const eventApiData = {
-      day_id: finalFormData.day_id,
-      title: finalFormData.title,
-      start_time: finalFormData.start_time,
-      end_time: finalFormData.end_time,
-      start_date: finalFormData.start_date,
-      end_date: finalFormData.end_date,
-      location: finalFormData.location,
-      notes: finalFormData.notes,
-      weather: finalFormData.weather,
-      loadout: finalFormData.loadout,
-      color: finalFormData.color
-    }
-    
-    onSave(eventApiData, expenses)
+    onSave(finalFormData, expenses)
     onClose()
   }
 
@@ -275,7 +205,6 @@ export default function EventModal({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showDestinationDropdown])
 
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) {
@@ -301,6 +230,36 @@ export default function EventModal({
               className="w-full p-2 border rounded-md"
               placeholder="Event title"
             />
+          </div>
+
+          {/* Time Slots */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Start Time *</label>
+              <select
+                value={formData.startSlot}
+                onChange={(e) => setFormData({ ...formData, startSlot: e.target.value })}
+                className="w-full p-2 border rounded-md"
+              >
+                {TIME_SLOTS.map(slot => (
+                  <option key={slot} value={slot}>{formatTimeSlot(slot)}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">End Time</label>
+              <select
+                value={formData.endSlot || ''}
+                onChange={(e) => setFormData({ ...formData, endSlot: e.target.value || null })}
+                className="w-full p-2 border rounded-md"
+              >
+                <option value="">--</option>
+                {TIME_SLOTS.map(slot => (
+                  <option key={slot} value={slot}>{formatTimeSlot(slot)}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Location */}
@@ -353,109 +312,6 @@ export default function EventModal({
                 Add destinations to Points of Interest to see them here
               </div>
             )}
-          </div>
-
-          {/* Start Date */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Start Date *</label>
-            {tripStartDate && tripEndDate && formData.start_date && (
-              <div className="mb-2 text-sm text-gray-600">
-                {(() => {
-                  const dateInfo = getTripDateInfo(new Date(formData.start_date), tripStartDate, tripEndDate)
-                  const styles = getTripDateStyles(dateInfo)
-                  
-                  return styles.dayLabel.show && (
-                    <span className={styles.dayLabel.className}>
-                      {styles.dayLabel.text}{dateInfo.dateType === 'trip-day' ? ' of trip' : ''}
-                    </span>
-                  )
-                })()
-                }
-              </div>
-            )}
-            <input
-              type="date"
-              required
-              value={formData.start_date}
-              onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-              className="w-full p-2 border rounded-md"
-            />
-          </div>
-
-          {/* Start Time */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Start Time *</label>
-            <div className="flex gap-2">
-              <select
-                value={startTime12.time}
-                onChange={(e) => setStartTime12({ ...startTime12, time: e.target.value })}
-                className="flex-1 p-2 border rounded-md"
-              >
-                {TIME_OPTIONS_12H.map(time => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
-              <select
-                value={startTime12.period}
-                onChange={(e) => setStartTime12({ ...startTime12, period: e.target.value as 'AM' | 'PM' })}
-                className="w-20 p-2 border rounded-md"
-              >
-                <option value="AM">AM</option>
-                <option value="PM">PM</option>
-              </select>
-            </div>
-          </div>
-
-          {/* End Date */}
-          <div>
-            <label className="block text-sm font-medium mb-2">End Date</label>
-            {tripStartDate && tripEndDate && formData.end_date && (
-              <div className="mb-2 text-sm text-gray-600">
-                {(() => {
-                  const dateInfo = getTripDateInfo(new Date(formData.end_date), tripStartDate, tripEndDate)
-                  const styles = getTripDateStyles(dateInfo)
-                  
-                  return styles.dayLabel.show && (
-                    <span className={styles.dayLabel.className}>
-                      {styles.dayLabel.text}{dateInfo.dateType === 'trip-day' ? ' of trip' : ''}
-                    </span>
-                  )
-                })()
-                }
-              </div>
-            )}
-            <input
-              type="date"
-              value={formData.end_date || ''}
-              onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-              className="w-full p-2 border rounded-md"
-            />
-          </div>
-          
-          {/* End Time */}
-          <div>
-            <label className="block text-sm font-medium mb-2">End Time</label>
-            <div className="flex gap-2">
-              <select
-                value={endTime12.time}
-                onChange={(e) => setEndTime12({ ...endTime12, time: e.target.value })}
-                className="flex-1 p-2 border rounded-md"
-              >
-                <option value="">--</option>
-                {TIME_OPTIONS_12H.map(time => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
-              <select
-                value={endTime12.period}
-                onChange={(e) => setEndTime12({ ...endTime12, period: e.target.value as 'AM' | 'PM' })}
-                className="w-20 p-2 border rounded-md"
-                disabled={!endTime12.time}
-              >
-                <option value="AM">AM</option>
-                <option value="PM">PM</option>
-              </select>
-            </div>
           </div>
 
           {/* Notes */}

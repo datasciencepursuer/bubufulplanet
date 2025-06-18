@@ -1,228 +1,193 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session'
 import { prisma } from '@/lib/prisma'
-import type { Event, Expense } from '@prisma/client'
-import { formatTimeForStorage, normalizeDate, validateDateRange, extractTimeString } from '@/lib/dateTimeUtils'
+import { isValidTimeSlot, getNextTimeSlot } from '@/lib/timeSlotUtils'
 
-type EventUpdate = Partial<Omit<Event, 'id' | 'createdAt'>>
-type ExpenseInsert = Omit<Expense, 'id' | 'createdAt' | 'dayId' | 'eventId'>
-
-// API input interface with snake_case naming
-interface EventUpdateInput {
-  title?: string
-  start_time?: string
-  end_time?: string | null
-  start_date?: string
-  end_date?: string | null
-  location?: string | null
-  notes?: string | null
-  weather?: string | null
-  loadout?: string | null
-  color?: string
-}
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const event = await prisma.event.findUnique({
-      where: { id },
-      include: {
-        day: {
-          select: {
-            id: true,
-            tripId: true
+    return await withUnifiedSessionContext(async (context) => {
+      const event = await prisma.event.findFirst({
+        where: {
+          id: params.id,
+          day: {
+            trip: {
+              groupId: context.groupId
+            }
           }
         },
-        expenses: true
-      }
-    })
-
-    if (!event) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
-    }
-
-    // Transform Prisma camelCase to snake_case for API compatibility
-    const transformedEvent = {
-      id: event.id,
-      day_id: event.dayId,
-      title: event.title,
-      start_time: extractTimeString(event.startTime), // Use consistent time extraction
-      end_time: event.endTime ? extractTimeString(event.endTime) : null,
-      start_date: normalizeDate(event.startDate), // Use consistent date normalization
-      end_date: event.endDate ? normalizeDate(event.endDate) : null,
-      location: event.location,
-      notes: event.notes,
-      weather: event.weather,
-      loadout: event.loadout,
-      color: event.color,
-      created_at: event.createdAt.toISOString(),
-      trip_days: event.day ? {
-        id: event.day.id,
-        trip_id: event.day.tripId
-      } : null,
-      expenses: event.expenses?.map(expense => ({
-        id: expense.id,
-        event_id: expense.eventId,
-        day_id: expense.dayId,
-        description: expense.description,
-        amount: expense.amount,
-        category: expense.category,
-        created_at: expense.createdAt.toISOString()
-      })) || []
-    }
-
-    return NextResponse.json({ event: transformedEvent })
-  } catch (error) {
-    console.error('Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-
-  try {
-    const body = await request.json()
-    const { event, expenses }: { 
-      event: EventUpdateInput
-      expenses?: Omit<ExpenseInsert, 'day_id' | 'event_id'>[] 
-    } = body
-
-    // Verify event exists and get day_id
-    const existingEvent = await prisma.event.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        dayId: true
-      }
-    })
-
-    if (!existingEvent) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
-    }
-
-    // Transform snake_case input to camelCase for Prisma with validation
-    const prismaEventData: any = {}
-    
-    if (event.title !== undefined) prismaEventData.title = event.title
-    
-    if (event.start_time !== undefined) {
-      prismaEventData.startTime = formatTimeForStorage(event.start_time)
-    }
-    
-    if (event.end_time !== undefined) {
-      prismaEventData.endTime = event.end_time ? formatTimeForStorage(event.end_time) : null
-    }
-    
-    if (event.start_date !== undefined) {
-      const normalizedStartDate = normalizeDate(event.start_date)
-      prismaEventData.startDate = new Date(normalizedStartDate)
-    }
-    
-    if (event.end_date !== undefined) {
-      const normalizedEndDate = event.end_date ? normalizeDate(event.end_date) : null
-      prismaEventData.endDate = normalizedEndDate ? new Date(normalizedEndDate) : null
-      
-      // Validate date range if both dates are being updated
-      if (event.start_date !== undefined && normalizedEndDate) {
-        const normalizedStartDate = normalizeDate(event.start_date)
-        if (!validateDateRange(normalizedStartDate, normalizedEndDate)) {
-          return NextResponse.json({ 
-            error: 'Invalid date range',
-            details: 'End date cannot be before start date'
-          }, { status: 400 })
+        include: {
+          day: true,
+          expenses: true
         }
-      }
-    }
-    
-    if (event.location !== undefined) prismaEventData.location = event.location
-    if (event.notes !== undefined) prismaEventData.notes = event.notes
-    if (event.weather !== undefined) prismaEventData.weather = event.weather
-    if (event.loadout !== undefined) prismaEventData.loadout = event.loadout
-    if (event.color !== undefined) prismaEventData.color = event.color
-
-    // Update the event
-    const updatedEvent = await prisma.event.update({
-      where: { id },
-      data: prismaEventData
-    })
-
-    // Handle expenses update if provided
-    if (expenses !== undefined) {
-      // Delete existing expenses for this event
-      await prisma.expense.deleteMany({
-        where: { eventId: id }
       })
 
-      // Insert new expenses if any
-      if (expenses.length > 0) {
-        const expenseInserts = expenses.map(expense => ({
-          ...expense,
-          dayId: existingEvent.dayId,
-          eventId: id
-        }))
-
-        await prisma.expense.createMany({
-          data: expenseInserts
-        })
+      if (!event) {
+        return NextResponse.json({ 
+          error: 'Event not found',
+          details: 'Event does not exist or you do not have access'
+        }, { status: 404 })
       }
-    }
 
-    // Transform Prisma camelCase to snake_case for API compatibility
-    const transformedEvent = {
-      id: updatedEvent.id,
-      day_id: updatedEvent.dayId,
-      title: updatedEvent.title,
-      start_time: extractTimeString(updatedEvent.startTime), // Use consistent time extraction
-      end_time: updatedEvent.endTime ? extractTimeString(updatedEvent.endTime) : null,
-      start_date: normalizeDate(updatedEvent.startDate), // Use consistent date normalization
-      end_date: updatedEvent.endDate ? normalizeDate(updatedEvent.endDate) : null,
-      location: updatedEvent.location,
-      notes: updatedEvent.notes,
-      weather: updatedEvent.weather,
-      loadout: updatedEvent.loadout,
-      color: updatedEvent.color,
-      created_at: updatedEvent.createdAt.toISOString()
-    }
-
-    return NextResponse.json({ event: transformedEvent })
+      return NextResponse.json({ event })
+    })
   } catch (error) {
-    console.error('Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    console.error('Unexpected error in GET /api/events/[id]:', error)
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Internal server error'
+    }, { status: 500 })
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    // Verify event exists
-    const event = await prisma.event.findUnique({
-      where: { id },
-      select: { id: true }
+    const body = await request.json()
+    const { event, expenses } = body
+
+    return await withUnifiedSessionContext(async (context) => {
+      // Check modify permission
+      requireUnifiedPermission(context, 'modify')
+
+      // Verify event exists and belongs to user's group
+      const existingEvent = await prisma.event.findFirst({
+        where: {
+          id: params.id,
+          day: {
+            trip: {
+              groupId: context.groupId
+            }
+          }
+        }
+      })
+
+      if (!existingEvent) {
+        return NextResponse.json({ 
+          error: 'Event not found',
+          details: 'Event does not exist or you do not have access'
+        }, { status: 404 })
+      }
+
+      // Validate required fields
+      if (!event.title || !event.startSlot) {
+        return NextResponse.json({ 
+          error: 'Missing required fields',
+          details: 'title and startSlot are required'
+        }, { status: 400 })
+      }
+
+      // Validate time slots
+      if (!isValidTimeSlot(event.startSlot)) {
+        return NextResponse.json({ 
+          error: 'Invalid start time slot',
+          details: 'startSlot must be a valid time slot (e.g., "09:00")'
+        }, { status: 400 })
+      }
+
+      if (event.endSlot && !isValidTimeSlot(event.endSlot)) {
+        return NextResponse.json({ 
+          error: 'Invalid end time slot',
+          details: 'endSlot must be a valid time slot (e.g., "10:00")'
+        }, { status: 400 })
+      }
+
+      const eventData = {
+        title: event.title,
+        startSlot: event.startSlot,
+        endSlot: event.endSlot || getNextTimeSlot(event.startSlot),
+        location: event.location || null,
+        notes: event.notes || null,
+        weather: event.weather || null,
+        loadout: event.loadout || null,
+        color: event.color || '#3B82F6'
+      }
+
+      // Update the event
+      const updatedEvent = await prisma.event.update({
+        where: { id: params.id },
+        data: eventData
+      })
+
+      // Update expenses
+      if (expenses !== undefined) {
+        // Delete existing expenses
+        await prisma.expense.deleteMany({
+          where: { eventId: params.id }
+        })
+
+        // Create new expenses if provided
+        if (expenses.length > 0) {
+          await prisma.expense.createMany({
+            data: expenses.map((expense: any) => ({
+              eventId: params.id,
+              dayId: existingEvent.dayId,
+              description: expense.description,
+              amount: expense.amount,
+              category: expense.category
+            }))
+          })
+        }
+      }
+
+      return NextResponse.json({ event: updatedEvent })
     })
-
-    if (!event) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
-    }
-
-    // Delete the event (expenses will be deleted automatically due to CASCADE)
-    await prisma.event.delete({
-      where: { id }
-    })
-
-    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (error instanceof Error && error.message.includes('Insufficient permissions')) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    console.error('Unexpected error in PUT /api/events/[id]:', error)
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Internal server error'
+    }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    return await withUnifiedSessionContext(async (context) => {
+      // Check modify permission
+      requireUnifiedPermission(context, 'modify')
+
+      // Verify event exists and belongs to user's group
+      const existingEvent = await prisma.event.findFirst({
+        where: {
+          id: params.id,
+          day: {
+            trip: {
+              groupId: context.groupId
+            }
+          }
+        }
+      })
+
+      if (!existingEvent) {
+        return NextResponse.json({ 
+          error: 'Event not found',
+          details: 'Event does not exist or you do not have access'
+        }, { status: 404 })
+      }
+
+      // Delete the event (expenses will be deleted automatically due to CASCADE)
+      await prisma.event.delete({
+        where: { id: params.id }
+      })
+
+      return NextResponse.json({ message: 'Event deleted successfully' })
+    })
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (error instanceof Error && error.message.includes('Insufficient permissions')) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    console.error('Unexpected error in DELETE /api/events/[id]:', error)
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Internal server error'
+    }, { status: 500 })
   }
 }

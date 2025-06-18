@@ -52,25 +52,23 @@ model TripDay {
 }
 
 model Event {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dayId     String    @map("day_id") @db.Uuid
-  title     String    @db.VarChar(255)
-  startTime DateTime  @map("start_time") @db.Time(6)
-  endTime   DateTime? @map("end_time") @db.Time(6)
-  startDate DateTime  @map("start_date") @db.Date
-  endDate   DateTime? @map("end_date") @db.Date
-  location  String?   @db.VarChar(255)
-  notes     String?   @db.Text
-  weather   String?   @db.VarChar(255)
-  loadout   String?   @db.Text
-  color     String    @default("#3B82F6") @db.VarChar(7)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dayId       String   @map("day_id") @db.Uuid
+  title       String   @db.VarChar(255)
+  startSlot   String   @map("start_slot") @db.VarChar(5) // e.g., "09:00"
+  endSlot     String?  @map("end_slot") @db.VarChar(5)   // e.g., "10:00"
+  location    String?  @db.VarChar(255)
+  notes       String?  @db.Text
+  weather     String?  @db.VarChar(255)
+  loadout     String?  @db.Text
+  color       String   @default("#3B82F6") @db.VarChar(7)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   day      TripDay   @relation(fields: [dayId], references: [id], onDelete: Cascade)
   expenses Expense[]
 
   @@index([dayId], map: "idx_events_day_id")
-  @@index([startTime, endTime], map: "idx_events_time")
+  @@index([startSlot, endSlot], map: "idx_events_slots")
   @@map("events")
 }
 
