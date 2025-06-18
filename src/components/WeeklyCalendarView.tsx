@@ -746,28 +746,34 @@ export default function WeeklyCalendarView({
                         }}
                       >
                         {durationMinutes <= 30 ? (
-                          // Ultra-compact view for 30-minute events - title only with better typography
+                          // Ultra-compact view for 30-minute events - title only with tooltip including notes
                           <div className="flex items-center h-full">
-                            <div className="font-medium text-left leading-tight text-xs truncate" title={`${event.title}${event.location ? ` • ${event.location}` : ''} • ${format(new Date(`2000-01-01T${dateToTimeString(event.startTime)}`), 'h:mm a')}${event.endTime ? ` - ${format(new Date(`2000-01-01T${dateToTimeString(event.endTime)}`), 'h:mm a')}` : ''}`}>
+                            <div className="font-medium text-left leading-tight text-xs truncate" title={`${event.title}${event.location ? ` • ${event.location}` : ''}${event.notes ? ` • ${event.notes}` : ''} • ${format(new Date(`2000-01-01T${dateToTimeString(event.startTime)}`), 'h:mm a')}${event.endTime ? ` - ${format(new Date(`2000-01-01T${dateToTimeString(event.endTime)}`), 'h:mm a')}` : ''}`}>
                               {event.title}
                             </div>
                           </div>
                         ) : durationMinutes <= 60 ? (
-                          // Compact view for 1-hour events - title and time
+                          // Compact view for 1-hour events - title, time, and notes if available
                           <div className="flex flex-col justify-center h-full gap-1">
                             <div className="font-medium text-left truncate text-sm">{event.title}</div>
                             <div className="text-xs opacity-75 text-left truncate">
                               {format(new Date(`2000-01-01T${dateToTimeString(event.startTime)}`), 'h:mm a')}
                               {event.endTime && ` - ${format(new Date(`2000-01-01T${dateToTimeString(event.endTime)}`), 'h:mm a')}`}
                             </div>
+                            {event.notes && (
+                              <div className="text-xs text-left opacity-75 truncate italic">{event.notes}</div>
+                            )}
                           </div>
                         ) : (
-                          // Full view for longer events - title, location, and time
+                          // Full view for longer events - title, location, notes, and time
                           <div className="flex flex-col justify-between h-full">
                             <div>
                               <div className="font-medium text-left truncate">{event.title}</div>
                               {event.location && (
                                 <div className="text-left truncate opacity-90 mt-1">{event.location}</div>
+                              )}
+                              {event.notes && (
+                                <div className="text-sm text-left opacity-75 mt-1 line-clamp-2 italic">{event.notes}</div>
                               )}
                             </div>
                             <div className="text-xs opacity-75 text-left">
