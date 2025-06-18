@@ -146,7 +146,7 @@ export default function Home() {
         <Card className="border-0 shadow-2xl">
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-teal-800 to-teal-600 bg-clip-text text-transparent">
-              Vacation Planner
+              Bubuful Planet
             </CardTitle>
             <CardDescription className="text-gray-600">
               {mode === 'select' && 'Choose how to get started'}
@@ -218,12 +218,12 @@ export default function Home() {
                       <div className="w-28">
                         <select
                           value={member.role}
-                          onChange={(e) => updateMember(index, 'role', e.target.value as 'adventurer' | 'follower')}
+                          onChange={(e) => updateMember(index, 'role', e.target.value as 'adventurer' | 'party member')}
                           className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-200 focus:outline-none transition-all duration-200"
                           disabled={index === 0 || loading}
                         >
-                          <option value="adventurer">Leader</option>
-                          <option value="follower">Follower</option>
+                          <option value="adventurer">Adventurer</option>
+                          <option value="party member">Party Member</option>
                         </select>
                       </div>
                       {members.length > 1 && (

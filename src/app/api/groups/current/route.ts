@@ -71,6 +71,8 @@ export async function GET() {
         accessCode: group.accessCode,
         createdAt: group.createdAt.toISOString()
       },
+      travelerName: member.travelerName,
+      role: member.role,
       currentMember: {
         id: member.id,
         name: member.travelerName,

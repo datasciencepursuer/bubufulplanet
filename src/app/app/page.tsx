@@ -47,7 +47,14 @@ export default function AppPage() {
       const response = await fetch('/api/groups/current')
       if (response.ok) {
         const data = await response.json()
+        console.log('Group info loaded:', data) // Debug log
         setGroupInfo({
+          name: data.group.name,
+          accessCode: data.group.accessCode,
+          travelerName: data.travelerName,
+          role: data.role
+        })
+        console.log('Set group info:', { // Debug log
           name: data.group.name,
           accessCode: data.group.accessCode,
           travelerName: data.travelerName,
@@ -241,6 +248,17 @@ export default function AppPage() {
                 )}
               </div>
             </div>
+            
+            {/* Center Brand */}
+            <div className="flex flex-col items-center justify-center">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-teal-800 to-teal-600 bg-clip-text text-transparent">
+                Bubuful Planet
+              </h2>
+              <p className="text-xs text-gray-500 italic">
+                Plan it beautifully
+              </p>
+            </div>
+            
             <div className="flex items-center gap-4">
               <Button 
                 variant="outline" 
@@ -278,15 +296,18 @@ export default function AppPage() {
               </div>
               
               {/* Welcome Card */}
-              {groupInfo && groupInfo.travelerName && (
-                <Card className="bg-teal-50 border-teal-200 max-w-sm flex-shrink-0">
-                  <CardContent className="pt-4">
-                    <p className="text-lg text-teal-700 font-medium">
-                      Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'} {groupInfo.travelerName}!
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+              {(() => {
+                console.log('Welcome card render check:', { groupInfo, travelerName: groupInfo?.travelerName, role: groupInfo?.role })
+                return groupInfo && groupInfo.travelerName && (
+                  <Card className="bg-teal-50 border-teal-200 max-w-sm flex-shrink-0">
+                    <CardContent className="pt-4">
+                      <p className="text-lg text-teal-700 font-medium">
+                        Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'} {groupInfo.travelerName}!
+                      </p>
+                    </CardContent>
+                  </Card>
+                )
+              })()}
             </div>
             
             {/* Next Trip Card - Moved from utility cards */}
