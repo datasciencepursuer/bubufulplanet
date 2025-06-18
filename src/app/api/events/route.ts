@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
       } else if (tripId) {
         whereClause.day = {
           trip: {
+            id: tripId,
             groupId: context.groupId
           }
         }
