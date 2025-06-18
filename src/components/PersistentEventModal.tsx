@@ -157,7 +157,7 @@ export default function PersistentEventModal({
     if (selectedEvent && isEditMode) {
       const startTimeStr = selectedEvent.startSlot || '09:00'
       const endTimeStr = selectedEvent.endSlot || ''
-      const startDateStr = selectedEvent.day?.date ? normalizeDate(selectedEvent.day.date) : normalizeDate(new Date())
+      const startDateStr = currentDate || normalizeDate(new Date())
       const endDateStr = startDateStr
       
       setFormData({
@@ -209,15 +209,15 @@ export default function PersistentEventModal({
   // Update 24-hour time when 12-hour components change
   useEffect(() => {
     const time24 = to24HourTime(startTime12.time, startTime12.period)
-    setFormData((prev: EventFormData) => ({ ...prev, start_time: time24 }))
+    setFormData((prev: EventFormData) => ({ ...prev, startSlot: time24 }))
   }, [startTime12])
 
   useEffect(() => {
     if (endTime12.time && endTime12.time !== '12:00') {
       const time24 = to24HourTime(endTime12.time, endTime12.period)
-      setFormData((prev: EventFormData) => ({ ...prev, end_time: time24 }))
+      setFormData((prev: EventFormData) => ({ ...prev, endSlot: time24 }))
     } else if (!endTime12.time) {
-      setFormData((prev: EventFormData) => ({ ...prev, end_time: '' }))
+      setFormData((prev: EventFormData) => ({ ...prev, endSlot: null }))
     }
   }, [endTime12])
 
@@ -226,18 +226,16 @@ export default function PersistentEventModal({
     
     // Set default end time if not provided
     let finalFormData = { ...formData }
-    if (!finalFormData.end_time) {
-      finalFormData.end_time = calculateDefaultEndTime(finalFormData.start_time)
+    if (!finalFormData.endSlot) {
+      finalFormData.endSlot = finalFormData.startSlot // Use same slot for default
     }
     
-    // For API, keep the snake_case format that the API expects
+    // Convert to API format (camelCase)
     const eventApiData: EventApiData = {
-      day_id: finalFormData.day_id,
+      dayId: finalFormData.dayId,
       title: finalFormData.title,
-      start_time: finalFormData.start_time,
-      end_time: finalFormData.end_time,
-      start_date: finalFormData.start_date,
-      end_date: finalFormData.end_date,
+      startSlot: finalFormData.startSlot,
+      endSlot: finalFormData.endSlot,
       location: finalFormData.location,
       notes: finalFormData.notes,
       weather: finalFormData.weather,
@@ -344,12 +342,12 @@ export default function PersistentEventModal({
                 {selectedEvent.startSlot || 'No start time'}
               </div>
               <div className="text-sm text-gray-600">
-                {selectedEvent.day?.date ? new Date(selectedEvent.day.date).toLocaleDateString() : 'No date'}
+                {currentDate ? new Date(currentDate).toLocaleDateString() : 'No date'}
               </div>
-              {tripStartDate && tripEndDate && selectedEvent.day?.date && (
+              {tripStartDate && tripEndDate && currentDate && (
                 <div className="text-xs mt-1">
                   {(() => {
-                    const dateInfo = getTripDateInfo(new Date(selectedEvent.day.date), tripStartDate, tripEndDate)
+                    const dateInfo = getTripDateInfo(new Date(currentDate), tripStartDate, tripEndDate)
                     const styles = getTripDateStyles(dateInfo)
                     
                     return styles.dayLabel.show && (
