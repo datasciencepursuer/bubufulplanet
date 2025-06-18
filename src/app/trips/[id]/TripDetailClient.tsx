@@ -10,7 +10,8 @@ import EventModal from '@/components/EventModal'
 import PersistentEventModal from '@/components/PersistentEventModal'
 import EventPropertiesPanel from '@/components/EventPropertiesPanel'
 import type { Trip, TripDay, Event, Expense } from '@prisma/client'
-import { normalizeDate } from '@/lib/tripDayUtils'
+import { normalizeDate } from '@/lib/dateTimeUtils'
+import { calculateDefaultEndTime } from '@/lib/dateTimeUtils'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 
@@ -140,22 +141,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       return
     }
     
-    // Parse the time to calculate end time
-    const [hours, minutes] = time.split(':').map(Number)
-    let endHours = hours
-    let endMinutes = minutes
-    
-    // Default to 1 hour duration, or 30 minutes if starting at :30
-    if (minutes === 30) {
-      endHours = hours + 1
-      endMinutes = 0
-    } else {
-      endHours = hours + 1
-      endMinutes = 0
-    }
-    
-    // Format end time
-    const endTime = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
+    // Calculate default end time
+    const endTime = calculateDefaultEndTime(time)
     
     if (calendarView === 'daily') {
       // For daily view, clear any selected event and enter creation mode in persistent modal
@@ -468,8 +455,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         {calendarView === 'weekly' ? (
           <WeeklyCalendarView
             key={`weekly-${trip.id}`}
-            tripStartDate={trip.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : ''}
-            tripEndDate={trip.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : ''}
+            tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
+            tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
             tripDays={tripDays}
             events={events}
             selectedEventId={selectedEventForPanel?.id}
@@ -484,8 +471,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           <div className="grid grid-cols-2 gap-6 h-full">
             <DailyCalendarView
               key={`daily-${trip.id}`}
-              tripStartDate={trip.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : ''}
-              tripEndDate={trip.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : ''}
+              tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
+              tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
               tripDays={tripDays}
               events={events}
               selectedEventId={persistentModalEvent?.id}
@@ -506,8 +493,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
               selectedEndTime={selectedEndTime}
               currentDate={currentDate}
               selectedEndDate={selectedEndDate}
-              tripStartDate={trip?.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : undefined}
-              tripEndDate={trip?.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : undefined}
+              tripStartDate={trip?.startDate ? normalizeDate(trip.startDate) : undefined}
+              tripEndDate={trip?.endDate ? normalizeDate(trip.endDate) : undefined}
               isEditMode={isEditMode}
               onEditModeChange={setIsEditMode}
             />
@@ -547,8 +534,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           selectedEndTime={selectedEndTime}
           currentDate={currentDate}
           selectedEndDate={selectedEndDate}
-          tripStartDate={trip?.startDate ? new Date(trip.startDate).toISOString().split('T')[0] : undefined}
-          tripEndDate={trip?.endDate ? new Date(trip.endDate).toISOString().split('T')[0] : undefined}
+          tripStartDate={trip?.startDate ? normalizeDate(trip.startDate) : undefined}
+          tripEndDate={trip?.endDate ? normalizeDate(trip.endDate) : undefined}
         />
       )}
     </div>

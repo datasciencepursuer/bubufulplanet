@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import type { Event, TripDay } from '@prisma/client'
 import { EVENT_COLORS, getEventColor } from '@/lib/eventColors'
 import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
+import { calculateDefaultEndTime } from '@/lib/dateTimeUtils'
 
 interface DailyCalendarViewProps {
   tripStartDate: string
@@ -211,18 +212,6 @@ export default function DailyCalendarView({
   const canGoToPrevious = currentDate > startDate
   const canGoToNext = currentDate < endDate
 
-  // Calculate default end time (1 hour after start time)
-  const calculateDefaultEndTime = (startTime: string): string => {
-    const [hours, minutes] = startTime.split(':').map(Number)
-    let endHours = hours + 1
-    let endMinutes = minutes
-    
-    if (endHours >= 24) {
-      endHours = endHours % 24
-    }
-    
-    return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
-  }
 
   const getEventForTimeSlot = (timeSlot: string): Event | null => {
     return eventsForDay.find(event => {

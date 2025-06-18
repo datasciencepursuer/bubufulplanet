@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session'
 import { prisma } from '@/lib/prisma'
+import { formatTimeForStorage, normalizeDate, validateDateRange } from '@/lib/dateTimeUtils'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -102,13 +103,32 @@ export async function POST(request: NextRequest) {
       const startDate = event.start_date || event.startDate  
       const endDate = event.end_date || event.endDate
 
+      // Validate input data
+      if (!startTime || !startDate) {
+        return NextResponse.json({ 
+          error: 'Missing required fields',
+          details: 'start_time and start_date are required'
+        }, { status: 400 })
+      }
+
+      // Normalize and validate dates
+      const normalizedStartDate = normalizeDate(startDate)
+      const normalizedEndDate = endDate ? normalizeDate(endDate) : null
+
+      if (!validateDateRange(normalizedStartDate, normalizedEndDate || undefined)) {
+        return NextResponse.json({ 
+          error: 'Invalid date range',
+          details: 'End date cannot be before start date'
+        }, { status: 400 })
+      }
+
       const eventData = {
         dayId: dayId,
         title: event.title,
-        startTime: typeof startTime === 'string' ? new Date(`2000-01-01T${startTime}`) : new Date(startTime),
-        endTime: endTime ? (typeof endTime === 'string' ? new Date(`2000-01-01T${endTime}`) : new Date(endTime)) : null,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
+        startTime: formatTimeForStorage(startTime),
+        endTime: endTime ? formatTimeForStorage(endTime) : null,
+        startDate: new Date(normalizedStartDate),
+        endDate: normalizedEndDate ? new Date(normalizedEndDate) : null,
         location: event.location,
         notes: event.notes,
         weather: event.weather,

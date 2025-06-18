@@ -7,7 +7,8 @@ import { Trash2, Palette, ChevronDown } from 'lucide-react'
 import ConfirmDialog from './ConfirmDialog'
 import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
-import { getTripDateInfo, getTripDateStyles, normalizeDate, extractTimeString } from '@/lib/tripDayUtils'
+import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
+import { normalizeDate, extractTimeString, to12HourComponents, to24HourTime, TIME_OPTIONS_12H, calculateDefaultEndTime } from '@/lib/dateTimeUtils'
 
 interface Destination {
   name: string
@@ -45,40 +46,6 @@ type EventFormData = {
   color: string
 }
 
-// Convert 24-hour time to 12-hour components
-const to12HourComponents = (time24: string): { time: string, period: 'AM' | 'PM' } => {
-  if (!time24) return { time: '12:00', period: 'AM' }
-  
-  const [hours, minutes] = time24.split(':').map(Number)
-  const period = hours >= 12 ? 'PM' : 'AM'
-  const hour12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
-  
-  return {
-    time: `${hour12}:${minutes.toString().padStart(2, '0')}`,
-    period
-  }
-}
-
-// Convert 12-hour components to 24-hour time
-const to24HourTime = (time12: string, period: 'AM' | 'PM'): string => {
-  const [hour, minute] = time12.split(':')
-  let hour24 = parseInt(hour)
-  
-  if (period === 'AM') {
-    if (hour24 === 12) hour24 = 0
-  } else {
-    if (hour24 !== 12) hour24 += 12
-  }
-  
-  return `${hour24.toString().padStart(2, '0')}:${minute.padStart(2, '0')}`
-}
-
-// Generate time options in 12-hour format (only 12 hours since AM/PM handles the distinction)
-const TIME_OPTIONS_12H = [
-  '12:00', '12:30', '1:00', '1:30', '2:00', '2:30', '3:00', '3:30',
-  '4:00', '4:30', '5:00', '5:30', '6:00', '6:30', '7:00', '7:30',
-  '8:00', '8:30', '9:00', '9:30', '10:00', '10:30', '11:00', '11:30'
-]
 
 interface EventModalProps {
   isOpen: boolean
@@ -253,10 +220,7 @@ export default function EventModal({
     // Set default end time if not provided
     let finalFormData = { ...formData }
     if (!finalFormData.end_time) {
-      const [hours, minutes] = finalFormData.start_time.split(':').map(Number)
-      const endMinutes = minutes === 0 ? 30 : 0
-      const endHours = minutes === 30 ? hours + 1 : hours
-      finalFormData.end_time = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
+      finalFormData.end_time = calculateDefaultEndTime(finalFormData.start_time)
     }
     
     // For API, keep the snake_case format that the API expects

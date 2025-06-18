@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import type { Event, Expense } from '@prisma/client'
+import { formatTimeForStorage, normalizeDate, validateDateRange, extractTimeString } from '@/lib/dateTimeUtils'
 
 type EventUpdate = Partial<Omit<Event, 'id' | 'createdAt'>>
 type ExpenseInsert = Omit<Expense, 'id' | 'createdAt' | 'dayId' | 'eventId'>
@@ -48,10 +49,10 @@ export async function GET(
       id: event.id,
       day_id: event.dayId,
       title: event.title,
-      start_time: event.startTime.toISOString().split('T')[1].slice(0, 8), // Convert Date to time string
-      end_time: event.endTime ? event.endTime.toISOString().split('T')[1].slice(0, 8) : null,
-      start_date: event.startDate.toISOString().split('T')[0], // Convert Date to date string
-      end_date: event.endDate ? event.endDate.toISOString().split('T')[0] : null,
+      start_time: extractTimeString(event.startTime), // Use consistent time extraction
+      end_time: event.endTime ? extractTimeString(event.endTime) : null,
+      start_date: normalizeDate(event.startDate), // Use consistent date normalization
+      end_date: event.endDate ? normalizeDate(event.endDate) : null,
       location: event.location,
       notes: event.notes,
       weather: event.weather,
@@ -106,28 +107,40 @@ export async function PUT(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
 
-    // Transform snake_case input to camelCase for Prisma
+    // Transform snake_case input to camelCase for Prisma with validation
     const prismaEventData: any = {}
+    
     if (event.title !== undefined) prismaEventData.title = event.title
+    
     if (event.start_time !== undefined) {
-      // Convert time string to Date
-      const today = new Date().toISOString().split('T')[0]
-      prismaEventData.startTime = new Date(`${today}T${event.start_time}`)
+      prismaEventData.startTime = formatTimeForStorage(event.start_time)
     }
+    
     if (event.end_time !== undefined) {
-      if (event.end_time) {
-        const today = new Date().toISOString().split('T')[0]
-        prismaEventData.endTime = new Date(`${today}T${event.end_time}`)
-      } else {
-        prismaEventData.endTime = null
+      prismaEventData.endTime = event.end_time ? formatTimeForStorage(event.end_time) : null
+    }
+    
+    if (event.start_date !== undefined) {
+      const normalizedStartDate = normalizeDate(event.start_date)
+      prismaEventData.startDate = new Date(normalizedStartDate)
+    }
+    
+    if (event.end_date !== undefined) {
+      const normalizedEndDate = event.end_date ? normalizeDate(event.end_date) : null
+      prismaEventData.endDate = normalizedEndDate ? new Date(normalizedEndDate) : null
+      
+      // Validate date range if both dates are being updated
+      if (event.start_date !== undefined && normalizedEndDate) {
+        const normalizedStartDate = normalizeDate(event.start_date)
+        if (!validateDateRange(normalizedStartDate, normalizedEndDate)) {
+          return NextResponse.json({ 
+            error: 'Invalid date range',
+            details: 'End date cannot be before start date'
+          }, { status: 400 })
+        }
       }
     }
-    if (event.start_date !== undefined) {
-      prismaEventData.startDate = new Date(event.start_date)
-    }
-    if (event.end_date !== undefined) {
-      prismaEventData.endDate = event.end_date ? new Date(event.end_date) : null
-    }
+    
     if (event.location !== undefined) prismaEventData.location = event.location
     if (event.notes !== undefined) prismaEventData.notes = event.notes
     if (event.weather !== undefined) prismaEventData.weather = event.weather
@@ -166,10 +179,10 @@ export async function PUT(
       id: updatedEvent.id,
       day_id: updatedEvent.dayId,
       title: updatedEvent.title,
-      start_time: updatedEvent.startTime.toISOString().split('T')[1].slice(0, 8),
-      end_time: updatedEvent.endTime ? updatedEvent.endTime.toISOString().split('T')[1].slice(0, 8) : null,
-      start_date: updatedEvent.startDate.toISOString().split('T')[0],
-      end_date: updatedEvent.endDate ? updatedEvent.endDate.toISOString().split('T')[0] : null,
+      start_time: extractTimeString(updatedEvent.startTime), // Use consistent time extraction
+      end_time: updatedEvent.endTime ? extractTimeString(updatedEvent.endTime) : null,
+      start_date: normalizeDate(updatedEvent.startDate), // Use consistent date normalization
+      end_date: updatedEvent.endDate ? normalizeDate(updatedEvent.endDate) : null,
       location: updatedEvent.location,
       notes: updatedEvent.notes,
       weather: updatedEvent.weather,

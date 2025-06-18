@@ -6,7 +6,8 @@ import { ChevronLeft, ChevronRight, Plus, ChevronsLeft, ChevronsRight, CalendarD
 import { Button } from '@/components/ui/button'
 import type { Event, TripDay } from '@prisma/client'
 import { EVENT_COLORS, getEventColor } from '@/lib/eventColors'
-import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
+import { getTripDateInfo, getTripDateStyles, normalizeDate } from '@/lib/tripDayUtils'
+import { extractTimeFromDateTime, calculateDefaultEndTime } from '@/lib/dateTimeUtils'
 
 interface WeeklyCalendarViewProps {
   tripStartDate: string
@@ -123,14 +124,28 @@ export default function WeeklyCalendarView({
   const eventsForWeek = useMemo(() => {
     const eventsByDay: Record<string, Event[]> = {}
     
-    tripDaysInWeek.forEach(({ tripDay }) => {
+    tripDaysInWeek.forEach(({ tripDay, date }) => {
       if (tripDay) {
-        eventsByDay[tripDay.id] = events.filter(event => event.dayId === tripDay.id)
-          .sort((a, b) => {
-            const aTime = new Date(a.startTime).toTimeString().slice(0, 8)
-            const bTime = new Date(b.startTime).toTimeString().slice(0, 8)
-            return aTime.localeCompare(bTime)
-          })
+        eventsByDay[tripDay.id] = []
+        
+        // Get all events that appear on this specific date
+        events.forEach(event => {
+          const eventStartDate = new Date(event.startDate)
+          const eventEndDate = event.endDate ? new Date(event.endDate) : eventStartDate
+          const currentDate = date
+          
+          // Check if the current date falls within the event's date range
+          if (currentDate >= eventStartDate && currentDate <= eventEndDate) {
+            eventsByDay[tripDay.id].push(event)
+          }
+        })
+        
+        // Sort events by start time
+        eventsByDay[tripDay.id].sort((a, b) => {
+          const aTime = extractTimeFromDateTime(new Date(a.startTime))
+          const bTime = extractTimeFromDateTime(new Date(b.startTime))
+          return aTime.localeCompare(bTime)
+        })
       }
     })
     
@@ -194,35 +209,50 @@ export default function WeeklyCalendarView({
 
   // Helper function to convert Date to time string
   const dateToTimeString = (date: Date): string => {
-    return new Date(date).toTimeString().slice(0, 8)
+    return extractTimeFromDateTime(date)
   }
 
   const getEventForTimeSlot = (dayId: string, timeSlot: string): Event | null => {
     const dayEvents = eventsForWeek[dayId] || []
+    const tripDay = tripDays.find(td => td.id === dayId)
+    if (!tripDay) return null
+    
+    const currentDate = new Date(tripDay.date)
+    
     return dayEvents.find(event => {
-      const eventStartTime = dateToTimeString(event.startTime)
-      const eventEndTime = event.endTime ? dateToTimeString(event.endTime) : calculateDefaultEndTime(eventStartTime)
+      const eventStartDate = new Date(event.startDate)
+      const eventEndDate = event.endDate ? new Date(event.endDate) : eventStartDate
+      
+      let effectiveStartTime: string
+      let effectiveEndTime: string
+      
+      // Determine the effective start and end times for this specific day
+      if (currentDate.getTime() === eventStartDate.getTime() && currentDate.getTime() === eventEndDate.getTime()) {
+        // Single day event
+        effectiveStartTime = dateToTimeString(event.startTime)
+        effectiveEndTime = event.endTime ? dateToTimeString(event.endTime) : calculateDefaultEndTime(effectiveStartTime)
+      } else if (currentDate.getTime() === eventStartDate.getTime()) {
+        // First day of multi-day event
+        effectiveStartTime = dateToTimeString(event.startTime)
+        effectiveEndTime = "23:59"
+      } else if (currentDate.getTime() === eventEndDate.getTime()) {
+        // Last day of multi-day event
+        effectiveStartTime = "00:00"
+        effectiveEndTime = event.endTime ? dateToTimeString(event.endTime) : "23:59"
+      } else {
+        // Middle day of multi-day event
+        effectiveStartTime = "00:00"
+        effectiveEndTime = "23:59"
+      }
       
       const slotMinutes = parseInt(timeSlot.split(':')[0]) * 60 + parseInt(timeSlot.split(':')[1])
-      const startMinutes = parseInt(eventStartTime.split(':')[0]) * 60 + parseInt(eventStartTime.split(':')[1])
-      const endMinutes = parseInt(eventEndTime.split(':')[0]) * 60 + parseInt(eventEndTime.split(':')[1])
+      const startMinutes = parseInt(effectiveStartTime.split(':')[0]) * 60 + parseInt(effectiveStartTime.split(':')[1])
+      const endMinutes = parseInt(effectiveEndTime.split(':')[0]) * 60 + parseInt(effectiveEndTime.split(':')[1])
       
       return slotMinutes >= startMinutes && slotMinutes < endMinutes
     }) || null
   }
   
-  // Calculate default end time (1 hour after start time)
-  const calculateDefaultEndTime = (startTime: string): string => {
-    const [hours, minutes] = startTime.split(':').map(Number)
-    let endHours = hours + 1
-    let endMinutes = minutes
-    
-    if (endHours >= 24) {
-      endHours = endHours % 24
-    }
-    
-    return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
-  }
 
   const getEventSpanInfo = (dayId: string, timeSlot: string): { event: Event | null, isFirst: boolean, isLast: boolean, totalSlots: number, durationMinutes: number } => {
     const event = getEventForTimeSlot(dayId, timeSlot)
@@ -410,9 +440,9 @@ export default function WeeklyCalendarView({
         actualEndDate = tripDaysInWeek[startDayIndex].tripDay!.date
       }
       
-      // Call the parent handler with cross-day event information
+      // Call the parent handler with cross-day event information (normalize dates)
       if (onTimeRangeSelect) {
-        onTimeRangeSelect(actualStartDayId, actualStartTime, actualEndTime, actualEndDate)
+        onTimeRangeSelect(actualStartDayId, actualStartTime, actualEndTime, normalizeDate(actualEndDate))
       }
     }
     

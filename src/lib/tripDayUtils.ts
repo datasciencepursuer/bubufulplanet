@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import { normalizeDate as normalizeDateTime } from './dateTimeUtils'
 
 /**
  * Trip Day Calculation Utilities
@@ -156,18 +157,11 @@ export const dateToString = (date: Date): string => {
 
 /**
  * Converts a date string (YYYY-MM-DD) or Date to consistent YYYY-MM-DD format
+ * @deprecated Use normalizeDateTime from dateTimeUtils.ts for better error handling
  */
 export const normalizeDate = (date: string | Date): string => {
-  if (typeof date === 'string') {
-    // If it's already a date string, return as-is (assuming YYYY-MM-DD format)
-    if (date.includes('-') && date.length === 10) {
-      return date
-    }
-    // If it's an ISO string, parse and convert
-    return dateToString(new Date(date))
-  }
-  
-  return dateToString(date)
+  // Use the more robust implementation from dateTimeUtils
+  return normalizeDateTime(date)
 }
 
 /**
