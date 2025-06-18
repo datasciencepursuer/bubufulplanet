@@ -1,11 +1,11 @@
 'use client'
 
-import { format, parseISO } from 'date-fns'
 import { Calendar, Clock, MapPin, DollarSign, Palette, FileText, Edit, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import type { Event, Expense } from '@prisma/client'
 import { getEventColor } from '@/lib/eventColors'
+import { formatDateRange, extractTimeString, normalizeDate } from '@/lib/dateUtils'
 
 interface EventPropertiesPanelProps {
   selectedEvent: Event | null
@@ -31,13 +31,6 @@ export default function EventPropertiesPanel({
   const eventExpenses = expenses.filter(expense => expense.eventId === selectedEvent.id)
   const totalExpenses = eventExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0)
 
-  const formatTime = (time: string) => {
-    return format(new Date(`2000-01-01T${time}`), 'h:mm a')
-  }
-
-  const formatDate = (dateString: string) => {
-    return format(parseISO(dateString), 'EEEE, MMMM d, yyyy')
-  }
 
   return (
     <div 
@@ -102,35 +95,18 @@ export default function EventPropertiesPanel({
             </div>
           )}
 
-          {/* Start Date & Time */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-gray-700">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <span>Start: {formatDate(new Date(selectedEvent.startDate).toISOString().split('T')[0])}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-gray-700">
-              <Clock className="h-4 w-4 text-gray-500" />
-              <span>{formatTime(new Date(selectedEvent.startTime).toTimeString().slice(0, 8))}</span>
-            </div>
+          {/* Date & Time */}
+          <div className="flex items-start gap-2 text-sm text-gray-700">
+            <Calendar className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <span className="break-words">
+              {formatDateRange(
+                normalizeDate(selectedEvent.startDate),
+                extractTimeString(new Date(selectedEvent.startTime)),
+                selectedEvent.endDate ? normalizeDate(selectedEvent.endDate) : undefined,
+                selectedEvent.endTime ? extractTimeString(new Date(selectedEvent.endTime)) : undefined
+              )}
+            </span>
           </div>
-
-          {/* End Date & Time */}
-          {(selectedEvent.endDate || selectedEvent.endTime) && (
-            <div className="space-y-2">
-              {selectedEvent.endDate && (
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  <span>End: {formatDate(new Date(selectedEvent.endDate).toISOString().split('T')[0])}</span>
-                </div>
-              )}
-              {selectedEvent.endTime && (
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Clock className="h-4 w-4 text-gray-500" />
-                  <span>{formatTime(new Date(selectedEvent.endTime).toTimeString().slice(0, 8))}</span>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Notes */}
           {selectedEvent.notes && (

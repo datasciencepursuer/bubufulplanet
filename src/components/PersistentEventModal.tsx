@@ -7,6 +7,7 @@ import ConfirmDialog from './ConfirmDialog'
 import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
 import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
+import { normalizeDate, extractTimeString } from '@/lib/dateUtils'
 
 interface Destination {
   name: string
@@ -102,8 +103,8 @@ export default function PersistentEventModal({
     title: '',
     start_time: selectedTime || '09:00',
     end_time: selectedEndTime || '',
-    start_date: currentDate || new Date().toISOString().split('T')[0],
-    end_date: selectedEndDate || currentDate || new Date().toISOString().split('T')[0],
+    start_date: currentDate || normalizeDate(new Date()),
+    end_date: selectedEndDate || currentDate || normalizeDate(new Date()),
     location: '',
     notes: '',
     weather: '',
@@ -179,10 +180,10 @@ export default function PersistentEventModal({
     fetchDestinations()
     
     if (selectedEvent && isEditMode) {
-      const startTimeStr = new Date(selectedEvent.startTime).toTimeString().slice(0, 8)
-      const endTimeStr = selectedEvent.endTime ? new Date(selectedEvent.endTime).toTimeString().slice(0, 8) : ''
-      const startDateStr = new Date(selectedEvent.startDate).toISOString().split('T')[0]
-      const endDateStr = selectedEvent.endDate ? new Date(selectedEvent.endDate).toISOString().split('T')[0] : startDateStr
+      const startTimeStr = extractTimeString(new Date(selectedEvent.startTime))
+      const endTimeStr = selectedEvent.endTime ? extractTimeString(new Date(selectedEvent.endTime)) : ''
+      const startDateStr = normalizeDate(selectedEvent.startDate)
+      const endDateStr = selectedEvent.endDate ? normalizeDate(selectedEvent.endDate) : startDateStr
       
       setFormData({
         day_id: selectedEvent.dayId,
@@ -206,8 +207,8 @@ export default function PersistentEventModal({
         title: '',
         start_time: selectedTime || '09:00',
         end_time: selectedEndTime || '',
-        start_date: currentDate || new Date().toISOString().split('T')[0],
-        end_date: selectedEndDate || currentDate || new Date().toISOString().split('T')[0],
+        start_date: currentDate || normalizeDate(new Date()),
+        end_date: selectedEndDate || currentDate || normalizeDate(new Date()),
         location: '',
         notes: '',
         weather: '',

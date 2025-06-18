@@ -10,6 +10,7 @@ import EventModal from '@/components/EventModal'
 import PersistentEventModal from '@/components/PersistentEventModal'
 import EventPropertiesPanel from '@/components/EventPropertiesPanel'
 import type { Trip, TripDay, Event, Expense } from '@prisma/client'
+import { normalizeDate } from '@/lib/dateUtils'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 
@@ -96,7 +97,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   // Helper function to get date from dayId
   const getDateForDayId = (dayId: string): string => {
     const day = tripDays.find(d => d.id === dayId)
-    return day?.date ? new Date(day.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+    return day?.date ? normalizeDate(day.date) : normalizeDate(new Date())
   }
 
 
@@ -209,7 +210,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       setSelectedDayId(event.dayId)
       setSelectedTime('')
       setSelectedEndTime('')
-      setCurrentDate(event.startDate ? new Date(event.startDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
+      setCurrentDate(event.startDate ? normalizeDate(event.startDate) : normalizeDate(new Date()))
       setIsModalOpen(true)
     }
   }
