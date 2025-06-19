@@ -77,7 +77,7 @@ export default function TripForm({
   const currentStartDate = isEdit ? new Date(editStartDate) : startDate
   const currentEndDate = isEdit ? new Date(editEndDate) : endDate
   const tripDuration = currentStartDate && currentEndDate 
-    ? Math.floor((currentEndDate.getTime() - currentStartDate.getTime()) / (1000 * 60 * 60 * 24))
+    ? Math.floor((currentEndDate.getTime() - currentStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
     : 0
 
   // Check if dates changed in edit mode

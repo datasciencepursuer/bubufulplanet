@@ -39,17 +39,13 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
   const nextMonthStart = startOfMonth(nextMonth)
   const nextMonthEnd = endOfMonth(nextMonth)
 
-  // Get calendar grid days (including leading/trailing days from adjacent months)
+  // Get calendar grid days (only actual month dates, no adjacent month previews)
   const getCurrentMonthGrid = () => {
-    const start = startOfWeek(currentMonthStart, { weekStartsOn: 0 }) // Sunday start
-    const end = endOfWeek(currentMonthEnd, { weekStartsOn: 0 })
-    return eachDayOfInterval({ start, end })
+    return eachDayOfInterval({ start: currentMonthStart, end: currentMonthEnd })
   }
 
   const getNextMonthGrid = () => {
-    const start = startOfWeek(nextMonthStart, { weekStartsOn: 0 })
-    const end = endOfWeek(nextMonthEnd, { weekStartsOn: 0 })
-    return eachDayOfInterval({ start, end })
+    return eachDayOfInterval({ start: nextMonthStart, end: nextMonthEnd })
   }
 
   const currentMonthDays = getCurrentMonthGrid()
@@ -153,8 +149,7 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
     return () => document.removeEventListener('mouseup', handleGlobalMouseUp)
   }, [dragState.isActive, handleMouseUp])
 
-  const renderMonth = (monthDays: Date[], monthName: string, isCurrentMonth: boolean) => {
-    const monthStart = isCurrentMonth ? currentMonthStart : nextMonthStart
+  const renderMonth = (monthDays: Date[], monthName: string) => {
     
     return (
       <div className="bg-white rounded-lg border overflow-hidden">
@@ -172,19 +167,17 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
         </div>
         
         {/* Calendar grid */}
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-7 auto-rows-fr">
           {monthDays.map(date => {
-            const isInCurrentMonth = isSameMonth(date, monthStart)
             const isInTrip = isDayInTrip(date)
             const isSelected = isDaySelected(date)
             const isPastDate = date < new Date(new Date().setHours(0, 0, 0, 0))
-            const isClickable = !isInTrip && !isPastDate && isInCurrentMonth
+            const isClickable = !isInTrip && !isPastDate
             
             return (
               <div
                 key={date.toISOString()}
                 className={`min-h-[80px] p-2 border-r border-b relative select-none ${
-                  !isInCurrentMonth ? 'bg-gray-50 text-gray-400' :
                   isPastDate ? 'bg-gray-100 text-gray-400' :
                   isInTrip ? 'bg-blue-100 border-blue-200' :
                   isClickable ? 'cursor-pointer hover:bg-blue-50' : 
@@ -208,9 +201,7 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
               >
                 <div className="flex justify-between items-start mb-1">
                   <span className={`text-sm font-medium ${
-                    !isInCurrentMonth ? 'text-gray-400' :
-                    isPastDate ? 'text-gray-400' :
-                    'text-gray-900'
+                    isPastDate ? 'text-gray-400' : 'text-gray-900'
                   }`}>
                     {format(date, 'd')}
                   </span>
@@ -263,8 +254,8 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
 
         {/* Two month grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {renderMonth(currentMonthDays, format(currentMonth, 'MMMM yyyy'), true)}
-          {renderMonth(nextMonthDays, format(nextMonth, 'MMMM yyyy'), false)}
+          {renderMonth(currentMonthDays, format(currentMonth, 'MMMM yyyy'))}
+          {renderMonth(nextMonthDays, format(nextMonth, 'MMMM yyyy'))}
         </div>
       </div>
       
