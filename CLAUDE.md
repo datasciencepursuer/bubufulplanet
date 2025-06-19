@@ -4,79 +4,83 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Next.js 15 vacation planning application with TypeScript, Tailwind CSS, and Prisma + Supabase. Features include trip planning with calendar views, day-by-day itineraries, expense tracking, and group-based collaboration.
+A Next.js 15 vacation planning application with TypeScript, Tailwind CSS, and Prisma + PostgreSQL. Features include group-based trip planning with calendar views, day-by-day itineraries, expense tracking, and device session management for seamless authentication.
 
 ## Development Commands
 
 ```bash
+# Core development
 pnpm run dev         # Start development server (http://localhost:3000)
 pnpm run build       # Build for production (includes prisma generate)
 pnpm start           # Run production server
 pnpm run lint        # Run ESLint with Next.js strict configuration
+
+# Database management
 pnpm run db:migrate  # Deploy Prisma migrations
 pnpm run db:generate # Generate Prisma client
 pnpm run db:reset    # Reset database with fresh migrations
 pnpm run db:seed     # Run database seeding
+pnpm prisma migrate dev --name <name>  # Create new migration
+
+# Maintenance & testing scripts
+pnpm run cleanup:sessions         # Run device session cleanup manually
+pnpm run test:session-extension   # Test session extension functionality
+pnpm run test:logout             # Test logout functionality
+pnpm run test:final-day          # Test final day clickability fix
 ```
 
 ## Architecture
 
-### Database Structure (Prisma + Supabase)
+### Database Structure (Prisma + PostgreSQL)
+
 Hierarchical data model with group-based access control:
 - `travel_groups` → `group_members` + `trips` + `device_sessions`
 - `trips` → `trip_days` → `events` → `expenses`
+- `devices` → `device_sessions` (consolidates device fingerprints)
 - `packing_items` (linked to trips)
+- `cleanup_log` (tracks maintenance operations)
 
-Database schema is managed via Prisma migrations in `prisma/migrations/`. All operations are scoped to travel groups with role-based permissions.
+**Key Database Features:**
+- Composite indexes for performance (e.g., `trip_days` on `[tripId, dayNumber]`)
+- Device session consolidation with lifespan management
+- Automatic cleanup of expired sessions via cron job
 
-**CRITICAL: Schema Synchronization**
-- `prisma/schema.prisma` - Source of truth for database structure
-- Run `pnpm run db:generate` after schema changes to update Prisma client
-- Use `pnpm prisma migrate dev` to create new migrations for schema changes
-- Database access is through Prisma client (`@/lib/prisma`), not direct Supabase queries
+### Authentication & Session Management
 
-### Database Access Strategy
-- **Prisma Client** (`src/lib/prisma.ts`): Primary database interface for all operations
-- **Supabase Clients**: Legacy - still present but being phased out in favor of Prisma
-  - Browser Client (`src/lib/supabase/client.ts`)
-  - Server Client (`src/lib/supabase/server.ts`) 
-  - Service Client (`src/lib/supabase/service.ts`)
+**Group-Based System:**
+- No traditional user accounts - authentication via travel groups
+- Users create/join groups using unique access codes
+- Travelers identified by name within groups
 
-### Authentication Flow (Group-Based System)
-- **Travel Groups**: Users create or join travel groups using unique access codes
-- **Device Sessions**: Browser fingerprinting for automatic re-authentication (`src/hooks/useDeviceSession.ts`)
-- **Unified Session Management** (`src/lib/unified-session.ts`): Combines cookie and device-based sessions
-- **Middleware** (`src/middleware.ts`): Protects `/app` and `/trips` routes, validates group membership
-- **Auth Routes**: `/api/groups/create`, `/api/groups/join`, `/api/auth/logout`, `/api/auth/verify-code`
-- **No traditional user accounts** - authentication is group-based with traveler names
+**Device Session Features:**
+- Browser fingerprinting for automatic re-authentication
+- Session lifespans: 90 days (remember_device), extendable on login
+- One session per device per group (consolidation)
+- Automatic cleanup of expired/idle sessions
+- Optional local data clearing on logout
 
-### Routing Structure
-- `/` - Landing page with group creation/joining (public)
-- `/app` - Main dashboard with trip listing (protected)
-- `/trips/[id]` - **Trip details with weekly calendar and event management** (protected)
-- `/group-settings` - Travel group management (protected)
-- `/device-demo` - Device session testing page
-- **API Routes**:
-  - `/api/groups/*` - Group creation, joining, member management
-  - `/api/trips/*` - Trip CRUD operations
-  - `/api/events/*` - Event management with expense support
-  - `/api/device-sessions/*` - Device fingerprinting and auto-login
-  - `/api/auth/*` - Legacy auth endpoints (verify-code, logout)
+**Key Files:**
+- `src/lib/device-fingerprint.ts` - Device fingerprint generation
+- `src/hooks/useDeviceSession.ts` - React hook for device sessions
+- `src/lib/unified-session.ts` - Server-side session management
+- `src/lib/session-config.ts` - Session lifespan configuration
 
-### Key Implementation Details
-1. **Group-Based Architecture**: All data is scoped to travel groups - no individual user accounts
-2. **Device Fingerprinting**: Automatic re-authentication using browser characteristics (`src/lib/device-fingerprint.ts`)
-3. **Date Management**: Trip creation automatically generates `trip_days` entries for the date range
-4. **Weekly Calendar View**: Custom time-slot grid (6 AM-10 PM) with drag-to-select ranges in `WeeklyCalendarView.tsx`
-5. **Event Modal**: Complete event creation/editing with embedded expense management (`EventModal.tsx`)
-6. **Expense Integration**: Events can have multiple expenses (description, amount, category) saved via API
-7. **Role-Based Permissions**: Group members have different roles (adventurer, party member) with varying permissions
-8. **Clean Architecture**: Domain-driven design with entities, use cases, and repositories in `src/domain/`, `src/application/`, `src/infrastructure/`
-9. **UI Components**: Limited shadcn/ui components (button, card, dialog) - extend as needed
+### Date & Time Management
 
-### API Pattern Example
+**Timezone-Agnostic Approach:**
+- All dates treated as absolute calendar dates using UTC
+- `createAbsoluteDate()` - Creates timezone-independent dates
+- `createAbsoluteDateRange()` - Generates inclusive date ranges
+- `normalizeDate()` - Converts dates to YYYY-MM-DD format using UTC methods
+
+**Critical Fix Applied:**
+- Final day of trips now properly clickable (UTC normalization fix)
+- All date comparisons use consistent UTC-based approach
+
+### API Pattern
+
 ```typescript
-// Standard API route pattern with group-based authentication
+// Standard API route pattern
 import { validateUnifiedSession } from '@/lib/unified-session'
 import { prisma } from '@/lib/prisma'
 
@@ -85,57 +89,96 @@ if (!validation.isValid) {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 }
 
-// Database operations via Prisma, automatically scoped to group
+// Operations automatically scoped to group
 const trips = await prisma.trip.findMany({
   where: { groupId: validation.context!.groupId },
   orderBy: { createdAt: 'desc' }
 })
 ```
 
+### Key Components
+
+**Calendar System:**
+- `WeeklyCalendarView.tsx` - Time-slot grid (6 AM-10 PM) with drag selection
+- `AppMonthlyCalendar.tsx` - Trip creation via date range selection
+- `DailyCalendarView.tsx` - Single day detailed view
+
+**Event Management:**
+- `EventModal.tsx` - Create/edit events with embedded expense tracking
+- `PersistentEventModal.tsx` - Wrapper for consistent modal behavior
+- Events support multiple expenses per event
+
+**Trip Management:**
+- `TripForm.tsx` - Create/edit trips with date confirmation
+- Automatic `trip_days` generation for date ranges
+- Trip dates editable post-creation
+
 ## Environment Variables
 
 Required in `.env.local`:
 ```
-DATABASE_URL=                    # PostgreSQL connection string for Prisma
+DATABASE_URL=                    # PostgreSQL connection string
 DIRECT_DATABASE_URL=             # Direct database URL for migrations
-NEXT_PUBLIC_SUPABASE_URL=        # Supabase project URL (legacy)
-NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase anonymous key (legacy)
-SUPABASE_SERVICE_ROLE_KEY=       # Service role key (legacy, keep secret!)
+NEXT_PUBLIC_SUPABASE_URL=        # Supabase URL (legacy, being phased out)
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase anon key (legacy)
+SUPABASE_SERVICE_ROLE_KEY=       # Service role key (legacy)
 ```
 
-## Current Implementation Status
-- ✅ **Group-based authentication** - Travel groups with access codes
-- ✅ **Device session management** - Automatic re-authentication via fingerprinting
-- ✅ **Trip creation and listing** - With automatic trip_days generation
-- ✅ **Calendar date selection** - Drag-to-select ranges
-- ✅ **Protected routes** - Middleware-based protection
-- ✅ **Trip detail page with weekly calendar view** - Full time-slot grid (6 AM-10 PM)
-- ✅ **Event management** - Complete CRUD with time-based calendar integration
-- ✅ **Expense tracking** - Multiple expenses per event with categories
-- ✅ **Group member management** - Role-based permissions (adventurer, party member)
-- ❌ **Packing lists** - Database schema exists but no implementation
+## Production Deployment
 
-## Important Implementation Notes
-- Path alias `@/*` maps to `./src/*`
-- ESLint configured with `next/core-web-vitals`
-- No testing framework configured
-- All API routes require group-based authentication except landing page
-- Package manager: pnpm preferred, npm as fallback
-- Framework: Next.js 15 with App Router
-- Date operations use `date-fns` library
-- Database access primarily through Prisma client, not Supabase SDK
+**Coolify Cron Setup:**
+- Configure cleanup script: `cd /app && npm run cleanup:sessions`
+- Recommended schedule: `0 2 * * *` (daily at 2 AM)
+- Uses same environment as webapp
 
-### Development Patterns
-- **Group-Scoped Operations**: All data operations are automatically scoped to the user's travel group
-- **Device Fingerprinting**: Uses `generateDeviceFingerprint()` for seamless re-authentication
-- **Unified Session Management**: Combines cookie-based and device-based sessions via `unified-session.ts`
-- **Event/Expense Pattern**: Events and expenses are tightly coupled - expenses are created/updated via event endpoints
-- **Modal State Management**: Event editing uses `selectedEvent` state in `TripDetailClient` to pass data to `EventModal`
-- **Calendar Integration**: `WeeklyCalendarView` handles time-slot clicks and passes `dayId` + time to parent for event creation
-- **Permission Checking**: Use `requireUnifiedPermission()` to validate user permissions before operations
-- **Clean Architecture**: Follow domain/application/infrastructure separation for business logic
+**Database Indexes:**
+- Composite index on `trip_days(tripId, dayNumber)` for fast lookups
+- Event index on `events(dayId, startSlot)` for calendar queries
+- Device session indexes for efficient cleanup operations
 
-### Missing Features with Schema Support
-- **Packing Lists**: `packing_items` table exists but needs `/api/packing` endpoints and UI components
-- **Weather Integration**: Event schema has weather field but no implementation
-- **Loadout Management**: Event schema has loadout field but no UI implementation
+## Recent Improvements
+
+1. **Device Session Optimization:**
+   - Consolidated device storage (60-70% reduction)
+   - Session lifespan extension on login
+   - Automatic cleanup via Coolify cron
+   - Remember device for 3 months (extendable)
+
+2. **Date Handling Fixes:**
+   - Final day of trips now clickable
+   - Timezone-agnostic date operations
+   - Consistent UTC-based normalization
+
+3. **Trip Management Enhancements:**
+   - Editable trip dates post-creation
+   - Date confirmation during creation
+   - Proper duration calculation (inclusive)
+
+4. **Session Features:**
+   - Complete logout removes all device sessions
+   - Optional local data clearing for privacy
+   - Session extension on each login
+
+## Development Patterns
+
+- **Prisma-First Database Access**: All DB operations through Prisma client
+- **Group-Scoped Operations**: Data automatically filtered by travel group
+- **Modal State Management**: Parent components manage modal state
+- **Drag-to-Select Calendar**: Custom implementation in weekly view
+- **Expense Integration**: Tightly coupled with events
+- **Permission System**: Role-based (adventurer vs party member)
+
+## Testing Utilities
+
+Located in `scripts/` directory:
+- `test-session-extension.js` - Verify session lifespan extension
+- `test-logout-functionality.js` - Ensure complete session removal
+- `test-final-day-clickability.js` - Confirm final day fix
+- `cleanup-device-sessions.js` - Manual cleanup execution
+- `check-cleanup-logs.js` - Monitor cleanup operations
+
+## Missing Features (Schema Ready)
+
+- **Packing Lists**: `packing_items` table exists, needs implementation
+- **Weather Integration**: Event schema supports weather field
+- **Loadout Management**: Event schema supports loadout field
