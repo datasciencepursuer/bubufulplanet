@@ -77,7 +77,7 @@ export default function TripForm({
   const currentStartDate = isEdit ? new Date(editStartDate) : startDate
   const currentEndDate = isEdit ? new Date(editEndDate) : endDate
   const tripDuration = currentStartDate && currentEndDate 
-    ? Math.floor((currentEndDate.getTime() - currentStartDate.getTime()) / (1000 * 60 * 60 * 24))
+    ? Math.floor((currentEndDate.getTime() - currentStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
     : 0
 
   // Check if dates changed in edit mode
@@ -93,9 +93,9 @@ export default function TripForm({
           <DialogTitle>{isEdit ? 'Edit Trip' : 'Create New Trip'}</DialogTitle>
           <DialogDescription>
             {isEdit ? (
-              `Edit your ${tripDuration}-day trip${currentStartDate && currentEndDate ? ` from ${format(currentStartDate, 'MMM d, yyyy')} to ${format(new Date(currentEndDate.getTime() - 86400000), 'MMM d, yyyy')}` : ''}`
+              `Edit your ${tripDuration}-day trip${currentStartDate && currentEndDate ? ` from ${format(currentStartDate, 'MMM d, yyyy')} to ${format(currentEndDate, 'MMM d, yyyy')}` : ''}`
             ) : (
-              `Plan your ${tripDuration}-day adventure from ${format(startDate!, 'MMM d, yyyy')} to ${format(new Date(endDate!.getTime() - 86400000), 'MMM d, yyyy')}`
+              `Plan your ${tripDuration}-day adventure from ${format(startDate!, 'MMM d, yyyy')} to ${format(endDate!, 'MMM d, yyyy')}`
             )}
           </DialogDescription>
         </DialogHeader>
@@ -164,7 +164,7 @@ export default function TripForm({
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600">End Date:</span>
-                    <span className="font-medium text-teal-700">{endDate ? format(new Date(endDate.getTime() - 86400000), 'EEEE, MMM d, yyyy') : 'Not set'}</span>
+                    <span className="font-medium text-teal-700">{endDate ? format(endDate, 'EEEE, MMM d, yyyy') : 'Not set'}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm border-t border-teal-200 pt-2 mt-2">
                     <span className="text-gray-600">Duration:</span>
