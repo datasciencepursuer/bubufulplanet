@@ -301,11 +301,19 @@ export default function WeeklyCalendarView({
                 const isInSelection = dayId ? isSlotInSelection(dayId, timeSlot) : false
                 const isEventStart = event && event.startSlot === timeSlot
                 
+                // Get date info for styling Before/After days
+                const dateInfo = getTripDateInfo(date, tripStartDate, tripEndDate)
+                const isBeforeOrAfter = dateInfo.dateType === 'before' || dateInfo.dateType === 'after'
+                
                 return (
                   <div
                     key={`${format(date, 'yyyy-MM-dd')}-${timeSlot}`}
                     className={`border-r p-1 relative ${
-                      isClickable ? 'cursor-pointer hover:bg-blue-50' : 'bg-gray-50'
+                      isClickable 
+                        ? 'cursor-pointer hover:bg-blue-50' 
+                        : isBeforeOrAfter 
+                        ? 'bg-amber-50 opacity-75 cursor-not-allowed' 
+                        : 'bg-gray-50'
                     } ${isInSelection ? 'bg-blue-200 hover:bg-blue-300' : ''}`}
                     onMouseDown={(e) => {
                       e.preventDefault()

@@ -119,7 +119,9 @@ export function getTripDateStyles(dateInfo: TripDateInfo) {
     // Day label styling and text
     dayLabel: {
       show: dateType === 'trip-day' || dateType === 'before' || dateType === 'after',
-      className: dateType === 'trip-day' ? 'text-xs text-green-700 mt-1' : 'text-xs text-amber-600 mt-1',
+      className: dateType === 'trip-day' 
+        ? 'text-xs text-green-700 font-medium mt-1' 
+        : 'text-xs text-amber-700 font-medium mt-1 bg-amber-100 px-1 rounded',
       text: dateType === 'trip-day' 
         ? `Day ${dateInfo.dayNumber}` 
         : dateType === 'before' 
@@ -133,7 +135,7 @@ export function getTripDateStyles(dateInfo: TripDateInfo) {
     container: isWithinTripDates 
       ? 'cursor-pointer hover:bg-blue-50' 
       : dateType === 'before' || dateType === 'after'
-      ? 'cursor-pointer hover:bg-amber-50'
+      ? 'bg-amber-50 cursor-not-allowed opacity-75'
       : 'bg-gray-100'
   }
 }
