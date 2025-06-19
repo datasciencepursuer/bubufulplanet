@@ -61,6 +61,10 @@ export default function DailyCalendarView({
     currentSlot: null
   })
 
+  // Double-click detection state
+  const [lastClickTime, setLastClickTime] = useState<number>(0)
+  const [lastClickedEvent, setLastClickedEvent] = useState<string | null>(null)
+
   // Get trip day for current date
   const currentTripDay = useMemo(() => {
     const targetDateStr = normalizeDate(currentDate)
@@ -115,6 +119,28 @@ export default function DailyCalendarView({
       const eventSlots = getTimeSlotRange(event.startSlot, event.endSlot || event.startSlot)
       return eventSlots.includes(timeSlot)
     }) || null
+  }
+
+  // Handle event click with double-click detection
+  const handleEventClick = (event: Event, e: React.MouseEvent) => {
+    e.stopPropagation()
+    
+    const now = Date.now()
+    const DOUBLE_CLICK_THRESHOLD = 300 // ms
+    
+    const isDoubleClick = lastClickedEvent === event.id && 
+                         now - lastClickTime < DOUBLE_CLICK_THRESHOLD
+    
+    setLastClickTime(now)
+    setLastClickedEvent(event.id)
+    
+    if (isDoubleClick) {
+      // Double-click: Edit mode
+      onEventClick(event) // This will set the event and trigger edit mode
+    } else {
+      // Single-click: Preview mode  
+      onEventSelect && onEventSelect(event, { top: 0, left: 0 })
+    }
   }
 
   // Drag handlers
@@ -263,10 +289,7 @@ export default function DailyCalendarView({
                 >
                   {event && isEventStart ? (
                     <div
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onEventClick(event)
-                      }}
+                      onClick={(e) => handleEventClick(event, e)}
                       className={`cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 rounded-lg shadow-sm p-3 overflow-hidden ${
                         newEventIds?.has(event.id) ? 'event-grow-animation' : ''
                       } ${

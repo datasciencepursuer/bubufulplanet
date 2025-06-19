@@ -298,8 +298,8 @@ export default function PersistentEventModal({
     }
   }
 
-  // Show instructions when no event is selected
-  if (!selectedEvent) {
+  // Show instructions when no event is selected AND not in edit mode
+  if (!selectedEvent && !isEditMode) {
     return (
       <div className="bg-white rounded-lg border h-full flex flex-col">
         <div className="p-6 border-b">
@@ -310,6 +310,7 @@ export default function PersistentEventModal({
             <MousePointer2 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <p className="text-lg mb-2">No event selected</p>
             <p className="text-sm">
+              Click an empty time slot to create an event<br />
               Click an event to preview details<br />
               Double-click an event to edit
             </p>

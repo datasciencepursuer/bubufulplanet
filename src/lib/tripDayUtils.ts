@@ -50,6 +50,30 @@ export function isWithinTripDates(date: Date, tripStartDate: string, tripEndDate
 }
 
 /**
+ * Check if a date is exactly 1 day before the trip start
+ * @param date - Date to check
+ * @param tripStartDate - Trip start date as ISO string
+ * @returns true if date is exactly 1 day before trip start
+ */
+export function isExactlyOneDayBefore(date: Date, tripStartDate: string): boolean {
+  const dateStr = format(date, 'yyyy-MM-dd')
+  const dayBeforeStr = format(subDays(new Date(tripStartDate), 1), 'yyyy-MM-dd')
+  return dateStr === dayBeforeStr
+}
+
+/**
+ * Check if a date is exactly 1 day after the trip end
+ * @param date - Date to check
+ * @param tripEndDate - Trip end date as ISO string
+ * @returns true if date is exactly 1 day after trip end
+ */
+export function isExactlyOneDayAfter(date: Date, tripEndDate: string): boolean {
+  const dateStr = format(date, 'yyyy-MM-dd')
+  const dayAfterStr = format(addDays(new Date(tripEndDate), 1), 'yyyy-MM-dd')
+  return dateStr === dayAfterStr
+}
+
+/**
  * Check if a date is within the extended range (trip dates + buffer days)
  * @param date - Date to check
  * @param tripStartDate - Trip start date as ISO string
@@ -57,15 +81,9 @@ export function isWithinTripDates(date: Date, tripStartDate: string, tripEndDate
  * @returns true if date is within extended range
  */
 export function isWithinExtendedRange(date: Date, tripStartDate: string, tripEndDate: string): boolean {
-  const dateStr = format(date, 'yyyy-MM-dd')
-  // Extended range includes 1 day before and after
-  const extendedStart = subDays(new Date(tripStartDate), 1)
-  const extendedEnd = addDays(new Date(tripEndDate), 1)
-  
-  const extendedStartStr = format(extendedStart, 'yyyy-MM-dd')
-  const extendedEndStr = format(extendedEnd, 'yyyy-MM-dd')
-  
-  return dateStr >= extendedStartStr && dateStr <= extendedEndStr
+  return isWithinTripDates(date, tripStartDate, tripEndDate) || 
+         isExactlyOneDayBefore(date, tripStartDate) || 
+         isExactlyOneDayAfter(date, tripEndDate)
 }
 
 /**
@@ -74,10 +92,18 @@ export function isWithinExtendedRange(date: Date, tripStartDate: string, tripEnd
  * @param tripStartDate - Trip start date as ISO string
  * @param tripEndDate - Trip end date as ISO string
  * @returns Complete information about the date
+ * 
+ * Expected behavior:
+ * - Exactly 1 day before trip start: 'before'
+ * - Trip dates (start to end inclusive): 'trip-day'
+ * - Exactly 1 day after trip end: 'after'
+ * - All other dates: 'outside-range'
  */
 export function getTripDateInfo(date: Date, tripStartDate: string, tripEndDate: string): TripDateInfo {
   const isWithinTrip = isWithinTripDates(date, tripStartDate, tripEndDate)
-  const isWithinExtended = isWithinExtendedRange(date, tripStartDate, tripEndDate)
+  const isBefore = isExactlyOneDayBefore(date, tripStartDate)
+  const isAfter = isExactlyOneDayAfter(date, tripEndDate)
+  const isWithinExtended = isWithinTrip || isBefore || isAfter
   
   let dateType: TripDateInfo['dateType']
   let dayNumber: number | null = null
@@ -85,9 +111,10 @@ export function getTripDateInfo(date: Date, tripStartDate: string, tripEndDate: 
   if (isWithinTrip) {
     dateType = 'trip-day'
     dayNumber = calculateTripDayNumber(date, tripStartDate)
-  } else if (isWithinExtended) {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    dateType = dateStr < tripStartDate ? 'before' : 'after'
+  } else if (isBefore) {
+    dateType = 'before'
+  } else if (isAfter) {
+    dateType = 'after'
   } else {
     dateType = 'outside-range'
   }
