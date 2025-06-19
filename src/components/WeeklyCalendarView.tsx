@@ -268,11 +268,11 @@ export default function WeeklyCalendarView({
               return (
                 <div
                   key={format(date, 'yyyy-MM-dd')}
-                  className={`p-3 text-center border-r cursor-pointer hover:bg-gray-50 ${styles.background}`}
+                  className={`p-3 text-center border-r ${styles.container}`}
                   onClick={() => onDayHeaderClick && onDayHeaderClick(format(date, 'yyyy-MM-dd'))}
                 >
                   <div className="text-sm font-medium">{format(date, 'EEE')}</div>
-                  <div className={`text-lg ${styles.dayNumber.className}`}>
+                  <div className={`text-lg ${styles.dateNumber}`}>
                     {format(date, 'd')}
                   </div>
                   {styles.dayLabel.show && (
