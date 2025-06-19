@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle } from 'lucide-react'
+import { createAbsoluteDate, createAbsoluteDateRange, normalizeDate } from '@/lib/dateTimeUtils'
 
 interface TripFormProps {
   startDate?: Date
@@ -42,6 +43,20 @@ export default function TripForm({
   const [editStartDate, setEditStartDate] = useState('')
   const [editEndDate, setEditEndDate] = useState('')
 
+  // Helper function to format dates in a timezone-agnostic way
+  const formatAbsoluteDate = (date: Date): string => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    
+    const year = date.getUTCFullYear()
+    const month = months[date.getUTCMonth()]
+    const day = date.getUTCDate()
+    const dayOfWeek = days[date.getUTCDay()]
+    
+    return `${dayOfWeek}, ${month} ${day}, ${year}`
+  }
+
   // Initialize form data
   useEffect(() => {
     if (isEdit && existingTrip) {
@@ -73,11 +88,18 @@ export default function TripForm({
     })
   }
 
-  // Calculate duration based on current dates (inclusive range)
-  const currentStartDate = isEdit ? new Date(editStartDate) : startDate
-  const currentEndDate = isEdit ? new Date(editEndDate) : endDate
+  // Calculate duration based on current dates (timezone-agnostic inclusive range)
+  const currentStartDate = isEdit ? createAbsoluteDate(editStartDate) : startDate
+  const currentEndDate = isEdit ? createAbsoluteDate(editEndDate) : endDate
+  
   const tripDuration = currentStartDate && currentEndDate 
-    ? Math.floor((currentEndDate.getTime() - currentStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    ? (() => {
+        // Use timezone-agnostic date range calculation
+        const start = isEdit ? createAbsoluteDate(editStartDate) : createAbsoluteDate(normalizeDate(startDate!))
+        const end = isEdit ? createAbsoluteDate(editEndDate) : createAbsoluteDate(normalizeDate(endDate!))
+        const dateRange = createAbsoluteDateRange(start, end)
+        return dateRange.length
+      })()
     : 0
 
   // Check if dates changed in edit mode
@@ -93,9 +115,9 @@ export default function TripForm({
           <DialogTitle>{isEdit ? 'Edit Trip' : 'Create New Trip'}</DialogTitle>
           <DialogDescription>
             {isEdit ? (
-              `Edit your ${tripDuration}-day trip${currentStartDate && currentEndDate ? ` from ${format(currentStartDate, 'MMM d, yyyy')} to ${format(currentEndDate, 'MMM d, yyyy')}` : ''}`
+              `Edit your ${tripDuration}-day trip${currentStartDate && currentEndDate ? ` from ${formatAbsoluteDate(currentStartDate)} to ${formatAbsoluteDate(currentEndDate)}` : ''}`
             ) : (
-              `Plan your ${tripDuration}-day adventure from ${format(startDate!, 'MMM d, yyyy')} to ${format(endDate!, 'MMM d, yyyy')}`
+              `Plan your ${tripDuration}-day adventure from ${formatAbsoluteDate(startDate!)} to ${formatAbsoluteDate(endDate!)}`
             )}
           </DialogDescription>
         </DialogHeader>
@@ -160,11 +182,11 @@ export default function TripForm({
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600">Start Date:</span>
-                    <span className="font-medium text-teal-700">{startDate ? format(startDate, 'EEEE, MMM d, yyyy') : 'Not set'}</span>
+                    <span className="font-medium text-teal-700">{startDate ? formatAbsoluteDate(startDate) : 'Not set'}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600">End Date:</span>
-                    <span className="font-medium text-teal-700">{endDate ? format(endDate, 'EEEE, MMM d, yyyy') : 'Not set'}</span>
+                    <span className="font-medium text-teal-700">{endDate ? formatAbsoluteDate(endDate) : 'Not set'}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm border-t border-teal-200 pt-2 mt-2">
                     <span className="text-gray-600">Duration:</span>
