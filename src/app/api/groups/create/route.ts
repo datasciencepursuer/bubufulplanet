@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
+import { extendSessionLifespan, type SessionType } from '@/lib/session-config'
 
 interface GroupMember {
   name: string
@@ -138,15 +139,37 @@ export async function POST(request: NextRequest) {
           }
         })
 
+        // Extend session lifespan from current login time
+        const sessionType: SessionType = 'remember_device'
+        const { expiresAt, maxIdleTime, lastUsed } = extendSessionLifespan(sessionType)
+
+        // Create device if not exists
+        await prisma.device.upsert({
+          where: { fingerprint: deviceFingerprint },
+          update: { 
+            userAgent,
+            updatedAt: new Date()
+          },
+          create: {
+            fingerprint: deviceFingerprint,
+            userAgent
+          }
+        })
+
         // Then create new session for the current group
         await prisma.deviceSession.create({
           data: {
             deviceFingerprint,
             groupId: group.id,
-            travelerName: validMembers[0].name.trim(),
+            currentTravelerName: validMembers[0].name.trim(),
+            availableTravelers: [validMembers[0].name.trim()],
+            sessionType,
+            expiresAt,
+            maxIdleTime,
             userAgent,
             ipAddress: ip,
-            isActive: true
+            isActive: true,
+            lastUsed
           }
         })
       } catch (error) {

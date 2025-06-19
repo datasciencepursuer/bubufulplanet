@@ -14,14 +14,14 @@ export const SESSION_LIFESPANS = {
   },
   // Default session type for most users
   remember_device: {
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    maxIdle: 7 * 24 * 60 * 60 * 1000, // 7 days idle
+    maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days (3 months)
+    maxIdle: 21 * 24 * 60 * 60 * 1000, // 21 days idle (3 weeks)
     description: 'Standard device session with auto-login'
   },
   // Extended session for trusted devices
   long_term: {
-    maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
-    maxIdle: 30 * 24 * 60 * 60 * 1000, // 30 days idle
+    maxAge: 180 * 24 * 60 * 60 * 1000, // 180 days (6 months)
+    maxIdle: 60 * 24 * 60 * 60 * 1000, // 60 days idle (2 months)
     description: 'Extended session for trusted devices'
   }
 } as const;
@@ -109,6 +109,25 @@ export function updateSessionActivity(sessionId: string) {
       where: { id: sessionId },
       data: { lastUsed: new Date() }
     }
+  };
+}
+
+/**
+ * Extend session lifespan from current date (called on login)
+ * Resets both expiry date and last used timestamp
+ */
+export function extendSessionLifespan(sessionType: SessionType): {
+  expiresAt: Date;
+  maxIdleTime: number;
+  lastUsed: Date;
+} {
+  const { expiresAt, maxIdleTime } = calculateSessionExpiry(sessionType);
+  const now = new Date();
+  
+  return {
+    expiresAt,
+    maxIdleTime,
+    lastUsed: now
   };
 }
 

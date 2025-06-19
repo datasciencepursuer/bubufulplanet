@@ -9,6 +9,7 @@
 
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
+import { extendSessionLifespan, type SessionType } from '@/lib/session-config'
 
 export interface UnifiedSessionContext {
   groupId: string
@@ -146,13 +147,35 @@ export async function createUnifiedSession(
         })
         
         // Create new session
+        // Extend session lifespan from current login time
+        const sessionType: SessionType = 'remember_device'
+        const { expiresAt, maxIdleTime, lastUsed } = extendSessionLifespan(sessionType)
+
+        // Create device if not exists
+        await prisma.device.upsert({
+          where: { fingerprint: deviceFingerprint },
+          update: { 
+            userAgent,
+            updatedAt: new Date()
+          },
+          create: {
+            fingerprint: deviceFingerprint,
+            userAgent
+          }
+        })
+
         await prisma.deviceSession.create({
           data: {
             deviceFingerprint,
             groupId,
-            travelerName,
+            currentTravelerName: travelerName,
+            availableTravelers: [travelerName],
+            sessionType,
+            expiresAt,
+            maxIdleTime,
             userAgent,
-            isActive: true
+            isActive: true,
+            lastUsed
           }
         })
       } catch (deviceError) {

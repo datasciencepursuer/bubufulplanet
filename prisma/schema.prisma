@@ -164,7 +164,7 @@ model DeviceSession {
   availableTravelers  Json?     @map("available_travelers") // Array of traveler names this device can access
   sessionType         String    @default("remember_device") @map("session_type") @db.VarChar(20) // 'temporary', 'remember_device', 'long_term'
   expiresAt           DateTime  @map("expires_at") @db.Timestamptz(6)
-  maxIdleTime         Int       @default(604800) @map("max_idle_time") // Seconds (default: 7 days)
+  maxIdleTime         Int       @default(1814400) @map("max_idle_time") // Seconds (default: 21 days)
   sessionData         Json?     @map("session_data")
   userAgent           String?   @map("user_agent") @db.Text
   ipAddress           String?   @map("ip_address") @db.VarChar(45)

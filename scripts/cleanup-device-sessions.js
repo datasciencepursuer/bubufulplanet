@@ -10,6 +10,11 @@
  * 4. Enforcing per-device session limits (5 most recent per device)
  * 5. Cleaning up orphaned devices with no active sessions
  * 
+ * NOTE: Session lifespans are automatically extended on each login!
+ * - remember_device sessions: 90 days (extended on login)
+ * - long_term sessions: 180 days (extended on login)
+ * - Active users never lose their sessions due to auto-extension
+ * 
  * Usage: node scripts/cleanup-device-sessions.js
  * Recommended schedule: Daily at 2 AM (0 2 * * *)
  */

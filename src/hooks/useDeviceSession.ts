@@ -7,6 +7,7 @@ import {
   getStoredDeviceFingerprint,
   storeRecentGroupAccess,
   getRecentGroupAccesses,
+  clearDeviceData,
   type DeviceInfo,
   type RecentGroupAccess 
 } from '@/lib/device-fingerprint'
@@ -187,7 +188,7 @@ export function useDeviceSession() {
   }
 
   // Logout and clear device session
-  const logout = async (): Promise<boolean> => {
+  const logout = async (clearLocalData: boolean = false): Promise<boolean> => {
     if (!deviceInfo) return false
 
     try {
@@ -202,6 +203,13 @@ export function useDeviceSession() {
       if (response.ok) {
         // Clear available sessions immediately
         setAvailableSessions([])
+        
+        // Optionally clear local device data (recent groups, etc.)
+        if (clearLocalData) {
+          clearDeviceData()
+          setRecentGroups([])
+          console.log('🧹 Cleared local device data for privacy')
+        }
         
         // Force a fresh check to make sure sessions are cleared
         try {

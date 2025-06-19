@@ -11,7 +11,9 @@
     "db:generate": "prisma generate",
     "db:reset": "prisma migrate reset",
     "db:seed": "prisma db seed",
-    "cleanup:sessions": "node scripts/cleanup-device-sessions.js"
+    "cleanup:sessions": "node scripts/cleanup-device-sessions.js",
+    "test:session-extension": "node scripts/test-session-extension.js",
+    "test:logout": "node scripts/test-logout-functionality.js"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.17",

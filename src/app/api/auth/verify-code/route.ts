@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
+import { extendSessionLifespan, type SessionType } from '@/lib/session-config'
 
 export async function POST(request: Request) {
   try {
@@ -48,23 +49,49 @@ export async function POST(request: Request) {
 
     // Create/update device session if fingerprint provided
     if (deviceFingerprint) {
-      // First deactivate any existing sessions for this device
-      await prisma.deviceSession.updateMany({
-        where: {
-          deviceFingerprint,
-          isActive: true
+      // Extend session lifespan from current login time
+      const sessionType: SessionType = 'remember_device'
+      const { expiresAt, maxIdleTime, lastUsed } = extendSessionLifespan(sessionType)
+      
+      // Check if device exists, create if not
+      await prisma.device.upsert({
+        where: { fingerprint: deviceFingerprint },
+        update: { 
+          userAgent,
+          updatedAt: new Date()
         },
-        data: {
-          isActive: false
+        create: {
+          fingerprint: deviceFingerprint,
+          userAgent
         }
       })
       
-      // Create new session
-      await prisma.deviceSession.create({
-        data: {
+      // Upsert device session (one per device per group)
+      await prisma.deviceSession.upsert({
+        where: {
+          unique_device_group_session: {
+            deviceFingerprint,
+            groupId: travelGroup.id
+          }
+        },
+        update: {
+          currentTravelerName: travelerName,
+          availableTravelers: [travelerName],
+          sessionType,
+          expiresAt,
+          maxIdleTime,
+          userAgent,
+          isActive: true,
+          lastUsed
+        },
+        create: {
           deviceFingerprint,
           groupId: travelGroup.id,
-          travelerName,
+          currentTravelerName: travelerName,
+          availableTravelers: [travelerName],
+          sessionType,
+          expiresAt,
+          maxIdleTime,
           userAgent,
           isActive: true
         }

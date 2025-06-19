@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { extendSessionLifespan, type SessionType } from '@/lib/session-config'
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,29 +19,53 @@ export async function POST(request: NextRequest) {
     const realIp = request.headers.get('x-real-ip')
     const ip = forwardedFor?.split(',')[0] || realIp || '127.0.0.1'
 
-    // First, deactivate any existing sessions for this device/group/traveler combo
-    await prisma.deviceSession.updateMany({
-      where: {
-        deviceFingerprint,
-        groupId,
-        travelerName,
-        isActive: true
+    // Extend session lifespan from current login time
+    const sessionType: SessionType = 'remember_device'
+    const { expiresAt, maxIdleTime, lastUsed } = extendSessionLifespan(sessionType)
+
+    // Ensure device exists
+    await prisma.device.upsert({
+      where: { fingerprint: deviceFingerprint },
+      update: { 
+        userAgent,
+        updatedAt: new Date()
       },
-      data: {
-        isActive: false
+      create: {
+        fingerprint: deviceFingerprint,
+        userAgent
       }
     })
 
-    // Create new active session
-    const session = await prisma.deviceSession.create({
-      data: {
-        deviceFingerprint,
-        groupId,
-        travelerName,
+    // Upsert device session (one per device per group)
+    const session = await prisma.deviceSession.upsert({
+      where: {
+        unique_device_group_session: {
+          deviceFingerprint,
+          groupId
+        }
+      },
+      update: {
+        currentTravelerName: travelerName,
+        availableTravelers: [travelerName],
+        sessionType,
+        expiresAt,
+        maxIdleTime,
         userAgent,
         ipAddress: ip,
         isActive: true,
-        lastUsed: new Date()
+        lastUsed
+      },
+      create: {
+        deviceFingerprint,
+        groupId,
+        currentTravelerName: travelerName,
+        availableTravelers: [travelerName],
+        sessionType,
+        expiresAt,
+        maxIdleTime,
+        userAgent,
+        ipAddress: ip,
+        isActive: true
       }
     })
 

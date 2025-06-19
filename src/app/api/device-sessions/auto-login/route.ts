@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createUnifiedSession } from '@/lib/unified-session'
 import { prisma } from '@/lib/prisma'
+import { isSessionValid, extendSessionLifespan, type SessionType } from '@/lib/session-config'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,22 +16,63 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the device session exists and is valid using Prisma
-    const session = await prisma.deviceSession.findFirst({
+    const session = await prisma.deviceSession.findUnique({
       where: {
-        deviceFingerprint,
-        groupId,
-        travelerName,
-        isActive: true
+        unique_device_group_session: {
+          deviceFingerprint,
+          groupId
+        }
       },
-      select: { id: true }
+      select: { 
+        id: true,
+        currentTravelerName: true,
+        availableTravelers: true,
+        sessionType: true,
+        expiresAt: true,
+        maxIdleTime: true,
+        lastUsed: true,
+        isActive: true
+      }
     })
 
-    if (!session) {
+    if (!session || !session.isActive) {
       return NextResponse.json(
-        { error: 'Invalid or expired device session' },
+        { error: 'Device session not found' },
         { status: 401 }
       )
     }
+
+    // Check if session is still valid (not expired or idle)
+    if (!isSessionValid(session)) {
+      return NextResponse.json(
+        { error: 'Device session expired' },
+        { status: 401 }
+      )
+    }
+
+    // Check if the requested traveler is available on this device
+    const availableTravelers = Array.isArray(session.availableTravelers) ? session.availableTravelers : []
+    if (!availableTravelers.includes(travelerName)) {
+      return NextResponse.json(
+        { error: 'Traveler not available on this device session' },
+        { status: 401 }
+      )
+    }
+
+    // Extend session lifespan on successful auto-login
+    const sessionType = (session.sessionType as SessionType) || 'remember_device'
+    const { expiresAt, maxIdleTime, lastUsed } = extendSessionLifespan(sessionType)
+    
+    // Update session with extended lifespan
+    await prisma.deviceSession.update({
+      where: { id: session.id },
+      data: {
+        currentTravelerName: travelerName,
+        expiresAt,
+        maxIdleTime,
+        lastUsed
+      }
+    })
 
     // Get group info using Prisma
     const group = await prisma.travelGroup.findUnique({
