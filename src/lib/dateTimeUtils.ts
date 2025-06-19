@@ -23,10 +23,13 @@ export const normalizeDate = (date: Date | string): string => {
       if (!isValid(date)) {
         throw new Error(`Invalid Date object: ${date}`)
       }
-      // Use UTC methods to avoid timezone issues
+      
+      // Use completely timezone-agnostic approach consistent with createAbsoluteDate()
+      // Extract UTC components to represent the absolute calendar date
       const year = date.getUTCFullYear()
       const month = (date.getUTCMonth() + 1).toString().padStart(2, '0')
       const day = date.getUTCDate().toString().padStart(2, '0')
+      
       return `${year}-${month}-${day}`
     } else {
       throw new Error(`Unsupported date type: ${typeof date}`)

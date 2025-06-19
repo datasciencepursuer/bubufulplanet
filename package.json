@@ -13,7 +13,8 @@
     "db:seed": "prisma db seed",
     "cleanup:sessions": "node scripts/cleanup-device-sessions.js",
     "test:session-extension": "node scripts/test-session-extension.js",
-    "test:logout": "node scripts/test-logout-functionality.js"
+    "test:logout": "node scripts/test-logout-functionality.js",
+    "test:final-day": "node scripts/test-final-day-clickability.js"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.17",
