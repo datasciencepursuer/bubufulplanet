@@ -71,9 +71,14 @@ export function isExactlyOneDayBefore(date: Date, tripStartDate: string): boolea
  */
 export function isExactlyOneDayAfter(date: Date, tripEndDate: string): boolean {
   const dateStr = format(date, 'yyyy-MM-dd')
-  // Parse the trip end date using the same method as normalizeDate
-  const endDateParsed = parseISO(tripEndDate.includes('T') ? tripEndDate.split('T')[0] : tripEndDate)
-  const dayAfterStr = format(addDays(endDateParsed, 1), 'yyyy-MM-dd')
+  // Parse trip end date consistently - ensure it's treated as YYYY-MM-DD
+  const cleanEndDate = tripEndDate.includes('T') ? tripEndDate.split('T')[0] : tripEndDate
+  const endDateParsed = parseISO(cleanEndDate)
+  
+  // Create the day after by parsing YYYY-MM-DD and adding 1 day
+  const dayAfter = addDays(endDateParsed, 1)
+  const dayAfterStr = format(dayAfter, 'yyyy-MM-dd')
+  
   return dateStr === dayAfterStr
 }
 

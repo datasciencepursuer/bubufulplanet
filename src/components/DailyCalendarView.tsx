@@ -172,8 +172,11 @@ export default function DailyCalendarView({
       const endSlot = TIME_SLOTS[Math.max(startIndex, endIndex)]
       
       if (startSlot === endSlot) {
-        // Single slot click
-        onTimeSlotClick(currentTripDay.id, startSlot, startSlot)
+        // Single slot click - create 1-hour time slot
+        const startIndex = getTimeSlotIndex(startSlot)
+        const endIndex = Math.min(startIndex + 1, TIME_SLOTS.length - 1)
+        const endSlotForSingle = TIME_SLOTS[endIndex]
+        onTimeSlotClick(currentTripDay.id, startSlot, endSlotForSingle)
       } else {
         // Range selection
         onTimeRangeSelect(currentTripDay.id, startSlot, endSlot)
