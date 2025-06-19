@@ -1,4 +1,4 @@
-import { format } from 'date-fns'
+import { format, addDays, subDays } from 'date-fns'
 import { normalizeDate as normalizeDateTime } from './dateTimeUtils'
 
 /**
@@ -59,10 +59,8 @@ export function isWithinTripDates(date: Date, tripStartDate: string, tripEndDate
 export function isWithinExtendedRange(date: Date, tripStartDate: string, tripEndDate: string): boolean {
   const dateStr = format(date, 'yyyy-MM-dd')
   // Extended range includes 1 day before and after
-  const extendedStart = new Date(tripStartDate)
-  extendedStart.setDate(extendedStart.getDate() - 1)
-  const extendedEnd = new Date(tripEndDate)
-  extendedEnd.setDate(extendedEnd.getDate() + 1)
+  const extendedStart = subDays(new Date(tripStartDate), 1)
+  const extendedEnd = addDays(new Date(tripEndDate), 1)
   
   const extendedStartStr = format(extendedStart, 'yyyy-MM-dd')
   const extendedEndStr = format(extendedEnd, 'yyyy-MM-dd')
