@@ -84,12 +84,17 @@ export default function WeeklyCalendarView({
   const canGoToNext = currentStartDate < maxPossibleStartDate
 
   const tripDaysInWeek = useMemo(() => {
-    return weekDays.map(day => {
-      const dateStr = normalizeDate(day)
-      const tripDay = tripDaysMap.get(dateStr)
-      return { date: day, tripDay }
-    })
-  }, [weekDays, tripDaysMap])
+    return weekDays
+      .filter(day => {
+        // Additional safety check: never show dates beyond tripRangeEnd
+        return day <= tripRangeEnd
+      })
+      .map(day => {
+        const dateStr = normalizeDate(day)
+        const tripDay = tripDaysMap.get(dateStr)
+        return { date: day, tripDay }
+      })
+  }, [weekDays, tripDaysMap, tripRangeEnd])
 
   const eventsForWeek = useMemo(() => {
     const eventsByDay: Record<string, Event[]> = {}
@@ -114,10 +119,11 @@ export default function WeeklyCalendarView({
 
   const goToNextDay = useCallback(() => {
     const newDate = addDays(currentStartDate, 1)
-    if (newDate <= maxPossibleStartDate) {
+    // Extra safety: make sure the new view doesn't go beyond tripRangeEnd
+    if (newDate <= maxPossibleStartDate && addDays(newDate, 6) <= tripRangeEnd) {
       setCurrentStartDate(newDate)
     }
-  }, [currentStartDate, maxPossibleStartDate])
+  }, [currentStartDate, maxPossibleStartDate, tripRangeEnd])
 
   const goToPreviousWeek = useCallback(() => {
     const newDate = subWeeks(currentStartDate, 1)
@@ -127,9 +133,12 @@ export default function WeeklyCalendarView({
 
   const goToNextWeek = useCallback(() => {
     const newDate = addWeeks(currentStartDate, 1)
-    const constrainedDate = min([newDate, maxPossibleStartDate])
-    setCurrentStartDate(constrainedDate)
-  }, [currentStartDate, maxPossibleStartDate])
+    // Extra safety: make sure the new week doesn't go beyond tripRangeEnd
+    if (addDays(newDate, 6) <= tripRangeEnd) {
+      const constrainedDate = min([newDate, maxPossibleStartDate])
+      setCurrentStartDate(constrainedDate)
+    }
+  }, [currentStartDate, maxPossibleStartDate, tripRangeEnd])
 
   // Get event that occupies a specific time slot for a specific day
   const getEventForTimeSlot = (dayId: string, timeSlot: string): Event | null => {
@@ -269,7 +278,12 @@ export default function WeeklyCalendarView({
                 <div
                   key={format(date, 'yyyy-MM-dd')}
                   className={`p-3 text-center border-r ${styles.container}`}
-                  onClick={() => onDayHeaderClick && onDayHeaderClick(format(date, 'yyyy-MM-dd'))}
+                  onClick={() => {
+                    // Only allow day header clicks for actual trip days
+                    if (onDayHeaderClick && dateInfo.isWithinTripDates) {
+                      onDayHeaderClick(format(date, 'yyyy-MM-dd'))
+                    }
+                  }}
                 >
                   <div className="text-sm font-medium">{format(date, 'EEE')}</div>
                   <div className={`text-lg ${styles.dateNumber}`}>
