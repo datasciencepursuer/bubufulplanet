@@ -306,7 +306,7 @@ export default function WeeklyCalendarView({
                 const isClickable = tripDay && !event && dateInfo.isWithinTripDates
                 const isInSelection = dayId ? isSlotInSelection(dayId, timeSlot) : false
                 const isEventStart = event && event.startSlot === timeSlot
-                const isBeforeOrAfter = dateInfo.dateType === 'before' || dateInfo.dateType === 'after'
+                const isBeforeOrAfter = false // No longer using before/after buffer days
                 const isOutsideRange = dateInfo.dateType === 'outside-range'
                 
                 return (

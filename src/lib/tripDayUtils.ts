@@ -10,7 +10,7 @@ import { normalizeDate as normalizeDateTime } from './dateTimeUtils'
 
 export interface TripDateInfo {
   dayNumber: number | null
-  dateType: 'trip-day' | 'before' | 'after' | 'outside-range'
+  dateType: 'trip-day' | 'outside-range'
   isWithinTripDates: boolean
   isWithinExtendedRange: boolean
 }
@@ -83,16 +83,14 @@ export function isExactlyOneDayAfter(date: Date, tripEndDate: string): boolean {
 }
 
 /**
- * Check if a date is within the extended range (trip dates + buffer days)
+ * Check if a date is within the extended range (now same as trip dates, no buffer days)
  * @param date - Date to check
  * @param tripStartDate - Trip start date as ISO string
  * @param tripEndDate - Trip end date as ISO string
- * @returns true if date is within extended range
+ * @returns true if date is within trip dates only
  */
 export function isWithinExtendedRange(date: Date, tripStartDate: string, tripEndDate: string): boolean {
-  return isWithinTripDates(date, tripStartDate, tripEndDate) || 
-         isExactlyOneDayBefore(date, tripStartDate) || 
-         isExactlyOneDayAfter(date, tripEndDate)
+  return isWithinTripDates(date, tripStartDate, tripEndDate)
 }
 
 /**
@@ -103,16 +101,12 @@ export function isWithinExtendedRange(date: Date, tripStartDate: string, tripEnd
  * @returns Complete information about the date
  * 
  * Expected behavior:
- * - Exactly 1 day before trip start: 'before'
  * - Trip dates (start to end inclusive): 'trip-day'
- * - Exactly 1 day after trip end: 'after'
  * - All other dates: 'outside-range'
  */
 export function getTripDateInfo(date: Date, tripStartDate: string, tripEndDate: string): TripDateInfo {
   const isWithinTrip = isWithinTripDates(date, tripStartDate, tripEndDate)
-  const isBefore = isExactlyOneDayBefore(date, tripStartDate)
-  const isAfter = isExactlyOneDayAfter(date, tripEndDate)
-  const isWithinExtended = isWithinTrip || isBefore || isAfter
+  const isWithinExtended = isWithinTrip // No buffer days
   
   let dateType: TripDateInfo['dateType']
   let dayNumber: number | null = null
@@ -120,10 +114,6 @@ export function getTripDateInfo(date: Date, tripStartDate: string, tripEndDate: 
   if (isWithinTrip) {
     dateType = 'trip-day'
     dayNumber = calculateTripDayNumber(date, tripStartDate)
-  } else if (isBefore) {
-    dateType = 'before'
-  } else if (isAfter) {
-    dateType = 'after'
   } else {
     dateType = 'outside-range'
   }
@@ -148,30 +138,22 @@ export function getTripDateStyles(dateInfo: TripDateInfo) {
     // Date number styling
     dateNumber: isWithinTripDates 
       ? 'text-gray-900' 
-      : dateType === 'before' || dateType === 'after'
-      ? 'text-amber-600'
       : 'text-gray-400',
     
     // Day label styling and text
     dayLabel: {
-      show: dateType === 'trip-day' || dateType === 'before' || dateType === 'after',
+      show: dateType === 'trip-day',
       className: dateType === 'trip-day' 
         ? 'text-xs text-green-700 font-medium mt-1' 
-        : 'text-xs text-amber-700 font-medium mt-1 bg-amber-100 px-1 rounded',
+        : '',
       text: dateType === 'trip-day' 
         ? `Day ${dateInfo.dayNumber}` 
-        : dateType === 'before' 
-        ? 'Before' 
-        : dateType === 'after' 
-        ? 'After' 
         : ''
     },
     
     // Background/container styling
     container: isWithinTripDates 
       ? 'cursor-pointer hover:bg-blue-50' 
-      : dateType === 'before' || dateType === 'after'
-      ? 'bg-amber-50 cursor-not-allowed opacity-75'
       : 'bg-gray-100'
   }
 }
