@@ -123,10 +123,8 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
       const startDate = dragState.startDate <= dragState.endDate ? dragState.startDate : dragState.endDate
       const endDate = dragState.startDate <= dragState.endDate ? dragState.endDate : dragState.startDate
       
-      // Add one day to end date to match FullCalendar behavior (exclusive end date)
-      const adjustedEndDate = addDays(endDate, 1)
-      
-      onTripSelect(startDate, adjustedEndDate)
+      // Use inclusive end date (no adjustment needed)
+      onTripSelect(startDate, endDate)
     }
     
     setDragState({
@@ -195,7 +193,7 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
                 }}
                 onClick={() => {
                   if (isClickable && !dragState.isActive) {
-                    onTripSelect(date, addDays(date, 1))
+                    onTripSelect(date, date)
                   }
                 }}
               >
