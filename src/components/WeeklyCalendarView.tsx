@@ -299,14 +299,13 @@ export default function WeeklyCalendarView({
               
               {/* Day Columns */}
               {tripDaysInWeek.map(({ date, tripDay }) => {
+                // Get date info for styling Before/After days
+                const dateInfo = getTripDateInfo(date, tripStartDate, tripEndDate)
                 const dayId = tripDay?.id || ''
                 const event = dayId ? getEventForTimeSlot(dayId, timeSlot) : null
                 const isClickable = tripDay && !event && dateInfo.isWithinTripDates
                 const isInSelection = dayId ? isSlotInSelection(dayId, timeSlot) : false
                 const isEventStart = event && event.startSlot === timeSlot
-                
-                // Get date info for styling Before/After days
-                const dateInfo = getTripDateInfo(date, tripStartDate, tripEndDate)
                 const isBeforeOrAfter = dateInfo.dateType === 'before' || dateInfo.dateType === 'after'
                 const isOutsideRange = dateInfo.dateType === 'outside-range'
                 
