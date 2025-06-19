@@ -52,7 +52,7 @@ export default function Calendar({ onTripSelect, existingTrips = [] }: CalendarP
       {selectedDates.start && selectedDates.end && (
         <div className="bg-gradient-to-r from-teal-500/10 to-cyan-500/10 p-4 border-t border-teal-200/20">
           <p className="text-sm font-medium text-teal-800">
-            ✈️ Selected dates: {format(selectedDates.start, 'MMM d, yyyy')} - {format(new Date(selectedDates.end.getTime() - 86400000), 'MMM d, yyyy')}
+            ✈️ Selected dates: {format(selectedDates.start, 'MMM d, yyyy')} - {format(selectedDates.end, 'MMM d, yyyy')}
           </p>
         </div>
       )}

@@ -39,13 +39,23 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
   const nextMonthStart = startOfMonth(nextMonth)
   const nextMonthEnd = endOfMonth(nextMonth)
 
-  // Get calendar grid days (only actual month dates, no adjacent month previews)
+  // Get calendar grid days with proper week alignment
   const getCurrentMonthGrid = () => {
-    return eachDayOfInterval({ start: currentMonthStart, end: currentMonthEnd })
+    const monthDays = eachDayOfInterval({ start: currentMonthStart, end: currentMonthEnd })
+    const firstDayOfWeek = currentMonthStart.getDay() // 0 = Sunday, 1 = Monday, etc.
+    
+    // Add empty cells for proper day alignment
+    const emptyCells = Array(firstDayOfWeek).fill(null)
+    return [...emptyCells, ...monthDays]
   }
 
   const getNextMonthGrid = () => {
-    return eachDayOfInterval({ start: nextMonthStart, end: nextMonthEnd })
+    const monthDays = eachDayOfInterval({ start: nextMonthStart, end: nextMonthEnd })
+    const firstDayOfWeek = nextMonthStart.getDay() // 0 = Sunday, 1 = Monday, etc.
+    
+    // Add empty cells for proper day alignment
+    const emptyCells = Array(firstDayOfWeek).fill(null)
+    return [...emptyCells, ...monthDays]
   }
 
   const currentMonthDays = getCurrentMonthGrid()
@@ -147,7 +157,7 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
     return () => document.removeEventListener('mouseup', handleGlobalMouseUp)
   }, [dragState.isActive, handleMouseUp])
 
-  const renderMonth = (monthDays: Date[], monthName: string) => {
+  const renderMonth = (monthDays: (Date | null)[], monthName: string) => {
     
     return (
       <div className="bg-white rounded-lg border overflow-hidden">
@@ -166,7 +176,17 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
         
         {/* Calendar grid */}
         <div className="grid grid-cols-7 auto-rows-fr">
-          {monthDays.map(date => {
+          {monthDays.map((date, index) => {
+            // Handle empty cells for proper day alignment
+            if (date === null) {
+              return (
+                <div
+                  key={`empty-${index}`}
+                  className="min-h-[80px] p-2 border-r border-b bg-gray-50"
+                />
+              )
+            }
+
             const isInTrip = isDayInTrip(date)
             const isSelected = isDaySelected(date)
             const isPastDate = date < new Date(new Date().setHours(0, 0, 0, 0))
