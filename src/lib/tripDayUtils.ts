@@ -1,4 +1,4 @@
-import { format, addDays, subDays } from 'date-fns'
+import { format, addDays, subDays, parseISO } from 'date-fns'
 import { normalizeDate as normalizeDateTime } from './dateTimeUtils'
 
 /**
@@ -57,7 +57,9 @@ export function isWithinTripDates(date: Date, tripStartDate: string, tripEndDate
  */
 export function isExactlyOneDayBefore(date: Date, tripStartDate: string): boolean {
   const dateStr = format(date, 'yyyy-MM-dd')
-  const dayBeforeStr = format(subDays(new Date(tripStartDate), 1), 'yyyy-MM-dd')
+  // Parse the trip start date using the same method as normalizeDate
+  const startDateParsed = parseISO(tripStartDate.includes('T') ? tripStartDate.split('T')[0] : tripStartDate)
+  const dayBeforeStr = format(subDays(startDateParsed, 1), 'yyyy-MM-dd')
   return dateStr === dayBeforeStr
 }
 
@@ -69,7 +71,9 @@ export function isExactlyOneDayBefore(date: Date, tripStartDate: string): boolea
  */
 export function isExactlyOneDayAfter(date: Date, tripEndDate: string): boolean {
   const dateStr = format(date, 'yyyy-MM-dd')
-  const dayAfterStr = format(addDays(new Date(tripEndDate), 1), 'yyyy-MM-dd')
+  // Parse the trip end date using the same method as normalizeDate
+  const endDateParsed = parseISO(tripEndDate.includes('T') ? tripEndDate.split('T')[0] : tripEndDate)
+  const dayAfterStr = format(addDays(endDateParsed, 1), 'yyyy-MM-dd')
   return dateStr === dayAfterStr
 }
 

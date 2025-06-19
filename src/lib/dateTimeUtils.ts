@@ -241,7 +241,27 @@ export const calculateDefaultEndTime = (startTime: string): string => {
  */
 export const to12HourComponents = (time24: string): { time: string; period: 'AM' | 'PM' } => {
   try {
-    const [hours, minutes] = time24.split(':').map(Number)
+    // Handle empty, null, or undefined input
+    if (!time24 || typeof time24 !== 'string') {
+      console.warn('Invalid time24 input:', time24)
+      return { time: '12:00', period: 'AM' }
+    }
+    
+    const timeParts = time24.split(':')
+    if (timeParts.length < 2) {
+      console.warn('Invalid time format:', time24)
+      return { time: '12:00', period: 'AM' }
+    }
+    
+    const hours = parseInt(timeParts[0], 10)
+    const minutes = parseInt(timeParts[1], 10)
+    
+    // Validate parsed values
+    if (isNaN(hours) || isNaN(minutes)) {
+      console.warn('Invalid time values:', { hours, minutes, input: time24 })
+      return { time: '12:00', period: 'AM' }
+    }
+    
     const period = hours >= 12 ? 'PM' : 'AM'
     const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
     return {

@@ -93,7 +93,7 @@ export default function PersistentEventModal({
 
   // 12-hour time state
   const [startTime12, setStartTime12] = useState(() => to12HourComponents(selectedTime || '09:00'))
-  const [endTime12, setEndTime12] = useState(() => to12HourComponents(selectedEndTime || ''))
+  const [endTime12, setEndTime12] = useState(() => to12HourComponents(selectedEndTime || '10:00'))
 
   const [expenses, setExpenses] = useState<ExpenseInsert[]>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
