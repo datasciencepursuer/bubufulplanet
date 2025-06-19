@@ -84,20 +84,20 @@ export async function PUT(
           }
         })
 
-        // Generate new trip days
-        const days = differenceInDays(end, start)
+        // Generate new trip days (inclusive range, matching original creation logic)
         const tripDaysData = []
+        let dayNumber = 1
         
-        for (let i = 0; i < days; i++) {
-          const date = addDays(start, i)
+        for (let date = new Date(start); date <= end; date = new Date(date.getTime() + 24*60*60*1000)) {
           tripDaysData.push({
             tripId,
-            date,
-            dayNumber: i + 1,
-            title: `Day ${i + 1}`,
+            date: new Date(date),
+            dayNumber,
+            title: `Day ${dayNumber}`,
             createdAt: new Date(),
             updatedAt: new Date()
           })
+          dayNumber++
         }
 
         if (tripDaysData.length > 0) {

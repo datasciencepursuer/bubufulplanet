@@ -73,11 +73,11 @@ export default function TripForm({
     })
   }
 
-  // Calculate duration based on current dates
+  // Calculate duration based on current dates (inclusive range)
   const currentStartDate = isEdit ? new Date(editStartDate) : startDate
   const currentEndDate = isEdit ? new Date(editEndDate) : endDate
   const tripDuration = currentStartDate && currentEndDate 
-    ? Math.ceil((currentEndDate.getTime() - currentStartDate.getTime()) / (1000 * 60 * 60 * 24))
+    ? Math.ceil((currentEndDate.getTime() - currentStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
     : 0
 
   // Check if dates changed in edit mode

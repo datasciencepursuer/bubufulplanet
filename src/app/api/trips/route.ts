@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       const tripDays = [];
       let dayNumber = 1;
 
-      for (let date = start; date <= end; date = addDays(date, 1)) {
+      for (let date = new Date(start); date <= end; date = new Date(date.getTime() + 24*60*60*1000)) {
         tripDays.push({
           tripId: trip.id,
           dayNumber,
