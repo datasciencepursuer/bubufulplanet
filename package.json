@@ -10,7 +10,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:reset": "prisma migrate reset",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "cleanup:sessions": "node scripts/cleanup-device-sessions.js"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.17",

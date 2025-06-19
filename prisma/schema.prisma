@@ -48,6 +48,7 @@ model TripDay {
   @@unique([tripId, date])
   @@index([tripId], map: "idx_trip_days_trip_id")
   @@index([date], map: "idx_trip_days_date")
+  @@index([tripId, dayNumber], map: "idx_trip_days_trip_id_day_number")
   @@map("trip_days")
 }
 
@@ -69,6 +70,7 @@ model Event {
 
   @@index([dayId], map: "idx_events_day_id")
   @@index([startSlot, endSlot], map: "idx_events_slots")
+  @@index([dayId, startSlot], map: "idx_events_day_start_slot")
   @@map("events")
 }
 
@@ -139,20 +141,56 @@ model GroupMember {
   @@map("group_members")
 }
 
+model Device {
+  fingerprint String   @id @db.VarChar(255)
+  userAgent   String?  @map("user_agent") @db.Text
+  screen      String?  @db.VarChar(100)
+  timezone    String?  @db.VarChar(100)
+  language    String?  @db.VarChar(20)
+  platform    String?  @db.VarChar(100)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  deviceSessions DeviceSession[]
+
+  @@map("devices")
+}
+
 model DeviceSession {
-  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  deviceFingerprint String    @map("device_fingerprint") @db.VarChar(255)
-  groupId           String    @map("group_id") @db.Uuid
-  travelerName      String    @map("traveler_name") @db.VarChar(255)
-  sessionData       Json?     @map("session_data")
-  userAgent         String?   @map("user_agent") @db.Text
-  ipAddress         String?   @map("ip_address") @db.VarChar(45)
-  isActive          Boolean   @default(true) @map("is_active")
-  lastUsed          DateTime  @default(now()) @map("last_used") @db.Timestamptz(6)
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deviceFingerprint   String    @map("device_fingerprint") @db.VarChar(255)
+  groupId             String    @map("group_id") @db.Uuid
+  currentTravelerName String    @map("current_traveler_name") @db.VarChar(255)
+  availableTravelers  Json?     @map("available_travelers") // Array of traveler names this device can access
+  sessionType         String    @default("remember_device") @map("session_type") @db.VarChar(20) // 'temporary', 'remember_device', 'long_term'
+  expiresAt           DateTime  @map("expires_at") @db.Timestamptz(6)
+  maxIdleTime         Int       @default(604800) @map("max_idle_time") // Seconds (default: 7 days)
+  sessionData         Json?     @map("session_data")
+  userAgent           String?   @map("user_agent") @db.Text
+  ipAddress           String?   @map("ip_address") @db.VarChar(45)
+  isActive            Boolean   @default(true) @map("is_active")
+  lastUsed            DateTime  @default(now()) @map("last_used") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  device Device @relation(fields: [deviceFingerprint], references: [fingerprint], onDelete: Cascade)
 
   @@index([deviceFingerprint], map: "idx_device_sessions_fingerprint")
   @@index([groupId], map: "idx_device_sessions_group_id")
   @@index([isActive], map: "idx_device_sessions_active")
+  @@index([expiresAt], map: "idx_device_sessions_expires")
+  @@index([lastUsed], map: "idx_device_sessions_last_used")
+  @@unique([deviceFingerprint, groupId], name: "unique_device_group_session")
   @@map("device_sessions")
+}
+
+model CleanupLog {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tableName    String   @map("table_name") @db.VarChar(100)
+  deletedCount Int      @map("deleted_count")
+  details      Json?
+  cleanedAt    DateTime @map("cleaned_at") @db.Timestamptz(6)
+
+  @@index([tableName], map: "idx_cleanup_log_table")
+  @@index([cleanedAt], map: "idx_cleanup_log_cleaned_at")
+  @@map("cleanup_log")
 }
