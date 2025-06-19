@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { format, eachDayOfInterval, addDays, subDays, parseISO, min, max, addWeeks, subWeeks } from 'date-fns'
+import { format, eachDayOfInterval, addDays, subDays, parseISO, min, max, addWeeks, subWeeks, startOfWeek, endOfWeek } from 'date-fns'
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Event, TripDay } from '@prisma/client'
@@ -39,13 +39,12 @@ export default function WeeklyCalendarView({
   const startDate = parseISO(tripStartDate)
   const endDate = parseISO(tripEndDate)
   
-  // Calculate trip range with 1-day buffer
-  const tripRangeStart = subDays(startDate, 1)
-  const tripRangeEnd = addDays(endDate, 1)
+  // Find the Monday-Sunday week that contains the trip start date
+  const initialWeekStart = startOfWeek(startDate, { weekStartsOn: 1 }) // 1 = Monday
   
-  // Current view shows 7 days starting from this date
-  const [currentStartDate, setCurrentStartDate] = useState(() => {
-    return tripRangeStart
+  // Current week start (always a Monday)
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+    return initialWeekStart
   })
 
   // Pre-render trip days map for quick lookup
@@ -73,28 +72,23 @@ export default function WeeklyCalendarView({
     currentSlot: null
   })
 
-  // Show 7 days starting from currentStartDate, but constrain to trip range
-  const viewEndDate = addDays(currentStartDate, 6)
-  const constrainedEndDate = min([viewEndDate, tripRangeEnd])
-  const weekDays = eachDayOfInterval({ start: currentStartDate, end: constrainedEndDate })
+  // Calculate current week (always Monday to Sunday)
+  const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 }) // Sunday
+  const weekDays = eachDayOfInterval({ start: currentWeekStart, end: currentWeekEnd })
 
-  // Calculate navigation boundaries
-  const maxPossibleStartDate = subDays(tripRangeEnd, 6)
-  const canGoToPrevious = currentStartDate > tripRangeStart
-  const canGoToNext = currentStartDate < maxPossibleStartDate
+  // Calculate navigation boundaries - can navigate to weeks that overlap with trip
+  const firstWeekStart = startOfWeek(startDate, { weekStartsOn: 1 })
+  const lastWeekStart = startOfWeek(endDate, { weekStartsOn: 1 })
+  const canGoToPrevious = currentWeekStart > firstWeekStart
+  const canGoToNext = currentWeekStart < lastWeekStart
 
   const tripDaysInWeek = useMemo(() => {
-    return weekDays
-      .filter(day => {
-        // Additional safety check: never show dates beyond tripRangeEnd
-        return day <= tripRangeEnd
-      })
-      .map(day => {
-        const dateStr = normalizeDate(day)
-        const tripDay = tripDaysMap.get(dateStr)
-        return { date: day, tripDay }
-      })
-  }, [weekDays, tripDaysMap, tripRangeEnd])
+    return weekDays.map(day => {
+      const dateStr = normalizeDate(day)
+      const tripDay = tripDaysMap.get(dateStr)
+      return { date: day, tripDay }
+    })
+  }, [weekDays, tripDaysMap])
 
   const eventsForWeek = useMemo(() => {
     const eventsByDay: Record<string, Event[]> = {}
@@ -111,34 +105,30 @@ export default function WeeklyCalendarView({
   }, [tripDaysInWeek, events])
 
   const goToPreviousDay = useCallback(() => {
-    const newDate = subDays(currentStartDate, 1)
-    if (newDate >= tripRangeStart) {
-      setCurrentStartDate(newDate)
+    // For day navigation, go to previous week
+    if (canGoToPrevious) {
+      setCurrentWeekStart(subWeeks(currentWeekStart, 1))
     }
-  }, [currentStartDate, tripRangeStart])
+  }, [currentWeekStart, canGoToPrevious])
 
   const goToNextDay = useCallback(() => {
-    const newDate = addDays(currentStartDate, 1)
-    // Extra safety: make sure the new view doesn't go beyond tripRangeEnd
-    if (newDate <= maxPossibleStartDate && addDays(newDate, 6) <= tripRangeEnd) {
-      setCurrentStartDate(newDate)
+    // For day navigation, go to next week
+    if (canGoToNext) {
+      setCurrentWeekStart(addWeeks(currentWeekStart, 1))
     }
-  }, [currentStartDate, maxPossibleStartDate, tripRangeEnd])
+  }, [currentWeekStart, canGoToNext])
 
   const goToPreviousWeek = useCallback(() => {
-    const newDate = subWeeks(currentStartDate, 1)
-    const constrainedDate = max([newDate, tripRangeStart])
-    setCurrentStartDate(constrainedDate)
-  }, [currentStartDate, tripRangeStart])
+    if (canGoToPrevious) {
+      setCurrentWeekStart(subWeeks(currentWeekStart, 1))
+    }
+  }, [currentWeekStart, canGoToPrevious])
 
   const goToNextWeek = useCallback(() => {
-    const newDate = addWeeks(currentStartDate, 1)
-    // Extra safety: make sure the new week doesn't go beyond tripRangeEnd
-    if (addDays(newDate, 6) <= tripRangeEnd) {
-      const constrainedDate = min([newDate, maxPossibleStartDate])
-      setCurrentStartDate(constrainedDate)
+    if (canGoToNext) {
+      setCurrentWeekStart(addWeeks(currentWeekStart, 1))
     }
-  }, [currentStartDate, maxPossibleStartDate, tripRangeEnd])
+  }, [currentWeekStart, canGoToNext])
 
   // Get event that occupies a specific time slot for a specific day
   const getEventForTimeSlot = (dayId: string, timeSlot: string): Event | null => {
@@ -250,7 +240,7 @@ export default function WeeklyCalendarView({
         
         <div className="text-center">
           <h2 className="text-xl font-semibold">
-            {format(currentStartDate, 'MMM d')} - {format(constrainedEndDate, 'MMM d, yyyy')}
+            {format(currentWeekStart, 'MMM d')} - {format(currentWeekEnd, 'MMM d, yyyy')}
           </h2>
         </div>
         
@@ -311,13 +301,14 @@ export default function WeeklyCalendarView({
               {tripDaysInWeek.map(({ date, tripDay }) => {
                 const dayId = tripDay?.id || ''
                 const event = dayId ? getEventForTimeSlot(dayId, timeSlot) : null
-                const isClickable = tripDay && !event
+                const isClickable = tripDay && !event && dateInfo.isWithinTripDates
                 const isInSelection = dayId ? isSlotInSelection(dayId, timeSlot) : false
                 const isEventStart = event && event.startSlot === timeSlot
                 
                 // Get date info for styling Before/After days
                 const dateInfo = getTripDateInfo(date, tripStartDate, tripEndDate)
                 const isBeforeOrAfter = dateInfo.dateType === 'before' || dateInfo.dateType === 'after'
+                const isOutsideRange = dateInfo.dateType === 'outside-range'
                 
                 return (
                   <div
@@ -327,6 +318,8 @@ export default function WeeklyCalendarView({
                         ? 'cursor-pointer hover:bg-blue-50' 
                         : isBeforeOrAfter 
                         ? 'bg-amber-50 opacity-75 cursor-not-allowed' 
+                        : isOutsideRange
+                        ? 'bg-gray-100 opacity-50 cursor-not-allowed'
                         : 'bg-gray-50'
                     } ${isInSelection ? 'bg-blue-200 hover:bg-blue-300' : ''}`}
                     onMouseDown={(e) => {
