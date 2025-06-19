@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session';
 import { prisma } from '@/lib/prisma';
-import { addDays, format } from 'date-fns';
+import { addDays, format, eachDayOfInterval } from 'date-fns';
+import { createAbsoluteDate, createAbsoluteDateRange } from '@/lib/dateTimeUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,32 +20,29 @@ export async function POST(request: NextRequest) {
       // Check create permission
       requireUnifiedPermission(context, 'create');
 
+      // Parse dates as absolute calendar dates (timezone-agnostic)
+      const start = createAbsoluteDate(startDate);
+      const end = createAbsoluteDate(endDate);
+
       // Create trip using Prisma
       const trip = await prisma.trip.create({
         data: {
           name,
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
+          startDate: start,
+          endDate: end,
           destination,
           groupId: context.groupId,
           userId: '' // Legacy field, set to empty string
         }
       });
 
-      // Create trip_days for each day in the range
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const tripDays = [];
-      let dayNumber = 1;
-
-      for (let date = new Date(start); date <= end; date = new Date(date.getTime() + 24*60*60*1000)) {
-        tripDays.push({
-          tripId: trip.id,
-          dayNumber,
-          date: new Date(date)
-        });
-        dayNumber++;
-      }
+      // Create trip_days for each day in the range using timezone-agnostic method
+      const dateRange = createAbsoluteDateRange(start, end);
+      const tripDays = dateRange.map((date, index) => ({
+        tripId: trip.id,
+        dayNumber: index + 1,
+        date: date
+      }));
 
       if (tripDays.length > 0) {
         try {

@@ -5,30 +5,93 @@ const TIME_BASE_DATE = '1970-01-01'
 
 /**
  * Normalize date input to consistent YYYY-MM-DD string format
- * Handles Date objects, ISO strings, and date strings
+ * Handles Date objects, ISO strings, and date strings in a timezone-agnostic way
  */
 export const normalizeDate = (date: Date | string): string => {
   try {
     if (typeof date === 'string') {
-      // Handle various string formats
-      const parsed = parseISO(date.includes('T') ? date.split('T')[0] : date)
-      if (!isValid(parsed)) {
-        throw new Error(`Invalid date string: ${date}`)
+      // Handle various string formats - extract just the date part
+      const dateStr = date.includes('T') ? date.split('T')[0] : date
+      
+      // Validate the date string format (YYYY-MM-DD)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        throw new Error(`Invalid date format: ${dateStr}`)
       }
-      return format(parsed, 'yyyy-MM-dd')
+      
+      return dateStr
     } else if (date instanceof Date) {
       if (!isValid(date)) {
         throw new Error(`Invalid Date object: ${date}`)
       }
-      return format(date, 'yyyy-MM-dd')
+      // Use UTC methods to avoid timezone issues
+      const year = date.getUTCFullYear()
+      const month = (date.getUTCMonth() + 1).toString().padStart(2, '0')
+      const day = date.getUTCDate().toString().padStart(2, '0')
+      return `${year}-${month}-${day}`
     } else {
       throw new Error(`Unsupported date type: ${typeof date}`)
     }
   } catch (error) {
     console.error('Date normalization error:', error)
-    // Fallback to current date
-    return format(new Date(), 'yyyy-MM-dd')
+    // Fallback to current date in UTC
+    const now = new Date()
+    const year = now.getUTCFullYear()
+    const month = (now.getUTCMonth() + 1).toString().padStart(2, '0')
+    const day = now.getUTCDate().toString().padStart(2, '0')
+    return `${year}-${month}-${day}`
   }
+}
+
+/**
+ * Create a timezone-agnostic Date object from a YYYY-MM-DD string
+ * The resulting Date represents the calendar date regardless of timezone
+ */
+export const createAbsoluteDate = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day))
+}
+
+/**
+ * Create a timezone-agnostic date range (inclusive) from start to end date
+ * Returns an array of Date objects representing each calendar day
+ */
+export const createAbsoluteDateRange = (startDate: Date, endDate: Date): Date[] => {
+  const dates: Date[] = []
+  
+  // Get the UTC date components to avoid timezone issues
+  let currentYear = startDate.getUTCFullYear()
+  let currentMonth = startDate.getUTCMonth()
+  let currentDay = startDate.getUTCDate()
+  
+  const endYear = endDate.getUTCFullYear()
+  const endMonth = endDate.getUTCMonth()
+  const endDay = endDate.getUTCDate()
+  
+  while (true) {
+    const currentDate = new Date(Date.UTC(currentYear, currentMonth, currentDay))
+    dates.push(currentDate)
+    
+    // Check if we've reached the end date
+    if (currentYear === endYear && currentMonth === endMonth && currentDay === endDay) {
+      break
+    }
+    
+    // Increment to next day
+    currentDay++
+    
+    // Handle month/year rollover
+    const daysInCurrentMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0)).getUTCDate()
+    if (currentDay > daysInCurrentMonth) {
+      currentDay = 1
+      currentMonth++
+      if (currentMonth > 11) {
+        currentMonth = 0
+        currentYear++
+      }
+    }
+  }
+  
+  return dates
 }
 
 /**

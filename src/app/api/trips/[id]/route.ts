@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { validateUnifiedSession } from '@/lib/unified-session'
-import { addDays, differenceInDays, format } from 'date-fns'
+import { addDays, differenceInDays, format, eachDayOfInterval } from 'date-fns'
+import { createAbsoluteDate, createAbsoluteDateRange } from '@/lib/dateTimeUtils'
 
 export async function PUT(
   request: Request,
@@ -27,9 +28,9 @@ export async function PUT(
       )
     }
 
-    // Parse dates
-    const start = new Date(startDate)
-    const end = new Date(endDate)
+    // Parse dates as absolute calendar dates (timezone-agnostic)
+    const start = createAbsoluteDate(startDate);
+    const end = createAbsoluteDate(endDate);
 
     // Validate dates
     if (start >= end) {
@@ -84,21 +85,16 @@ export async function PUT(
           }
         })
 
-        // Generate new trip days (inclusive range, matching original creation logic)
-        const tripDaysData = []
-        let dayNumber = 1
-        
-        for (let date = new Date(start); date <= end; date = new Date(date.getTime() + 24*60*60*1000)) {
-          tripDaysData.push({
-            tripId,
-            date: new Date(date),
-            dayNumber,
-            title: `Day ${dayNumber}`,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          })
-          dayNumber++
-        }
+        // Generate new trip days using timezone-agnostic method
+        const dateRange = createAbsoluteDateRange(start, end);
+        const tripDaysData = dateRange.map((date, index) => ({
+          tripId,
+          date: date,
+          dayNumber: index + 1,
+          title: `Day ${index + 1}`,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }));
 
         if (tripDaysData.length > 0) {
           await tx.tripDay.createMany({
