@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Calendar, MapPin, Users, CalendarDays } from 'lucide-react'
+import { ArrowLeft, Calendar, MapPin, Users, CalendarDays, Edit } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import WeeklyCalendarView from '@/components/WeeklyCalendarView'
 import DailyCalendarView from '@/components/DailyCalendarView'
 import EventModal from '@/components/EventModal'
 import PersistentEventModal from '@/components/PersistentEventModal'
 import EventPropertiesPanel from '@/components/EventPropertiesPanel'
+import TripForm from '@/components/TripForm'
 import type { Trip, TripDay, Event, Expense } from '@prisma/client'
 import { normalizeDate } from '@/lib/dateTimeUtils'
 import { calculateDefaultEndTime } from '@/lib/dateTimeUtils'
@@ -58,6 +59,9 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const [selectedEndTime, setSelectedEndTime] = useState<string>('')
   const [currentDate, setCurrentDate] = useState<string>('')
   const [selectedEndDate, setSelectedEndDate] = useState<string>('')
+
+  // Trip edit state
+  const [showTripEditForm, setShowTripEditForm] = useState(false)
 
   const fetchTripData = useCallback(async () => {
     try {
@@ -358,6 +362,44 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     setCalendarView('daily')
   }
 
+  const handleTripEdit = async (tripData: {
+    name: string
+    destination: string
+    startDate: string
+    endDate: string
+  }) => {
+    try {
+      const response = await fetch(`/api/trips/${tripId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tripData)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || `Failed to update trip: ${response.statusText}`)
+      }
+
+      const { trip: updatedTrip, datesChanged } = await response.json()
+      
+      // Update local state
+      setTrip(updatedTrip)
+      setShowTripEditForm(false)
+
+      // If dates changed, refresh all data since trip days would have been regenerated
+      if (datesChanged) {
+        await fetchTripData()
+        alert('Trip updated successfully. All events and expenses have been removed due to date changes.')
+      } else {
+        alert('Trip updated successfully!')
+      }
+    } catch (error) {
+      console.error('Error updating trip:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update trip'
+      alert(errorMessage + '. Please try again.')
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -391,16 +433,27 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       {/* Header */}
       <div className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <div className="flex items-center mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => router.push('/app')}
+                className="mr-4"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <h1 className="text-3xl font-bold text-gray-900">{trip.name}</h1>
+            </div>
             <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => router.push('/app')}
-              className="mr-4"
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowTripEditForm(true)}
+              className="gap-2"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <Edit className="h-4 w-4" />
+              Edit Trip
             </Button>
-            <h1 className="text-3xl font-bold text-gray-900">{trip.name}</h1>
           </div>
           
           <div className="flex flex-wrap items-center gap-4 text-gray-600">
@@ -533,6 +586,23 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           endSlot={selectedEndTime}
           tripStartDate={trip?.startDate ? normalizeDate(trip.startDate) : undefined}
           tripEndDate={trip?.endDate ? normalizeDate(trip.endDate) : undefined}
+        />
+      )}
+
+      {/* Trip Edit Form */}
+      {showTripEditForm && trip && (
+        <TripForm
+          isEdit={true}
+          existingTrip={{
+            id: trip.id,
+            name: trip.name,
+            destination: trip.destination,
+            startDate: trip.startDate,
+            endDate: trip.endDate
+          }}
+          onSubmit={handleTripEdit}
+          onCancel={() => setShowTripEditForm(false)}
+          open={showTripEditForm}
         />
       )}
     </div>
