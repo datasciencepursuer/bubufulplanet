@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MapPin, Plus, Edit2, Trash2, X, Link, ExternalLink, StickyNote, Map, Calendar } from 'lucide-react'
+import { usePermissions } from '@/hooks/usePermissions'
+import ConfirmDialog from '../ConfirmDialog'
 
 interface PointOfInterest {
   id: string
@@ -30,6 +32,9 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [poiToDelete, setPoiToDelete] = useState<{ id: string; name: string } | null>(null)
+  const { canCreate, canModify } = usePermissions()
   
   // Form state
   const [formData, setFormData] = useState({
@@ -116,7 +121,8 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
       })
 
       if (!response.ok) {
-        throw new Error('Failed to save point of interest')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save point of interest')
       }
 
       await loadPointsOfInterest()
@@ -126,7 +132,7 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
       }
     } catch (error) {
       console.error('Error saving point of interest:', error)
-      alert('Failed to save point of interest. Please try again.')
+      alert(error instanceof Error ? error.message : 'Failed to save point of interest. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -144,26 +150,38 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
     setIsEditing(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this point of interest?')) return
+  const handleDeleteClick = (poi: PointOfInterest, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setPoiToDelete({ id: poi.id, name: poi.destinationName })
+    setShowDeleteConfirm(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!poiToDelete) return
 
     try {
-      const response = await fetch(`/api/points-of-interest?id=${id}`, {
+      const response = await fetch(`/api/points-of-interest?id=${poiToDelete.id}`, {
         method: 'DELETE'
       })
 
       if (!response.ok) {
-        throw new Error('Failed to delete point of interest')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete point of interest')
       }
 
       await loadPointsOfInterest()
+      setPoiToDelete(null)
     } catch (error) {
       console.error('Error deleting point of interest:', error)
-      alert('Failed to delete point of interest. Please try again.')
+      alert(error instanceof Error ? error.message : 'Failed to delete point of interest. Please try again.')
     }
   }
 
   const handleLinkClick = (link: string, e: React.MouseEvent) => {
+    // Don't open link if clicking on action buttons
+    if ((e.target as HTMLElement).closest('button')) {
+      return
+    }
     e.stopPropagation()
     const url = link.startsWith('http') ? link : `https://${link}`
     window.open(url, '_blank', 'noopener,noreferrer')
@@ -226,19 +244,21 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
               {pointsOfInterest.length} destination{pointsOfInterest.length !== 1 ? 's' : ''} saved
             </CardDescription>
           </div>
-          <Button
-            onClick={() => {
-              setIsEditing(!isEditing)
-              if (!isEditing) {
-                resetForm()
-              }
-            }}
-            variant="ghost"
-            size="sm"
-            className="gap-1"
-          >
-            {isEditing ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-          </Button>
+          {(canCreate() || canModify()) && (
+            <Button
+              onClick={() => {
+                setIsEditing(!isEditing)
+                if (!isEditing) {
+                  resetForm()
+                }
+              }}
+              variant="ghost"
+              size="sm"
+              className="gap-1"
+            >
+              {isEditing ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -328,7 +348,7 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
           <div className="text-center py-6">
             <MapPin className="w-8 h-8 mx-auto text-gray-400 mb-2" />
             <p className="text-sm text-gray-600 mb-3">No destinations saved yet</p>
-            {!isEditing && (
+            {!isEditing && canCreate() && (
               <Button onClick={() => setIsEditing(true)} size="sm" variant="outline">
                 Add First Destination
               </Button>
@@ -339,7 +359,8 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
             {pointsOfInterest.map((poi) => (
               <div
                 key={poi.id}
-                className="border rounded-lg p-3 hover:bg-gray-50 transition-colors"
+                className={`group border rounded-lg p-3 hover:bg-gray-50 transition-colors ${poi.link ? 'cursor-pointer' : ''}`}
+                onClick={poi.link ? (e) => handleLinkClick(poi.link!, e) : undefined}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -361,13 +382,10 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
                     
                     {poi.link && (
                       <div className="flex items-center gap-1 mt-1">
-                        <Link className="w-3 h-3 text-gray-500" />
-                        <button
-                          onClick={(e) => handleLinkClick(poi.link!, e)}
-                          className="text-xs text-blue-600 hover:text-blue-800 hover:underline truncate"
-                        >
+                        <ExternalLink className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs text-blue-600 truncate">
                           {poi.link}
-                        </button>
+                        </span>
                       </div>
                     )}
                     
@@ -379,8 +397,8 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
                     )}
                   </div>
                   
-                  {isEditing && (
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                  {canModify() && (
+                    <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -393,7 +411,7 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDelete(poi.id)}
+                        onClick={(e) => handleDeleteClick(poi, e)}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
                         disabled={saving}
                       >
@@ -407,6 +425,20 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
           </div>
         )}
       </CardContent>
+      
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setPoiToDelete(null)
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Point of Interest"
+        message={`Are you sure you want to delete "${poiToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </Card>
   )
 }

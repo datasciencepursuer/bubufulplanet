@@ -30,13 +30,14 @@ export async function GET() {
       }
     })
 
-    // Transform to match expected format
+    // Transform to match expected format with current user flag
     const transformedMembers = members.map(member => ({
       id: member.id,
-      traveler_name: member.travelerName,
+      travelerName: member.travelerName,
       role: member.role,
       permissions: member.permissions,
-      joined_at: member.joinedAt.toISOString()
+      joinedAt: member.joinedAt.toISOString(),
+      isCurrentUser: member.travelerName === travelerName
     }))
 
     return NextResponse.json({ members: transformedMembers })

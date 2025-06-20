@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withUnifiedSessionContext } from '@/lib/unified-session'
 import { prisma } from '@/lib/prisma'
+import { hasPermission } from '@/lib/permissions'
 
 // GET all points of interest for the current group
 export async function GET(request: NextRequest) {
@@ -47,6 +48,27 @@ export async function POST(request: NextRequest) {
     const { destinationName, address, notes, link, tripId } = body
 
     return await withUnifiedSessionContext(async (context) => {
+      // Check if user has create permission
+      const member = await prisma.groupMember.findFirst({
+        where: {
+          groupId: context.groupId,
+          travelerName: context.travelerName
+        }
+      })
+
+      if (!member) {
+        return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+      }
+
+      const permissionContext = {
+        role: member.role,
+        permissions: member.permissions as { read: boolean; create: boolean; modify: boolean }
+      }
+
+      if (!hasPermission(permissionContext, 'create')) {
+        return NextResponse.json({ error: 'You do not have permission to create points of interest' }, { status: 403 })
+      }
+
       // Validate required fields
       if (!destinationName?.trim()) {
         return NextResponse.json({ error: 'Destination name is required' }, { status: 400 })
@@ -103,6 +125,27 @@ export async function PUT(request: NextRequest) {
     const { id, destinationName, address, notes, link, tripId } = body
 
     return await withUnifiedSessionContext(async (context) => {
+      // Check if user has modify permission
+      const member = await prisma.groupMember.findFirst({
+        where: {
+          groupId: context.groupId,
+          travelerName: context.travelerName
+        }
+      })
+
+      if (!member) {
+        return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+      }
+
+      const permissionContext = {
+        role: member.role,
+        permissions: member.permissions as { read: boolean; create: boolean; modify: boolean }
+      }
+
+      if (!hasPermission(permissionContext, 'modify')) {
+        return NextResponse.json({ error: 'You do not have permission to edit points of interest' }, { status: 403 })
+      }
+
       if (!id) {
         return NextResponse.json({ error: 'Point of interest ID is required' }, { status: 400 })
       }
@@ -170,6 +213,27 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id')
 
     return await withUnifiedSessionContext(async (context) => {
+      // Check if user has modify permission
+      const member = await prisma.groupMember.findFirst({
+        where: {
+          groupId: context.groupId,
+          travelerName: context.travelerName
+        }
+      })
+
+      if (!member) {
+        return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+      }
+
+      const permissionContext = {
+        role: member.role,
+        permissions: member.permissions as { read: boolean; create: boolean; modify: boolean }
+      }
+
+      if (!hasPermission(permissionContext, 'modify')) {
+        return NextResponse.json({ error: 'You do not have permission to delete points of interest' }, { status: 403 })
+      }
+
       if (!id) {
         return NextResponse.json({ error: 'Point of interest ID is required' }, { status: 400 })
       }

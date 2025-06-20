@@ -167,18 +167,6 @@ export default function AllTripsView({ trips, onTripsChange, onEditTrip, classNa
                   </p>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 h-auto"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      router.push(`/trips/${nextTrip.id}`)
-                    }}
-                    title="Open trip"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                  </Button>
                   {onEditTrip && (
                     <Button
                       variant="ghost"
@@ -359,18 +347,6 @@ function TripCard({ trip, onDelete, onEdit }: {
           </p>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 h-auto"
-            onClick={(e) => {
-              e.stopPropagation()
-              router.push(`/trips/${trip.id}`)
-            }}
-            title="Open trip"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </Button>
           {onEdit && (
             <Button
               variant="ghost"

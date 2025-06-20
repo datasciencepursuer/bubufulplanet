@@ -21,7 +21,17 @@ export default function AppPage() {
   const [trips, setTrips] = useState<any[]>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
-  const [groupInfo, setGroupInfo] = useState<{name: string, accessCode: string, travelerName?: string, role?: string} | null>(null)
+  const [groupInfo, setGroupInfo] = useState<{
+    name: string, 
+    accessCode: string, 
+    travelerName?: string, 
+    role?: string,
+    permissions?: {
+      read: boolean
+      create: boolean
+      modify: boolean
+    }
+  } | null>(null)
   const [accessCodeCopied, setAccessCodeCopied] = useState(false)
   const [editingTrip, setEditingTrip] = useState<any>(null)
   const router = useRouter()
@@ -60,7 +70,12 @@ export default function AppPage() {
           name: data.group.name,
           accessCode: data.group.accessCode,
           travelerName: data.travelerName,
-          role: data.role
+          role: data.role,
+          permissions: data.currentMember?.permissions || {
+            read: true,
+            create: data.role === 'adventurer',
+            modify: data.role === 'adventurer'
+          }
         })
       }
     } catch (error) {
@@ -69,6 +84,11 @@ export default function AppPage() {
   }
 
   const handleTripSelect = (start: Date, end: Date) => {
+    // Check if user has create permission
+    if (!groupInfo?.permissions?.create) {
+      alert('You do not have permission to create trips. Please ask your group adventurer for permission.')
+      return
+    }
     setSelectedDates({ start, end })
     setShowTripForm(true)
   }
@@ -94,6 +114,11 @@ export default function AppPage() {
   }
 
   const handleEditTrip = (trip: any) => {
+    // Check if user has modify permission
+    if (!groupInfo?.permissions?.modify) {
+      alert('You do not have permission to edit trips. Please ask your group adventurer for permission.')
+      return
+    }
     setEditingTrip(trip)
     setShowTripForm(true)
   }
@@ -155,6 +180,11 @@ export default function AppPage() {
 
   const handleDeleteTripClick = (tripId: string, tripName: string, event: React.MouseEvent) => {
     event.stopPropagation()
+    // Check if user has modify permission
+    if (!groupInfo?.permissions?.modify) {
+      alert('You do not have permission to delete trips. Please ask your group adventurer for permission.')
+      return
+    }
     setTripToDelete({ id: tripId, name: tripName })
     setShowDeleteConfirm(true)
   }
