@@ -14,7 +14,6 @@ fi
 
 echo "Generating Prisma client..."
 pnpm run db:generate
-pnpm exec prisma migrate resolve --applied "20250620_add_points_of_interest"
 
 echo "Running Prisma migrations..."
 pnpm run db:migrate

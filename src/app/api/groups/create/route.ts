@@ -128,16 +128,16 @@ export async function POST(request: NextRequest) {
         const realIp = request.headers.get('x-real-ip')
         const ip = forwardedFor?.split(',')[0] || realIp || '127.0.0.1'
 
-        // First, deactivate any existing sessions for this device
-        await prisma.deviceSession.updateMany({
+        // Delete ALL existing sessions for this traveler in ANY group (they're creating a new group)
+        const deletedSessions = await prisma.deviceSession.deleteMany({
           where: {
-            deviceFingerprint,
-            isActive: true
-          },
-          data: {
-            isActive: false
+            currentTravelerName: validMembers[0].name.trim()
           }
         })
+        
+        if (deletedSessions.count > 0) {
+          console.log(`Deleted ${deletedSessions.count} previous sessions for ${validMembers[0].name.trim()}`)
+        }
 
         // Extend session lifespan from current login time
         const sessionType: SessionType = 'remember_device'

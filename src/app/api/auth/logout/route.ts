@@ -20,20 +20,18 @@ export async function POST(request: NextRequest) {
     cookieStore.delete('vacation-planner-group-id')
     cookieStore.delete('vacation-planner-traveler-name')
 
-    // Clear device sessions if device fingerprint provided
+    // Delete device sessions if device fingerprint provided
     if (deviceFingerprint) {
       try {
-        await prisma.deviceSession.updateMany({
+        // Delete all sessions for this device
+        const deleted = await prisma.deviceSession.deleteMany({
           where: {
-            deviceFingerprint,
-            isActive: true
-          },
-          data: {
-            isActive: false
+            deviceFingerprint
           }
         })
+        console.log(`Deleted ${deleted.count} device sessions for fingerprint ${deviceFingerprint}`)
       } catch (error) {
-        console.warn('Failed to clear device sessions:', error)
+        console.warn('Failed to delete device sessions:', error)
         // Don't fail logout for device session issues
       }
     }

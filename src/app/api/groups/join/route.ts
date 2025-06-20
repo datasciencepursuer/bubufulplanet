@@ -57,22 +57,24 @@ export async function POST(request: NextRequest) {
 
     // Save device session if fingerprint provided
     if (deviceFingerprint) {
+      console.log(`[API] Creating device session for fingerprint: ${deviceFingerprint}, traveler: ${travelerName.trim()}, group: ${group.id}`)
       try {
         const userAgent = request.headers.get('user-agent') || 'unknown'
         const forwardedFor = request.headers.get('x-forwarded-for')
         const realIp = request.headers.get('x-real-ip')
         const ip = forwardedFor?.split(',')[0] || realIp || '127.0.0.1'
 
-        // First, deactivate any existing sessions for this device
-        await prisma.deviceSession.updateMany({
+        // Delete ALL existing sessions for this traveler in this group (across all devices)
+        const deletedSessions = await prisma.deviceSession.deleteMany({
           where: {
-            deviceFingerprint,
-            isActive: true
-          },
-          data: {
-            isActive: false
+            groupId: group.id,
+            currentTravelerName: travelerName.trim()
           }
         })
+        
+        if (deletedSessions.count > 0) {
+          console.log(`Deleted ${deletedSessions.count} previous sessions for ${travelerName.trim()} in group ${group.id}`)
+        }
 
         // Extend session lifespan from current login time
         const sessionType: SessionType = 'remember_device'
@@ -91,7 +93,7 @@ export async function POST(request: NextRequest) {
           }
         })
 
-        // Then create new session for the current group
+        // Create new session for the current device and group
         await prisma.deviceSession.create({
           data: {
             deviceFingerprint,
@@ -107,9 +109,17 @@ export async function POST(request: NextRequest) {
             lastUsed
           }
         })
+        
+        console.log(`Created new session for ${travelerName.trim()} on device ${deviceFingerprint}`)
       } catch (error) {
         // Don't fail the login if device session save fails
-        console.error('Failed to save device session:', error)
+        console.error('[API] Failed to save device session:', error)
+        console.error('[API] Error details:', {
+          deviceFingerprint,
+          groupId: group.id,
+          travelerName: travelerName.trim(),
+          error: error instanceof Error ? error.message : String(error)
+        })
       }
     }
 

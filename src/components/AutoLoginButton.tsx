@@ -25,6 +25,13 @@ export function AutoLoginButton({ className = '', showDivider = false }: AutoLog
 
   // Don't show button if no sessions available or still loading
   if (isLoading || !mostRecentSession || availableSessions.length === 0) {
+    if (!isLoading) {
+      console.log('[AutoLoginButton] Not showing:', {
+        isLoading,
+        hasMostRecentSession: !!mostRecentSession,
+        availableSessionsCount: availableSessions.length
+      })
+    }
     return null
   }
 

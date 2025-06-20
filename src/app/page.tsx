@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { AutoLoginButton } from '@/components/AutoLoginButton'
 import { AccessCodeConfirmation } from '@/components/AccessCodeConfirmation'
-import { generateDeviceFingerprint } from '@/lib/device-fingerprint'
+import { generateDeviceFingerprint, getStoredDeviceFingerprint, storeDeviceFingerprint } from '@/lib/device-fingerprint'
 
 type Mode = 'select' | 'create' | 'join' | 'confirm'
 
@@ -58,8 +58,12 @@ export default function Home() {
     setLoading(true)
 
     try {
-      // Generate device fingerprint for session saving
-      const deviceInfo = generateDeviceFingerprint()
+      // Get or generate device fingerprint for session saving
+      let deviceInfo = getStoredDeviceFingerprint()
+      if (!deviceInfo) {
+        deviceInfo = generateDeviceFingerprint()
+        storeDeviceFingerprint(deviceInfo)
+      }
       
       const response = await fetch('/api/groups/create', {
         method: 'POST',
@@ -99,8 +103,13 @@ export default function Home() {
     setLoading(true)
 
     try {
-      // Generate device fingerprint for session saving
-      const deviceInfo = generateDeviceFingerprint()
+      // Get or generate device fingerprint for session saving
+      let deviceInfo = getStoredDeviceFingerprint()
+      if (!deviceInfo) {
+        deviceInfo = generateDeviceFingerprint()
+        storeDeviceFingerprint(deviceInfo)
+      }
+      console.log('[Login] Sending device fingerprint:', deviceInfo.fingerprint)
       
       const response = await fetch('/api/groups/join', {
         method: 'POST',
@@ -160,6 +169,10 @@ export default function Home() {
               <div className="space-y-4">
                 {/* Auto-login button - only shows if previous sessions exist */}
                 <AutoLoginButton showDivider={true} />
+                <div className="text-xs text-gray-500 text-center">
+                  {/* Temporary debug info */}
+                  Check browser console for device session info
+                </div>
                 
                 <Button 
                   onClick={() => setMode('create')}
