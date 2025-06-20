@@ -11,11 +11,13 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
-echo "Running Prisma migrations..."
-pnpm run db:migrate
 
 echo "Generating Prisma client..."
 pnpm run db:generate
+
+echo "Running Prisma migrations..."
+pnpm run db:migrate
+
 
 echo "Starting Next.js application..."
 exec pnpm start
