@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import type { Event, TripDay } from '@prisma/client'
 import { EVENT_COLORS, getEventColor } from '@/lib/eventColors'
 import { getTripDateInfo, getTripDateStyles, normalizeDate } from '@/lib/tripDayUtils'
-import { TIME_SLOTS, formatTimeSlot, getTimeSlotRange } from '@/lib/timeSlotUtils'
+import { TIME_SLOTS, formatTimeSlot, getTimeSlotRange, getNextTimeSlot } from '@/lib/timeSlotUtils'
 
 interface WeeklyCalendarViewProps {
   tripStartDate: string
@@ -177,15 +177,20 @@ export default function WeeklyCalendarView({
       const endSlot = TIME_SLOTS[Math.max(startSlotIndex, endSlotIndex)]
       
       if (startSlot === endSlot && dragState.startDayId === dragState.currentDayId) {
-        // Single slot click
-        onTimeSlotClick(dragState.startDayId, startSlot, startSlot)
+        // Single slot click - create 1 hour event
+        const nextSlot = getNextTimeSlot(startSlot)
+        onTimeSlotClick(dragState.startDayId, startSlot, nextSlot)
       } else {
         // Range selection (currently only same-day supported)
         if (dragState.startDayId === dragState.currentDayId) {
-          onTimeRangeSelect(dragState.startDayId, startSlot, endSlot)
+          // Add one slot to include the end hour
+          const maxSlotIndex = Math.max(startSlotIndex, endSlotIndex) + 1
+          const adjustedEndSlot = maxSlotIndex < TIME_SLOTS.length ? TIME_SLOTS[maxSlotIndex] : '24:00'
+          onTimeRangeSelect(dragState.startDayId, startSlot, adjustedEndSlot)
         } else {
-          // For cross-day, just create on start day
-          onTimeSlotClick(dragState.startDayId, dragState.startSlot, dragState.startSlot)
+          // For cross-day, just create 1 hour event on start day
+          const nextSlot = getNextTimeSlot(dragState.startSlot)
+          onTimeSlotClick(dragState.startDayId, dragState.startSlot, nextSlot)
         }
       }
     }

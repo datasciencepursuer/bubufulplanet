@@ -9,6 +9,11 @@ export const TIME_SLOTS = [
 
 // Convert 24-hour time slot to 12-hour format for display
 export function formatTimeSlot(timeSlot: string): string {
+  // Special case for end of day
+  if (timeSlot === '24:00') {
+    return 'End of Day (12:00 AM)'
+  }
+  
   const [hours, minutes] = timeSlot.split(':').map(Number)
   const period = hours >= 12 ? 'PM' : 'AM'
   const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
@@ -18,14 +23,21 @@ export function formatTimeSlot(timeSlot: string): string {
 // Get the next time slot (for default end time)
 export function getNextTimeSlot(timeSlot: string): string {
   const currentIndex = TIME_SLOTS.indexOf(timeSlot)
-  if (currentIndex === -1 || currentIndex === TIME_SLOTS.length - 1) {
-    return timeSlot // Return same slot if not found or is last slot
+  if (currentIndex === -1) {
+    return timeSlot // Return same slot if not found
+  }
+  if (currentIndex === TIME_SLOTS.length - 1) {
+    return '24:00' // Return end of day for last slot
   }
   return TIME_SLOTS[currentIndex + 1]
 }
 
 // Check if one time slot is before another
 export function isTimeSlotBefore(timeSlot1: string, timeSlot2: string): boolean {
+  // Handle special "24:00" case
+  if (timeSlot2 === '24:00') return timeSlot1 !== '24:00'
+  if (timeSlot1 === '24:00') return false
+  
   const index1 = TIME_SLOTS.indexOf(timeSlot1)
   const index2 = TIME_SLOTS.indexOf(timeSlot2)
   return index1 < index2
@@ -34,6 +46,13 @@ export function isTimeSlotBefore(timeSlot1: string, timeSlot2: string): boolean 
 // Get time slots between start and end (end is exclusive)
 export function getTimeSlotRange(startSlot: string, endSlot: string): string[] {
   const startIndex = TIME_SLOTS.indexOf(startSlot)
+  
+  // Handle "24:00" as end slot - include all slots from start to end of day
+  if (endSlot === '24:00') {
+    if (startIndex === -1) return [startSlot]
+    return TIME_SLOTS.slice(startIndex)
+  }
+  
   const endIndex = TIME_SLOTS.indexOf(endSlot)
   
   if (startIndex === -1 || endIndex === -1 || startIndex >= endIndex) {
@@ -45,5 +64,22 @@ export function getTimeSlotRange(startSlot: string, endSlot: string): string[] {
 
 // Validate time slot format
 export function isValidTimeSlot(timeSlot: string): boolean {
-  return TIME_SLOTS.includes(timeSlot)
+  return TIME_SLOTS.includes(timeSlot) || timeSlot === '24:00'
+}
+
+// Get valid end time options based on selected start time
+export function getValidEndTimeOptions(startSlot: string): string[] {
+  const startIndex = TIME_SLOTS.indexOf(startSlot)
+  if (startIndex === -1) {
+    return []
+  }
+  // Return all time slots after the start time, plus "24:00" for end of day
+  const validSlots = TIME_SLOTS.slice(startIndex + 1)
+  validSlots.push('24:00') // End of day option
+  return validSlots
+}
+
+// Check if an event spans into the final hour (23:00-24:00)
+export function eventEndsAtMidnight(endSlot: string | null): boolean {
+  return endSlot === '24:00'
 }

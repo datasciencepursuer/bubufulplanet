@@ -12,8 +12,7 @@ import TripForm from '@/components/TripForm'
 import BearGlobeLoader from '@/components/BearGlobeLoader'
 import PointsOfInterestView from '@/components/TripUtilities/PointsOfInterestView'
 import type { Trip, TripDay, Event, Expense } from '@prisma/client'
-import { normalizeDate } from '@/lib/dateTimeUtils'
-import { calculateDefaultEndTime } from '@/lib/dateTimeUtils'
+import { normalizeDate, createAbsoluteDate, calculateDefaultEndTime, formatDateForDisplay } from '@/lib/dateTimeUtils'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 
@@ -516,7 +515,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             )}
             <div className="flex items-center">
               <Calendar className="h-4 w-4 mr-1" />
-              {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+              {formatDateForDisplay(trip.startDate)} - {formatDateForDisplay(trip.endDate)}
             </div>
             <div className="flex items-center">
               <Users className="h-4 w-4 mr-1" />

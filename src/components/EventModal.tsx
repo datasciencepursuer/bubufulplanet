@@ -8,7 +8,7 @@ import ConfirmDialog from './ConfirmDialog'
 import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
 import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
-import { TIME_SLOTS, formatTimeSlot, getNextTimeSlot } from '@/lib/timeSlotUtils'
+import { TIME_SLOTS, formatTimeSlot, getNextTimeSlot, getValidEndTimeOptions } from '@/lib/timeSlotUtils'
 
 interface Destination {
   name: string
@@ -238,7 +238,23 @@ export default function EventModal({
               <label className="block text-sm font-medium mb-2">Start Time *</label>
               <select
                 value={formData.startSlot}
-                onChange={(e) => setFormData({ ...formData, startSlot: e.target.value })}
+                onChange={(e) => {
+                  const newStartSlot = e.target.value
+                  const validEndTimes = getValidEndTimeOptions(newStartSlot)
+                  
+                  // Update start slot
+                  setFormData(prev => {
+                    // If current end slot is before or equal to new start slot, update it
+                    if (prev.endSlot && !validEndTimes.includes(prev.endSlot)) {
+                      return {
+                        ...prev,
+                        startSlot: newStartSlot,
+                        endSlot: getNextTimeSlot(newStartSlot)
+                      }
+                    }
+                    return { ...prev, startSlot: newStartSlot }
+                  })
+                }}
                 className="w-full p-2 border rounded-md"
               >
                 {TIME_SLOTS.map(slot => (
@@ -255,7 +271,7 @@ export default function EventModal({
                 className="w-full p-2 border rounded-md"
               >
                 <option value="">--</option>
-                {TIME_SLOTS.map(slot => (
+                {getValidEndTimeOptions(formData.startSlot).map(slot => (
                   <option key={slot} value={slot}>{formatTimeSlot(slot)}</option>
                 ))}
               </select>

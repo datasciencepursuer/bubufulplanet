@@ -7,7 +7,8 @@ import ConfirmDialog from './ConfirmDialog'
 import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
 import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
-import { normalizeDate, extractTimeString, to12HourComponents, to24HourTime, TIME_OPTIONS_12H, calculateDefaultEndTime } from '@/lib/dateTimeUtils'
+import { normalizeDate, createAbsoluteDate, extractTimeString, to12HourComponents, to24HourTime, TIME_OPTIONS_12H, calculateDefaultEndTime } from '@/lib/dateTimeUtils'
+import { format } from 'date-fns'
 
 interface Destination {
   name: string
@@ -351,7 +352,7 @@ export default function PersistentEventModal({
                 {selectedEvent.startSlot || 'No start time'}
               </div>
               <div className="text-sm text-gray-600">
-                {currentDate ? new Date(currentDate).toLocaleDateString() : 'No date'}
+                {currentDate ? format(createAbsoluteDate(normalizeDate(currentDate)), 'MMM d, yyyy') : 'No date'}
               </div>
               {tripStartDate && tripEndDate && currentDate && (
                 <div className="text-xs mt-1">
