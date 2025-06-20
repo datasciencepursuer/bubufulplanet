@@ -125,8 +125,8 @@ export default function AppPage() {
     startDate: string
     endDate: string
   }) => {
+    const isEdit = !!editingTrip
     try {
-      const isEdit = !!editingTrip
       const url = isEdit ? `/api/trips/${editingTrip.id}` : '/api/trips'
       const method = isEdit ? 'PUT' : 'POST'
       
