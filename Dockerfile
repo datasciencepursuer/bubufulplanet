@@ -65,9 +65,9 @@ RUN apk add --no-cache curl
 # Copy package.json so that package manager commands can be used.
 COPY package.json .
 
-# Copy the production dependencies from the deps stage and also
-# the built application from the build stage into the image.
-COPY --from=deps /usr/src/app/node_modules ./node_modules
+# Copy the production dependencies from the build stage instead of deps
+# to ensure prisma binary is available for migrations
+COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/.next ./.next
 
 # Copy Prisma files for migrations and client
