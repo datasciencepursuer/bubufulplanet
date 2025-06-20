@@ -100,7 +100,7 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
         startDate: start,
         endDate: end
       }
-    }).filter(Boolean)
+    }).filter((trip): trip is NonNullable<typeof trip> => trip !== null)
   }, [existingTrips])
 
   const goToPreviousMonth = () => {
@@ -120,6 +120,7 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
     const dateStr = `${year}-${month}-${day}`
     
     return tripRanges.some(trip => {
+      if (!trip) return false
       // Check if date falls within trip range
       const tripStartYear = trip.startDate.getUTCFullYear()
       const tripStartMonth = String(trip.startDate.getUTCMonth() + 1).padStart(2, '0')
@@ -285,6 +286,7 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
                   <div className="text-xs text-blue-700 truncate">
                     {tripRanges
                       .filter(trip => {
+                        if (!trip) return false
                         const year = date.getUTCFullYear()
                         const month = String(date.getUTCMonth() + 1).padStart(2, '0')
                         const day = String(date.getUTCDate()).padStart(2, '0')
