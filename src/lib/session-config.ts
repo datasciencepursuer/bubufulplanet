@@ -49,17 +49,20 @@ export function calculateSessionExpiry(type: SessionType): {
  */
 export function isSessionValid(session: {
   expiresAt: Date;
-  maxIdleTime: number;
+  maxIdleTime: number | null;
   lastUsed: Date;
   isActive: boolean;
 }): boolean {
   const now = new Date();
   const idleTime = now.getTime() - session.lastUsed.getTime();
   
+  // Use default maxIdleTime if null (21 days in seconds = 1814400)
+  const maxIdleTimeSeconds = session.maxIdleTime ?? 1814400;
+  
   return (
     session.isActive &&
     now < session.expiresAt &&
-    idleTime < (session.maxIdleTime * 1000) // Convert back to milliseconds
+    idleTime < (maxIdleTimeSeconds * 1000) // Convert back to milliseconds
   );
 }
 
@@ -68,7 +71,7 @@ export function isSessionValid(session: {
  */
 export function getSessionExpiryInfo(session: {
   expiresAt: Date;
-  maxIdleTime: number;
+  maxIdleTime: number | null;
   lastUsed: Date;
   sessionType?: string;
 }): {
@@ -80,7 +83,9 @@ export function getSessionExpiryInfo(session: {
   const now = new Date();
   const timeUntilExpiry = session.expiresAt.getTime() - now.getTime();
   const timeSinceLastUsed = now.getTime() - session.lastUsed.getTime();
-  const timeUntilIdleExpiry = (session.maxIdleTime * 1000) - timeSinceLastUsed;
+  // Use default maxIdleTime if null (21 days in seconds = 1814400)
+  const maxIdleTimeSeconds = session.maxIdleTime ?? 1814400;
+  const timeUntilIdleExpiry = (maxIdleTimeSeconds * 1000) - timeSinceLastUsed;
   
   const daysUntilExpiry = Math.max(0, Math.floor(timeUntilExpiry / (24 * 60 * 60 * 1000)));
   const isExpiringSoon = daysUntilExpiry <= 7; // Within 7 days
