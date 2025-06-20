@@ -14,5 +14,8 @@ fi
 echo "Running Prisma migrations..."
 pnpm run db:migrate
 
+echo "Generating Prisma client..."
+pnpm run db:generate
+
 echo "Starting Next.js application..."
 exec pnpm start
