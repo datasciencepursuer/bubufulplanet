@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button'
 import { AlertTriangle } from 'lucide-react'
 import { createAbsoluteDate, createAbsoluteDateRange, normalizeDate } from '@/lib/dateTimeUtils'
+import ConfirmDialog from './ConfirmDialog'
 
 interface TripFormProps {
   startDate?: Date
@@ -42,6 +43,8 @@ export default function TripForm({
   const [destination, setDestination] = useState('')
   const [editStartDate, setEditStartDate] = useState('')
   const [editEndDate, setEditEndDate] = useState('')
+  const [showEditConfirmation, setShowEditConfirmation] = useState(false)
+  const [pendingTripData, setPendingTripData] = useState<any>(null)
 
   // Helper function to format dates in a timezone-agnostic way
   const formatAbsoluteDate = (date: Date): string => {
@@ -80,25 +83,45 @@ export default function TripForm({
     const submitStartDate = isEdit ? editStartDate : (startDate ? format(startDate, 'yyyy-MM-dd') : editStartDate)
     const submitEndDate = isEdit ? editEndDate : (endDate ? format(endDate, 'yyyy-MM-dd') : editEndDate)
     
-    onSubmit({
+    const tripData = {
       name,
       destination,
       startDate: submitStartDate,
       endDate: submitEndDate,
-    })
+    }
+    
+    // Show confirmation dialog for edits
+    if (isEdit) {
+      setPendingTripData(tripData)
+      setShowEditConfirmation(true)
+    } else {
+      onSubmit(tripData)
+    }
+  }
+  
+  const handleConfirmEdit = () => {
+    if (pendingTripData) {
+      onSubmit(pendingTripData)
+      setPendingTripData(null)
+    }
   }
 
   // Calculate duration based on current dates (timezone-agnostic inclusive range)
-  const currentStartDate = isEdit ? createAbsoluteDate(editStartDate) : startDate
-  const currentEndDate = isEdit ? createAbsoluteDate(editEndDate) : endDate
+  const currentStartDate = isEdit && editStartDate ? createAbsoluteDate(editStartDate) : startDate
+  const currentEndDate = isEdit && editEndDate ? createAbsoluteDate(editEndDate) : endDate
   
   const tripDuration = currentStartDate && currentEndDate 
     ? (() => {
-        // Use timezone-agnostic date range calculation
-        const start = isEdit ? createAbsoluteDate(editStartDate) : createAbsoluteDate(normalizeDate(startDate!))
-        const end = isEdit ? createAbsoluteDate(editEndDate) : createAbsoluteDate(normalizeDate(endDate!))
-        const dateRange = createAbsoluteDateRange(start, end)
-        return dateRange.length
+        try {
+          // Use timezone-agnostic date range calculation
+          const start = currentStartDate
+          const end = currentEndDate
+          const dateRange = createAbsoluteDateRange(start, end)
+          return dateRange.length
+        } catch (error) {
+          console.error('Error calculating trip duration:', error)
+          return 0
+        }
       })()
     : 0
 
@@ -109,8 +132,9 @@ export default function TripForm({
   )
 
   return (
-    <Dialog open={open} onOpenChange={onCancel}>
-      <DialogContent onClose={onCancel}>
+    <>
+      <Dialog open={open} onOpenChange={onCancel}>
+        <DialogContent onClose={onCancel}>
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Trip' : 'Create New Trip'}</DialogTitle>
           <DialogDescription>
@@ -237,5 +261,25 @@ export default function TripForm({
         </form>
       </DialogContent>
     </Dialog>
+    
+    {/* Edit Confirmation Dialog */}
+    <ConfirmDialog
+      isOpen={showEditConfirmation}
+      onClose={() => {
+        setShowEditConfirmation(false)
+        setPendingTripData(null)
+      }}
+      onConfirm={handleConfirmEdit}
+      title="Confirm Trip Changes"
+      message={
+        datesChanged 
+          ? `Are you sure you want to update "${pendingTripData?.name || existingTrip?.name}"? Changing the trip dates will delete all existing events and expenses.`
+          : `Are you sure you want to update "${pendingTripData?.name || existingTrip?.name}"?`
+      }
+      confirmText="Update Trip"
+      cancelText="Cancel"
+      variant={datesChanged ? 'destructive' : 'default'}
+    />
+    </>
   )
 }

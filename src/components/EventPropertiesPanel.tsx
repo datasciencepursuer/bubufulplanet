@@ -2,7 +2,6 @@
 
 import { Calendar, Clock, MapPin, DollarSign, Palette, FileText, Edit, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import type { Event, Expense } from '@prisma/client'
 import { getEventColor } from '@/lib/eventColors'
 import { formatDateRange, extractTimeString, normalizeDate } from '@/lib/tripDayUtils'
@@ -23,7 +22,7 @@ export default function EventPropertiesPanel({
   onClearSelection
 }: EventPropertiesPanelProps) {
 
-  if (!selectedEvent || !position) {
+  if (!selectedEvent) {
     return null
   }
 
@@ -33,16 +32,23 @@ export default function EventPropertiesPanel({
 
 
   return (
-    <div 
-      className="absolute z-50 w-80"
-      style={{
-        top: position.top,
-        left: position.left,
-        maxHeight: '400px',
-        overflowY: 'auto'
-      }}
-    >
-      <Card className="w-full bg-white border-2 border-gray-300 shadow-2xl">
+    <>
+      {/* Invisible overlay to catch clicks outside */}
+      {selectedEvent && (
+        <div 
+          className="fixed inset-0 z-40"
+          onClick={onClearSelection}
+        />
+      )}
+      
+      {/* Panel */}
+      <div 
+        className="fixed right-0 top-0 h-full z-50 w-96 transform transition-transform duration-300 ease-out"
+        style={{
+          transform: selectedEvent ? 'translateX(0)' : 'translateX(100%)'
+        }}
+      >
+        <div className="h-full overflow-y-auto bg-white shadow-2xl border-l-2 border-gray-300">
         {/* Header */}
         <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-cyan-50">
           <div className="flex items-center justify-between">
@@ -155,7 +161,8 @@ export default function EventPropertiesPanel({
             </div>
           </div>
         </div>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </>
   )
 }

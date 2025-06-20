@@ -31,16 +31,16 @@ export function isTimeSlotBefore(timeSlot1: string, timeSlot2: string): boolean 
   return index1 < index2
 }
 
-// Get time slots between start and end (inclusive)
+// Get time slots between start and end (end is exclusive)
 export function getTimeSlotRange(startSlot: string, endSlot: string): string[] {
   const startIndex = TIME_SLOTS.indexOf(startSlot)
   const endIndex = TIME_SLOTS.indexOf(endSlot)
   
-  if (startIndex === -1 || endIndex === -1 || startIndex > endIndex) {
+  if (startIndex === -1 || endIndex === -1 || startIndex >= endIndex) {
     return [startSlot]
   }
   
-  return TIME_SLOTS.slice(startIndex, endIndex + 1)
+  return TIME_SLOTS.slice(startIndex, endIndex)
 }
 
 // Validate time slot format

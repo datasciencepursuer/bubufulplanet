@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Calendar, MapPin, Users, CalendarDays, Edit } from 'lucide-react'
+import { ArrowLeft, Calendar, MapPin, Users, CalendarDays, Edit, Map, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import WeeklyCalendarView from '@/components/WeeklyCalendarView'
 import DailyCalendarView from '@/components/DailyCalendarView'
 import EventModal from '@/components/EventModal'
-import PersistentEventModal from '@/components/PersistentEventModal'
 import EventPropertiesPanel from '@/components/EventPropertiesPanel'
 import TripForm from '@/components/TripForm'
+import BearGlobeLoader from '@/components/BearGlobeLoader'
+import PointsOfInterestView from '@/components/TripUtilities/PointsOfInterestView'
 import type { Trip, TripDay, Event, Expense } from '@prisma/client'
 import { normalizeDate } from '@/lib/dateTimeUtils'
 import { calculateDefaultEndTime } from '@/lib/dateTimeUtils'
@@ -44,12 +45,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const [calendarView, setCalendarView] = useState<'daily' | 'weekly'>('weekly')
   const [selectedDailyDate, setSelectedDailyDate] = useState<string | null>(null)
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set())
+  const [deletingEventIds, setDeletingEventIds] = useState<Set<string>>(new Set())
   const [selectedEventForPanel, setSelectedEventForPanel] = useState<Event | null>(null)
-  const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(null)
-  
-  // Persistent modal state for daily view
-  const [persistentModalEvent, setPersistentModalEvent] = useState<Event | null>(null)
-  const [isEditMode, setIsEditMode] = useState(false)
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -62,6 +59,9 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
 
   // Trip edit state
   const [showTripEditForm, setShowTripEditForm] = useState(false)
+  
+  // Points of Interest state
+  const [showPointsOfInterest, setShowPointsOfInterest] = useState(false)
 
   const fetchTripData = useCallback(async () => {
     try {
@@ -148,23 +148,13 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     // Calculate default end time
     const endTime = calculateDefaultEndTime(time)
     
-    if (calendarView === 'daily') {
-      // For daily view, clear any selected event and enter creation mode in persistent modal
-      setPersistentModalEvent(null)
-      setIsEditMode(true)
-      setSelectedDayId(dayId)
-      setSelectedTime(time)
-      setSelectedEndTime(endTime)
-      setCurrentDate(clickedDate)
-    } else {
-      // For weekly view, use the regular modal
-      setSelectedDayId(dayId)
-      setSelectedTime(time)
-      setSelectedEndTime(endTime)
-      setSelectedEvent(null)
-      setCurrentDate(clickedDate)
-      setIsModalOpen(true)
-    }
+    // For both views, use the regular modal
+    setSelectedDayId(dayId)
+    setSelectedTime(time)
+    setSelectedEndTime(endTime)
+    setSelectedEvent(null)
+    setCurrentDate(clickedDate)
+    setIsModalOpen(true)
   }
 
   const handleTimeRangeSelect = (dayId: string, startTime: string, endTime: string, endDate?: string, startDate?: string) => {
@@ -177,64 +167,41 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     // Use the provided startDate if available, otherwise fall back to dayId lookup
     const startDateStr = startDate || getDateForDayId(dayId)
     
-    if (calendarView === 'daily') {
-      // For daily view, clear any selected event and enter creation mode in persistent modal
-      setPersistentModalEvent(null)
-      setIsEditMode(true)
-      setSelectedDayId(dayId)
-      setSelectedTime(startTime)
-      setSelectedEndTime(endTime)
-      setCurrentDate(startDateStr)
-      if (endDate) {
-        setSelectedEndDate(endDate)
-      }
-    } else {
-      // For weekly view, use the regular modal
-      setSelectedDayId(dayId)
-      setSelectedTime(startTime)
-      setSelectedEndTime(endTime)
-      setSelectedEvent(null)
-      setCurrentDate(startDateStr)
-      
-      // If endDate is provided (multi-day event), we'll need to handle it in the modal
-      if (endDate) {
-        setSelectedEndDate(endDate)
-      }
-      setIsModalOpen(true)
+    // For both views, use the regular modal
+    setSelectedDayId(dayId)
+    setSelectedTime(startTime)
+    setSelectedEndTime(endTime)
+    setSelectedEvent(null)
+    setCurrentDate(startDateStr)
+    
+    // If endDate is provided (multi-day event), we'll need to handle it in the modal
+    if (endDate) {
+      setSelectedEndDate(endDate)
     }
+    setIsModalOpen(true)
   }
 
   const handleEventClick = (event: Event) => {
-    if (calendarView === 'daily') {
-      // For daily view, set the event for persistent modal and enter edit mode
-      setPersistentModalEvent(event)
-      setIsEditMode(true)
-    } else {
-      // For weekly view, use the regular modal
-      setSelectedEvent(event)
-      setSelectedDayId(event.dayId)
-      setSelectedTime('')
-      setSelectedEndTime('')
-      setCurrentDate(getDateForDayId(event.dayId))
-      setIsModalOpen(true)
-    }
+    // For both views, use the regular modal for editing
+    setSelectedEvent(event)
+    setSelectedDayId(event.dayId)
+    setSelectedTime('')
+    setSelectedEndTime('')
+    setCurrentDate(getDateForDayId(event.dayId))
+    setIsModalOpen(true)
   }
 
   const handleEventSelect = (event: Event, position: { top: number; left: number }) => {
-    if (calendarView === 'daily') {
-      // For daily view, set the event for persistent modal preview (not edit mode)
-      setPersistentModalEvent(event)
-      setIsEditMode(false)
+    // For both views, toggle the side panel
+    if (selectedEventForPanel?.id === event.id) {
+      setSelectedEventForPanel(null)
     } else {
-      // For weekly view, use the floating panel
       setSelectedEventForPanel(event)
-      setPanelPosition(position)
     }
   }
 
   const handleClearSelection = () => {
     setSelectedEventForPanel(null)
-    setPanelPosition(null)
   }
 
   const handleSaveEvent = async (
@@ -243,6 +210,46 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   ) => {
     try {
       if (selectedEvent) {
+        // Optimistic update for existing event
+        const updatedEvent: Event = {
+          ...selectedEvent,
+          title: eventData.title,
+          startSlot: eventData.startSlot,
+          endSlot: eventData.endSlot,
+          location: eventData.location,
+          notes: eventData.notes,
+          weather: eventData.weather,
+          loadout: eventData.loadout,
+          color: eventData.color
+        }
+        
+        // Update events state optimistically
+        setEvents(prevEvents => 
+          prevEvents.map(e => e.id === selectedEvent.id ? updatedEvent : e)
+        )
+        
+        // Update selected event for panel if it's the same event
+        if (selectedEventForPanel?.id === selectedEvent.id) {
+          setSelectedEventForPanel(updatedEvent)
+        }
+        
+        // Optimistically update expenses
+        setExpenses(prevExpenses => {
+          // Remove old expenses for this event
+          const filteredExpenses = prevExpenses.filter(e => e.eventId !== selectedEvent.id)
+          // Add new expenses with temporary IDs
+          const newExpenses = expenses.map((exp, index) => ({
+            id: `temp-${selectedEvent.id}-${index}`,
+            eventId: selectedEvent.id,
+            dayId: selectedEvent.dayId,
+            description: exp.description,
+            amount: exp.amount as any, // The server will handle proper Decimal conversion
+            category: exp.category || null,
+            createdAt: new Date()
+          } as Expense))
+          return [...filteredExpenses, ...newExpenses]
+        })
+        
         // Update existing event
         const response = await fetch(`/api/events/${selectedEvent.id}`, {
           method: 'PUT',
@@ -251,6 +258,21 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         })
 
         if (!response.ok) {
+          // Revert optimistic update on error
+          setEvents(prevEvents => 
+            prevEvents.map(e => e.id === selectedEvent.id ? selectedEvent : e)
+          )
+          if (selectedEventForPanel?.id === selectedEvent.id) {
+            setSelectedEventForPanel(selectedEvent)
+          }
+          
+          // Revert expenses by re-fetching from server
+          const expensesResponse = await fetch(`/api/events/expenses?tripId=${tripId}`)
+          if (expensesResponse.ok) {
+            const expensesData = await expensesResponse.json()
+            setExpenses(expensesData.expenses || [])
+          }
+          
           const errorText = await response.text()
           let errorData
           try {
@@ -308,7 +330,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         }
       }
 
-      // Refresh events and expenses
+      // Refresh events and expenses from server to ensure consistency
       const eventsResponse = await fetch(`/api/events?tripId=${tripId}`)
       if (eventsResponse.ok) {
         const eventsData = await eventsResponse.json()
@@ -329,6 +351,29 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   }
 
   const handleDeleteEvent = async (eventId: string) => {
+    // Mark event as being deleted for visual feedback
+    setDeletingEventIds(prev => new Set([...prev, eventId]))
+    
+    // Clear any selected event states immediately
+    if (selectedEventForPanel?.id === eventId) {
+      setSelectedEventForPanel(null)
+    }
+    
+    // Wait a brief moment for fade-out animation
+    await new Promise(resolve => setTimeout(resolve, 200))
+    
+    // Optimistic update - remove the event from UI
+    const previousEvents = events
+    const previousExpenses = expenses
+    
+    setEvents(events.filter(e => e.id !== eventId))
+    setExpenses(expenses.filter(e => e.eventId !== eventId))
+    setDeletingEventIds(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(eventId)
+      return newSet
+    })
+    
     try {
       const response = await fetch(`/api/events/${eventId}`, {
         method: 'DELETE'
@@ -338,7 +383,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         throw new Error('Failed to delete event')
       }
 
-      // Refresh events and expenses
+      // Refresh events and expenses to ensure consistency
       const eventsResponse = await fetch(`/api/events?tripId=${tripId}`)
       if (eventsResponse.ok) {
         const eventsData = await eventsResponse.json()
@@ -353,6 +398,9 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
 
     } catch (err) {
       console.error('Error deleting event:', err)
+      // Revert the optimistic update on error
+      setEvents(previousEvents)
+      setExpenses(previousExpenses)
       alert('Failed to delete event. Please try again.')
     }
   }
@@ -401,15 +449,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   }
 
   if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-          <div className="h-96 bg-gray-200 rounded"></div>
-        </div>
-      </div>
-    )
+    return <BearGlobeLoader />
   }
 
   if (error || !trip) {
@@ -445,15 +485,26 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
               </Button>
               <h1 className="text-3xl font-bold text-gray-900">{trip.name}</h1>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowTripEditForm(true)}
-              className="gap-2"
-            >
-              <Edit className="h-4 w-4" />
-              Edit Trip
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowPointsOfInterest(true)}
+                className="gap-2"
+              >
+                <Map className="h-4 w-4" />
+                Points of Interest
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowTripEditForm(true)}
+                className="gap-2"
+              >
+                <Edit className="h-4 w-4" />
+                Edit Trip
+              </Button>
+            </div>
           </div>
           
           <div className="flex flex-wrap items-center gap-4 text-gray-600">
@@ -503,7 +554,20 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       </div>
 
       {/* Calendar View - Takes remaining height */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
+      <div 
+        className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8"
+        onClick={(e) => {
+          // Close properties panel if clicking on empty space
+          const target = e.target as HTMLElement
+          const isCalendarClick = target.closest('.grid-cols-8') || 
+                                 target.closest('.grid-cols-2') ||
+                                 target.closest('[class*="calendar"]')
+          
+          if (!isCalendarClick) {
+            handleClearSelection()
+          }
+        }}
+      >
         {calendarView === 'weekly' ? (
           <WeeklyCalendarView
             key={`weekly-${trip.id}`}
@@ -513,6 +577,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             events={events}
             selectedEventId={selectedEventForPanel?.id}
             newEventIds={newEventIds}
+            deletingEventIds={deletingEventIds}
             onTimeSlotClick={handleTimeSlotClick}
             onTimeRangeSelect={handleTimeRangeSelect}
             onEventClick={handleEventClick}
@@ -520,74 +585,53 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             onDayHeaderClick={handleDayHeaderClick}
           />
         ) : (
-          <div className="grid grid-cols-2 gap-6 h-full">
-            <DailyCalendarView
-              key={`daily-${trip.id}`}
-              tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
-              tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
-              tripDays={tripDays}
-              events={events}
-              selectedEventId={persistentModalEvent?.id}
-              newEventIds={newEventIds}
-              onTimeSlotClick={handleTimeSlotClick}
-              onTimeRangeSelect={handleTimeRangeSelect}
-              onEventClick={handleEventClick}
-              onEventSelect={handleEventSelect}
-              initialDate={selectedDailyDate}
-            />
-            <PersistentEventModal
-              selectedEvent={persistentModalEvent}
-              expenses={expenses}
-              onSave={handleSaveEvent}
-              onDelete={handleDeleteEvent}
-              dayId={selectedDayId}
-              selectedTime={selectedTime}
-              selectedEndTime={selectedEndTime}
-              currentDate={currentDate}
-              selectedEndDate={selectedEndDate}
-              tripStartDate={trip?.startDate ? normalizeDate(trip.startDate) : undefined}
-              tripEndDate={trip?.endDate ? normalizeDate(trip.endDate) : undefined}
-              isEditMode={isEditMode}
-              onEditModeChange={setIsEditMode}
-            />
-          </div>
+          <DailyCalendarView
+            key={`daily-${trip.id}`}
+            tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
+            tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
+            tripDays={tripDays}
+            events={events}
+            selectedEventId={selectedEventForPanel?.id}
+            newEventIds={newEventIds}
+            deletingEventIds={deletingEventIds}
+            onTimeSlotClick={handleTimeSlotClick}
+            onTimeRangeSelect={handleTimeRangeSelect}
+            onEventClick={handleEventClick}
+            onEventSelect={handleEventSelect}
+            initialDate={selectedDailyDate}
+          />
         )}
       </div>
 
-      {/* Floating Event Properties Panel - Only for weekly view */}
-      {calendarView === 'weekly' && (
-        <EventPropertiesPanel
-          selectedEvent={selectedEventForPanel}
-          expenses={expenses}
-          position={panelPosition}
-          onEditEvent={handleEventClick}
-          onClearSelection={handleClearSelection}
-        />
-      )}
+      {/* Side Event Properties Panel - For both weekly and daily views */}
+      <EventPropertiesPanel
+        selectedEvent={selectedEventForPanel}
+        expenses={expenses}
+        onEditEvent={handleEventClick}
+        onClearSelection={handleClearSelection}
+      />
 
-      {/* Event Modal - Only for weekly view */}
-      {calendarView === 'weekly' && (
-        <EventModal
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false)
-            setSelectedEvent(null)
-            setSelectedDayId('')
-            setSelectedTime('')
-            setSelectedEndTime('')
-            setCurrentDate('')
-            setSelectedEndDate('')
-          }}
-          onSave={handleSaveEvent}
-          onDelete={handleDeleteEvent}
-          event={selectedEvent}
-          dayId={selectedDayId}
-          startSlot={selectedTime}
-          endSlot={selectedEndTime}
-          tripStartDate={trip?.startDate ? normalizeDate(trip.startDate) : undefined}
-          tripEndDate={trip?.endDate ? normalizeDate(trip.endDate) : undefined}
-        />
-      )}
+      {/* Event Modal - For both views */}
+      <EventModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          setSelectedEvent(null)
+          setSelectedDayId('')
+          setSelectedTime('')
+          setSelectedEndTime('')
+          setCurrentDate('')
+          setSelectedEndDate('')
+        }}
+        onSave={handleSaveEvent}
+        onDelete={handleDeleteEvent}
+        event={selectedEvent}
+        dayId={selectedDayId}
+        startSlot={selectedTime}
+        endSlot={selectedEndTime}
+        tripStartDate={trip?.startDate ? normalizeDate(trip.startDate) : undefined}
+        tripEndDate={trip?.endDate ? normalizeDate(trip.endDate) : undefined}
+      />
 
       {/* Trip Edit Form */}
       {showTripEditForm && trip && (
@@ -604,6 +648,31 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           onCancel={() => setShowTripEditForm(false)}
           open={showTripEditForm}
         />
+      )}
+
+      {/* Points of Interest Modal */}
+      {showPointsOfInterest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Points of Interest for {trip?.name}</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPointsOfInterest(false)}
+                className="p-1"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <PointsOfInterestView 
+                tripId={tripId} 
+                className="h-full"
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

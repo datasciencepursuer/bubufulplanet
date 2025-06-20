@@ -11,23 +11,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { MapPin, Calendar as CalendarIcon, DollarSign, Settings, ArrowLeft, Plus, LogOut, Trash2, Clock, Users, Copy, Check } from 'lucide-react'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import BearGlobeLoader from '@/components/BearGlobeLoader'
 import { useDeviceSession } from '@/hooks/useDeviceSession'
 
 export default function AppPage() {
   const [showTripForm, setShowTripForm] = useState(false)
   const [selectedDates, setSelectedDates] = useState<{ start: Date; end: Date } | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [trips, setTrips] = useState<any[]>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
   const [groupInfo, setGroupInfo] = useState<{name: string, accessCode: string, travelerName?: string, role?: string} | null>(null)
   const [accessCodeCopied, setAccessCodeCopied] = useState(false)
+  const [editingTrip, setEditingTrip] = useState<any>(null)
   const router = useRouter()
   const { logout } = useDeviceSession()
 
   useEffect(() => {
-    loadTrips()
-    loadGroupInfo()
+    const loadInitialData = async () => {
+      setLoading(true)
+      try {
+        await Promise.all([loadTrips(), loadGroupInfo()])
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadInitialData()
   }, [])
 
   const loadTrips = async () => {
@@ -91,6 +100,11 @@ export default function AppPage() {
     }
   }
 
+  const handleEditTrip = (trip: any) => {
+    setEditingTrip(trip)
+    setShowTripForm(true)
+  }
+
   const handleLogout = async () => {
     try {
       const success = await logout()
@@ -112,8 +126,12 @@ export default function AppPage() {
     endDate: string
   }) => {
     try {
-      const response = await fetch('/api/trips', {
-        method: 'POST',
+      const isEdit = !!editingTrip
+      const url = isEdit ? `/api/trips/${editingTrip.id}` : '/api/trips'
+      const method = isEdit ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -125,14 +143,20 @@ export default function AppPage() {
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const { trip } = await response.json()
-      // Reload trips after creating a new one
+      // Reload trips after creating/updating
       await loadTrips()
-      router.push(`/trips/${trip.id}`)
+      setEditingTrip(null)
+      setShowTripForm(false)
+      
+      // Only navigate to trip page for new trips
+      if (!isEdit) {
+        const { trip } = await response.json()
+        router.push(`/trips/${trip.id}`)
+      }
     } catch (error) {
-      console.error('Error creating trip:', error)
+      console.error(isEdit ? 'Error updating trip:' : 'Error creating trip:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      alert(`Failed to create trip: ${errorMessage}`)
+      alert(`Failed to ${isEdit ? 'update' : 'create'} trip: ${errorMessage}`)
     }
   }
 
@@ -195,14 +219,7 @@ export default function AppPage() {
   }, [trips])
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-800 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
+    return <BearGlobeLoader />
   }
 
   return (
@@ -314,6 +331,7 @@ export default function AppPage() {
             <AllTripsView 
               trips={trips} 
               onTripsChange={loadTrips}
+              onEditTrip={handleEditTrip}
             />
             
             <AppMonthlyCalendar 
@@ -337,13 +355,24 @@ export default function AppPage() {
         </div>
       </div>
 
-      {showTripForm && selectedDates && (
+      {showTripForm && (editingTrip || selectedDates) && (
         <TripForm
-          startDate={selectedDates.start}
-          endDate={selectedDates.end}
+          startDate={editingTrip ? new Date(editingTrip.startDate) : selectedDates!.start}
+          endDate={editingTrip ? new Date(editingTrip.endDate) : selectedDates!.end}
           onSubmit={handleTripSubmit}
-          onCancel={() => setShowTripForm(false)}
+          onCancel={() => {
+            setShowTripForm(false)
+            setEditingTrip(null)
+          }}
           open={showTripForm}
+          isEdit={!!editingTrip}
+          existingTrip={editingTrip ? {
+            id: editingTrip.id,
+            name: editingTrip.name,
+            destination: editingTrip.destination,
+            startDate: new Date(editingTrip.startDate),
+            endDate: new Date(editingTrip.endDate)
+          } : undefined}
         />
       )}
 

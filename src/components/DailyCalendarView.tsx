@@ -16,6 +16,7 @@ interface DailyCalendarViewProps {
   events: Event[]
   selectedEventId?: string | null
   newEventIds?: Set<string>
+  deletingEventIds?: Set<string>
   onTimeSlotClick: (dayId: string, startSlot: string, endSlot: string) => void
   onTimeRangeSelect: (dayId: string, startSlot: string, endSlot: string) => void
   onEventClick: (event: Event) => void
@@ -30,6 +31,7 @@ export default function DailyCalendarView({
   events,
   selectedEventId,
   newEventIds,
+  deletingEventIds,
   onTimeSlotClick,
   onTimeRangeSelect,
   onEventClick,
@@ -62,8 +64,8 @@ export default function DailyCalendarView({
   })
 
   // Double-click detection state
-  const [lastClickTime, setLastClickTime] = useState<number>(0)
-  const [lastClickedEvent, setLastClickedEvent] = useState<string | null>(null)
+  const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null)
+  const [lastClickedEventId, setLastClickedEventId] = useState<string | null>(null)
 
   // Get trip day for current date
   const currentTripDay = useMemo(() => {
@@ -125,21 +127,30 @@ export default function DailyCalendarView({
   const handleEventClick = (event: Event, e: React.MouseEvent) => {
     e.stopPropagation()
     
-    const now = Date.now()
-    const DOUBLE_CLICK_THRESHOLD = 300 // ms
-    
-    const isDoubleClick = lastClickedEvent === event.id && 
-                         now - lastClickTime < DOUBLE_CLICK_THRESHOLD
-    
-    setLastClickTime(now)
-    setLastClickedEvent(event.id)
-    
-    if (isDoubleClick) {
-      // Double-click: Edit mode
-      onEventClick(event) // This will set the event and trigger edit mode
+    if (clickTimer && lastClickedEventId === event.id) {
+      // Double click detected
+      clearTimeout(clickTimer)
+      setClickTimer(null)
+      setLastClickedEventId(null)
+      onEventClick(event) // This opens the edit modal
     } else {
-      // Single-click: Preview mode  
-      onEventSelect && onEventSelect(event, { top: 0, left: 0 })
+      // Single click
+      if (clickTimer) {
+        clearTimeout(clickTimer)
+      }
+      
+      // Set timer for single click action
+      const timer = setTimeout(() => {
+        // Show event details panel after delay
+        if (onEventSelect) {
+          onEventSelect(event, { top: 0, left: 0 })
+        }
+        setClickTimer(null)
+        setLastClickedEventId(null)
+      }, 300) // 300ms delay to wait for potential double-click
+      
+      setClickTimer(timer)
+      setLastClickedEventId(event.id)
     }
   }
 
@@ -205,6 +216,15 @@ export default function DailyCalendarView({
     }
   }, [dragState.isActive, handleMouseUp])
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimer) {
+        clearTimeout(clickTimer)
+      }
+    }
+  }, [clickTimer])
+
   const canGoToPrevious = currentDate > startDate
   const canGoToNext = currentDate < endDate
   const isWithinTripDates = currentTripDay !== undefined
@@ -260,6 +280,7 @@ export default function DailyCalendarView({
             
             // Check if this is the first slot of an event
             const isEventStart = event && event.startSlot === timeSlot
+            const isPartOfEvent = event && !isEventStart
             
             return (
               <div
@@ -276,7 +297,7 @@ export default function DailyCalendarView({
                 {/* Event Area */}
                 <div
                   className={`flex-1 p-2 relative ${
-                    isClickable ? 'cursor-pointer hover:bg-blue-50' : 'bg-gray-100'
+                    isClickable ? 'cursor-pointer hover:bg-blue-50' : (isPartOfEvent || isEventStart) ? '' : 'bg-gray-100'
                   }`}
                   onMouseDown={(e) => {
                     e.preventDefault()
@@ -292,9 +313,14 @@ export default function DailyCalendarView({
                 >
                   {event && isEventStart ? (
                     <div
-                      onClick={(e) => handleEventClick(event, e)}
-                      className={`cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 rounded-lg shadow-sm p-3 overflow-hidden ${
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleEventClick(event, e)
+                      }}
+                      className={`absolute left-2 right-2 cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 rounded-lg shadow-sm p-3 overflow-hidden ${
                         newEventIds?.has(event.id) ? 'event-grow-animation' : ''
+                      } ${
+                        deletingEventIds?.has(event.id) ? 'opacity-30 scale-95' : ''
                       } ${
                         selectedEventId === event.id ? 'ring-2 ring-teal-500 ring-offset-1' : ''
                       }`}
@@ -302,31 +328,28 @@ export default function DailyCalendarView({
                         backgroundColor: event.color || EVENT_COLORS[0].color,
                         color: getEventColor(event.color || EVENT_COLORS[0].color).fontColor,
                         height: `${getTimeSlotRange(event.startSlot, event.endSlot || event.startSlot).length * 80 - 16}px`,
-                        zIndex: selectedEventId === event.id ? 15 : 10
+                        zIndex: selectedEventId === event.id ? 15 : 10,
+                        top: '8px'
                       }}
                     >
-                      <div className="flex flex-col justify-between h-full">
-                        <div>
-                          <div className="font-medium text-left text-lg mb-1 truncate">{event.title}</div>
+                      <div className="flex flex-col h-full">
+                        <div className="flex-1">
+                          <div className="font-medium text-left text-lg mb-1 line-clamp-2">{event.title}</div>
                           {event.location && (
-                            <div className="text-sm text-left opacity-90 mb-1 truncate">{event.location}</div>
+                            <div className="text-sm text-left opacity-90 mb-1 line-clamp-1">{event.location}</div>
                           )}
                           {event.notes && (
-                            <div className="text-sm text-left opacity-75 mt-1 line-clamp-2 italic">{event.notes}</div>
+                            <div className="text-sm text-left opacity-75 mt-1 whitespace-pre-wrap break-words">{event.notes}</div>
                           )}
                         </div>
-                        <div className="text-sm opacity-75 text-left">
+                        <div className="text-sm opacity-75 text-left mt-2">
                           {formatTimeSlot(event.startSlot)}
                           {event.endSlot && ` - ${formatTimeSlot(event.endSlot)}`}
                         </div>
                       </div>
                     </div>
-                  ) : event && !isEventStart ? (
-                    // Empty div for non-first slots of multi-slot events
-                    <div className="h-full" />
-                  ) : (
-                    <div className="h-full min-h-[76px]" />
-                  )}
+                  ) : null}
+                  <div className="h-full min-h-[76px]" />
                 </div>
               </div>
             )
@@ -338,7 +361,9 @@ export default function DailyCalendarView({
       <div className="p-4 border-t bg-gray-50 text-sm text-gray-600 flex-shrink-0">
         <div className="space-y-1">
           <div>• <strong>Vertical drag:</strong> Select time range to create events</div>
-          <div>• <strong>Click:</strong> Add single-hour event</div>
+          <div>• <strong>Click time slot:</strong> Add single-hour event</div>
+          <div>• <strong>Click event:</strong> View event details</div>
+          <div>• <strong>Double-click event:</strong> Edit event</div>
         </div>
       </div>
     </div>

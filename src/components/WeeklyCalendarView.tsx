@@ -16,6 +16,7 @@ interface WeeklyCalendarViewProps {
   events: Event[]
   selectedEventId?: string | null
   newEventIds?: Set<string>
+  deletingEventIds?: Set<string>
   onTimeSlotClick: (dayId: string, startSlot: string, endSlot: string) => void
   onTimeRangeSelect: (dayId: string, startSlot: string, endSlot: string) => void
   onEventClick: (event: Event) => void
@@ -30,6 +31,7 @@ export default function WeeklyCalendarView({
   events,
   selectedEventId,
   newEventIds,
+  deletingEventIds,
   onTimeSlotClick,
   onTimeRangeSelect,
   onEventClick,
@@ -71,6 +73,10 @@ export default function WeeklyCalendarView({
     currentDayId: null,
     currentSlot: null
   })
+
+  // Double-click detection state
+  const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null)
+  const [lastClickedEventId, setLastClickedEventId] = useState<string | null>(null)
 
   // Calculate current week (always Monday to Sunday)
   const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 }) // Sunday
@@ -208,6 +214,15 @@ export default function WeeklyCalendarView({
     }
   }, [dragState.isActive, handleMouseUp])
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimer) {
+        clearTimeout(clickTimer)
+      }
+    }
+  }, [clickTimer])
+
   // Check if a slot is in current selection
   const isSlotInSelection = (dayId: string, timeSlot: string): boolean => {
     if (!dragState.isActive || !dragState.startDayId || !dragState.startSlot || !dragState.currentSlot) return false
@@ -307,6 +322,7 @@ export default function WeeklyCalendarView({
                 const isInSelection = dayId ? isSlotInSelection(dayId, timeSlot) : false
                 const isEventStart = event && event.startSlot === timeSlot
                 const isOutsideRange = dateInfo.dateType === 'outside-range'
+                const isPartOfEvent = event && !isEventStart
                 
                 return (
                   <div
@@ -316,6 +332,8 @@ export default function WeeklyCalendarView({
                         ? 'cursor-pointer hover:bg-blue-50' 
                         : isOutsideRange
                         ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                        : (isPartOfEvent || isEventStart)
+                        ? '' // No grey background for any slots with events
                         : 'bg-gray-50'
                     } ${isInSelection ? 'bg-blue-200 hover:bg-blue-300' : ''}`}
                     onMouseDown={(e) => {
@@ -334,18 +352,44 @@ export default function WeeklyCalendarView({
                       <div
                         onClick={(e) => {
                           e.stopPropagation()
-                          // Call both event click and event select for properties panel
-                          onEventClick(event)
-                          if (onEventSelect) {
+                          
+                          if (clickTimer && lastClickedEventId === event.id) {
+                            // Double click detected
+                            clearTimeout(clickTimer)
+                            setClickTimer(null)
+                            setLastClickedEventId(null)
+                            onEventClick(event) // This opens the edit modal
+                          } else {
+                            // Single click
+                            if (clickTimer) {
+                              clearTimeout(clickTimer)
+                            }
+                            
+                            // Capture position immediately
                             const rect = e.currentTarget.getBoundingClientRect()
-                            onEventSelect(event, { 
+                            const position = { 
                               top: rect.bottom + window.scrollY + 5, 
                               left: rect.left + window.scrollX 
-                            })
+                            }
+                            
+                            // Set timer for single click action
+                            const timer = setTimeout(() => {
+                              // Show event details panel after delay
+                              if (onEventSelect) {
+                                onEventSelect(event, position)
+                              }
+                              setClickTimer(null)
+                              setLastClickedEventId(null)
+                            }, 300) // 300ms delay to wait for potential double-click
+                            
+                            setClickTimer(timer)
+                            setLastClickedEventId(event.id)
                           }
                         }}
-                        className={`cursor-pointer hover:shadow-lg transition-all duration-200 rounded text-xs p-1 overflow-hidden ${
+                        className={`absolute left-1 right-1 cursor-pointer hover:shadow-lg transition-all duration-200 rounded text-xs p-1 overflow-hidden ${
                           newEventIds?.has(event.id) ? 'event-grow-animation' : ''
+                        } ${
+                          deletingEventIds?.has(event.id) ? 'opacity-30 scale-95' : ''
                         } ${
                           selectedEventId === event.id ? 'ring-1 ring-teal-500' : ''
                         }`}
@@ -353,20 +397,20 @@ export default function WeeklyCalendarView({
                           backgroundColor: event.color || EVENT_COLORS[0].color,
                           color: getEventColor(event.color || EVENT_COLORS[0].color).fontColor,
                           height: `${getTimeSlotRange(event.startSlot, event.endSlot || event.startSlot).length * 60 - 8}px`,
-                          zIndex: selectedEventId === event.id ? 15 : 10
+                          zIndex: selectedEventId === event.id ? 15 : 10,
+                          top: '4px'
                         }}
                       >
-                        <div className="font-medium truncate">{event.title}</div>
+                        <div className="font-medium line-clamp-2">{event.title}</div>
                         {event.location && (
-                          <div className="opacity-75 truncate">{event.location}</div>
+                          <div className="opacity-75 text-xs line-clamp-1">{event.location}</div>
+                        )}
+                        {event.notes && (
+                          <div className="opacity-75 text-xs mt-1 line-clamp-3">{event.notes}</div>
                         )}
                       </div>
-                    ) : event && !isEventStart ? (
-                      // Empty div for non-first slots of multi-slot events
-                      <div className="h-full" />
-                    ) : (
-                      <div className="h-full min-h-[52px]" />
-                    )}
+                    ) : null}
+                    <div className="h-full min-h-[52px]" />
                   </div>
                 )
               })}

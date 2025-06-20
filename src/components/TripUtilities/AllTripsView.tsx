@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MapPin, Calendar, Trash2, Clock, ExternalLink, ChevronRight, X } from 'lucide-react'
+import { MapPin, Calendar, Trash2, Clock, ExternalLink, ChevronRight, X, Edit2 } from 'lucide-react'
 import ConfirmDialog from '../ConfirmDialog'
 
 interface Trip {
@@ -19,10 +19,11 @@ interface Trip {
 interface AllTripsViewProps {
   trips: Trip[]
   onTripsChange: () => void
+  onEditTrip?: (trip: Trip) => void
   className?: string
 }
 
-export default function AllTripsView({ trips, onTripsChange, className }: AllTripsViewProps) {
+export default function AllTripsView({ trips, onTripsChange, onEditTrip, className }: AllTripsViewProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
   const [showAllModal, setShowAllModal] = useState(false)
@@ -177,6 +178,20 @@ export default function AllTripsView({ trips, onTripsChange, className }: AllTri
                   >
                     <ExternalLink className="w-3 h-3" />
                   </Button>
+                  {onEditTrip && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-600 hover:text-gray-800 hover:bg-gray-50 p-1 h-auto"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onEditTrip(nextTrip)
+                      }}
+                      title="Edit trip"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -234,7 +249,7 @@ export default function AllTripsView({ trips, onTripsChange, className }: AllTri
                       </h3>
                       <div className="space-y-2">
                         {current.map((trip) => (
-                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} />
+                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} onEdit={onEditTrip} />
                         ))}
                       </div>
                     </div>
@@ -249,7 +264,7 @@ export default function AllTripsView({ trips, onTripsChange, className }: AllTri
                       </h3>
                       <div className="space-y-2">
                         {upcoming.map((trip) => (
-                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} />
+                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} onEdit={onEditTrip} />
                         ))}
                       </div>
                     </div>
@@ -264,7 +279,7 @@ export default function AllTripsView({ trips, onTripsChange, className }: AllTri
                       </h3>
                       <div className="space-y-2">
                         {past.map((trip) => (
-                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} />
+                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} onEdit={onEditTrip} />
                         ))}
                       </div>
                     </div>
@@ -313,7 +328,11 @@ function getTripStatus(trip: Trip) {
 }
 
 // Helper component for trip cards in the modal
-function TripCard({ trip, onDelete }: { trip: Trip; onDelete: (id: string, name: string, e: React.MouseEvent) => void }) {
+function TripCard({ trip, onDelete, onEdit }: { 
+  trip: Trip; 
+  onDelete: (id: string, name: string, e: React.MouseEvent) => void;
+  onEdit?: (trip: Trip) => void;
+}) {
   const router = useRouter()
   const { status, color, icon: StatusIcon } = getTripStatus(trip)
   
@@ -351,6 +370,20 @@ function TripCard({ trip, onDelete }: { trip: Trip; onDelete: (id: string, name:
           >
             <ExternalLink className="w-3 h-3" />
           </Button>
+          {onEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-gray-600 hover:text-gray-800 hover:bg-gray-50 p-1 h-auto"
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(trip)
+              }}
+              title="Edit trip"
+            >
+              <Edit2 className="w-3 h-3" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

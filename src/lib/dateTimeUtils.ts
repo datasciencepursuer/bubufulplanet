@@ -59,6 +59,15 @@ export const createAbsoluteDate = (dateStr: string): Date => {
  * Returns an array of Date objects representing each calendar day
  */
 export const createAbsoluteDateRange = (startDate: Date, endDate: Date): Date[] => {
+  // Validate inputs
+  if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    throw new Error('Invalid start or end date')
+  }
+  
+  if (startDate > endDate) {
+    throw new Error('Start date must be before or equal to end date')
+  }
+  
   const dates: Date[] = []
   
   // Get the UTC date components to avoid timezone issues
@@ -70,7 +79,11 @@ export const createAbsoluteDateRange = (startDate: Date, endDate: Date): Date[] 
   const endMonth = endDate.getUTCMonth()
   const endDay = endDate.getUTCDate()
   
-  while (true) {
+  // Safety limit - maximum 1000 days (about 2.7 years)
+  let safetyCounter = 0
+  const maxDays = 1000
+  
+  while (safetyCounter < maxDays) {
     const currentDate = new Date(Date.UTC(currentYear, currentMonth, currentDay))
     dates.push(currentDate)
     
@@ -81,6 +94,7 @@ export const createAbsoluteDateRange = (startDate: Date, endDate: Date): Date[] 
     
     // Increment to next day
     currentDay++
+    safetyCounter++
     
     // Handle month/year rollover
     const daysInCurrentMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0)).getUTCDate()
@@ -92,6 +106,10 @@ export const createAbsoluteDateRange = (startDate: Date, endDate: Date): Date[] 
         currentYear++
       }
     }
+  }
+  
+  if (safetyCounter >= maxDays) {
+    throw new Error('Date range too large (maximum 1000 days)')
   }
   
   return dates

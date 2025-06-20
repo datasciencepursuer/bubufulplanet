@@ -3,121 +3,176 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MapPin, Plus, Edit2, Trash2, X, Link, ExternalLink } from 'lucide-react'
+import { MapPin, Plus, Edit2, Trash2, X, Link, ExternalLink, StickyNote, Map, Calendar } from 'lucide-react'
 
-interface Destination {
-  name: string
-  link?: string
+interface PointOfInterest {
+  id: string
+  destinationName: string
+  address?: string | null
+  notes?: string | null
+  link?: string | null
+  tripId?: string | null
+  trip?: {
+    id: string
+    name: string
+  } | null
 }
 
 interface PointsOfInterestViewProps {
   className?: string
+  tripId?: string // Optional tripId to filter by specific trip
 }
 
-export default function PointsOfInterestView({ className }: PointsOfInterestViewProps) {
-  const [destinations, setDestinations] = useState<Destination[]>([])
+export default function PointsOfInterestView({ className, tripId }: PointsOfInterestViewProps) {
+  const [pointsOfInterest, setPointsOfInterest] = useState<PointOfInterest[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [newDestination, setNewDestination] = useState('')
-  const [newLink, setNewLink] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    destinationName: '',
+    address: '',
+    notes: '',
+    link: '',
+    tripId: tripId || ''
+  })
+
+  // Available trips for dropdown
+  const [availableTrips, setAvailableTrips] = useState<Array<{ id: string; name: string }>>([])
 
   useEffect(() => {
-    loadDestinations()
-  }, [])
+    loadPointsOfInterest()
+    if (!tripId) {
+      loadAvailableTrips()
+    }
+  }, [tripId])
 
-  const loadDestinations = async () => {
+  const loadPointsOfInterest = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/groups/current')
+      const url = tripId 
+        ? `/api/points-of-interest?tripId=${tripId}`
+        : '/api/points-of-interest'
+      
+      const response = await fetch(url)
       
       if (response.ok) {
         const data = await response.json()
-        const saved = data.group.savedDestinations
-        if (saved) {
-          // Handle both old string format and new JSON format
-          if (typeof saved === 'string') {
-            // Legacy format: comma-delimited strings
-            const legacyDestinations = saved.split(',').map((dest: string) => ({
-              name: dest.trim(),
-              link: undefined
-            })).filter((dest: Destination) => dest.name)
-            setDestinations(legacyDestinations)
-          } else if (Array.isArray(saved)) {
-            // New format: array of objects
-            setDestinations(saved.filter((dest: Destination) => dest.name))
-          } else {
-            setDestinations([])
-          }
-        } else {
-          setDestinations([])
-        }
+        setPointsOfInterest(data.pointsOfInterest || [])
       } else {
-        throw new Error('Failed to load destinations')
+        throw new Error('Failed to load points of interest')
       }
     } catch (error) {
-      console.error('Error loading destinations:', error)
+      console.error('Error loading points of interest:', error)
       setError('Failed to load points of interest')
     } finally {
       setLoading(false)
     }
   }
 
-  const saveDestinations = async (newDestinations: Destination[]) => {
+  const loadAvailableTrips = async () => {
+    try {
+      const response = await fetch('/api/trips')
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableTrips(data.trips || [])
+      }
+    } catch (error) {
+      console.error('Error loading trips:', error)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      destinationName: '',
+      address: '',
+      notes: '',
+      link: '',
+      tripId: tripId || ''
+    })
+    setEditingId(null)
+  }
+
+  const handleSave = async () => {
+    if (!formData.destinationName.trim()) return
+
     try {
       setSaving(true)
       
-      const response = await fetch('/api/groups/destinations', {
-        method: 'PUT',
+      const method = editingId ? 'PUT' : 'POST'
+      const body = editingId 
+        ? { id: editingId, ...formData }
+        : formData
+
+      const response = await fetch('/api/points-of-interest', {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ savedDestinations: newDestinations }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to save destinations')
+        throw new Error('Failed to save point of interest')
       }
 
-      setDestinations(newDestinations)
-      setIsEditing(false)
-      setNewDestination('')
-      setNewLink('')
+      await loadPointsOfInterest()
+      resetForm()
+      if (!editingId) {
+        setIsEditing(false)
+      }
     } catch (error) {
-      console.error('Error saving destinations:', error)
-      alert('Failed to save points of interest. Please try again.')
+      console.error('Error saving point of interest:', error)
+      alert('Failed to save point of interest. Please try again.')
     } finally {
       setSaving(false)
     }
   }
 
-  const addDestination = () => {
-    if (newDestination.trim() && !destinations.find(dest => dest.name === newDestination.trim())) {
-      const newDest: Destination = {
-        name: newDestination.trim(),
-        link: newLink.trim() || undefined
-      }
-      const updated = [...destinations, newDest]
-      saveDestinations(updated)
-    }
+  const handleEdit = (poi: PointOfInterest) => {
+    setFormData({
+      destinationName: poi.destinationName,
+      address: poi.address || '',
+      notes: poi.notes || '',
+      link: poi.link || '',
+      tripId: poi.tripId || ''
+    })
+    setEditingId(poi.id)
+    setIsEditing(true)
   }
 
-  const removeDestination = (index: number) => {
-    const updated = destinations.filter((_, i) => i !== index)
-    saveDestinations(updated)
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this point of interest?')) return
+
+    try {
+      const response = await fetch(`/api/points-of-interest?id=${id}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete point of interest')
+      }
+
+      await loadPointsOfInterest()
+    } catch (error) {
+      console.error('Error deleting point of interest:', error)
+      alert('Failed to delete point of interest. Please try again.')
+    }
   }
 
   const handleLinkClick = (link: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    // Ensure the link has a protocol
     const url = link.startsWith('http') ? link : `https://${link}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      addDestination()
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSave()
     }
   }
 
@@ -151,7 +206,7 @@ export default function PointsOfInterestView({ className }: PointsOfInterestView
         <CardContent>
           <div className="text-center py-4">
             <p className="text-red-600 mb-2">{error}</p>
-            <Button onClick={loadDestinations} size="sm">Try Again</Button>
+            <Button onClick={loadPointsOfInterest} size="sm">Try Again</Button>
           </div>
         </CardContent>
       </Card>
@@ -168,56 +223,108 @@ export default function PointsOfInterestView({ className }: PointsOfInterestView
               Points of Interest
             </CardTitle>
             <CardDescription>
-              {destinations.length} destination{destinations.length !== 1 ? 's' : ''} saved
+              {pointsOfInterest.length} destination{pointsOfInterest.length !== 1 ? 's' : ''} saved
             </CardDescription>
           </div>
           <Button
-            onClick={() => setIsEditing(!isEditing)}
+            onClick={() => {
+              setIsEditing(!isEditing)
+              if (!isEditing) {
+                resetForm()
+              }
+            }}
             variant="ghost"
             size="sm"
             className="gap-1"
           >
-            {isEditing ? <X className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
+            {isEditing ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        {/* Add New Destination */}
+        {/* Add/Edit Form */}
         {isEditing && (
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={newDestination}
-                onChange={(e) => setNewDestination(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Enter destination name..."
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-3">
+            <input
+              type="text"
+              value={formData.destinationName}
+              onChange={(e) => setFormData({ ...formData, destinationName: e.target.value })}
+              onKeyPress={handleKeyPress}
+              placeholder="Destination name *"
+              className="w-full p-2 text-sm border rounded-md"
+              disabled={saving}
+            />
+            
+            <input
+              type="text"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              onKeyPress={handleKeyPress}
+              placeholder="Address (optional)"
+              className="w-full p-2 text-sm border rounded-md"
+              disabled={saving}
+            />
+            
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Notes (optional)"
+              className="w-full p-2 text-sm border rounded-md resize-none"
+              rows={2}
+              disabled={saving}
+            />
+            
+            <input
+              type="url"
+              value={formData.link}
+              onChange={(e) => setFormData({ ...formData, link: e.target.value })}
+              onKeyPress={handleKeyPress}
+              placeholder="Link (optional)"
+              className="w-full p-2 text-sm border rounded-md"
+              disabled={saving}
+            />
+            
+            {!tripId && availableTrips.length > 0 && (
+              <select
+                value={formData.tripId}
+                onChange={(e) => setFormData({ ...formData, tripId: e.target.value })}
                 className="w-full p-2 text-sm border rounded-md"
                 disabled={saving}
-              />
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={newLink}
-                  onChange={(e) => setNewLink(e.target.value)}
-                  placeholder="Enter link (optional)..."
-                  className="flex-1 p-2 text-sm border rounded-md"
-                  disabled={saving}
-                />
+              >
+                <option value="">No specific trip</option>
+                {availableTrips.map(trip => (
+                  <option key={trip.id} value={trip.id}>
+                    {trip.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleSave}
+                disabled={!formData.destinationName.trim() || saving}
+                size="sm"
+                className="flex-1"
+              >
+                {editingId ? 'Update' : 'Add'}
+              </Button>
+              {editingId && (
                 <Button 
-                  onClick={addDestination}
-                  disabled={!newDestination.trim() || saving}
+                  onClick={resetForm}
+                  disabled={saving}
                   size="sm"
+                  variant="outline"
                 >
-                  <Plus className="w-4 h-4" />
+                  Cancel
                 </Button>
-              </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Destinations List */}
-        {destinations.length === 0 ? (
+        {/* Points of Interest List */}
+        {pointsOfInterest.length === 0 ? (
           <div className="text-center py-6">
             <MapPin className="w-8 h-8 mx-auto text-gray-400 mb-2" />
             <p className="text-sm text-gray-600 mb-3">No destinations saved yet</p>
@@ -228,57 +335,75 @@ export default function PointsOfInterestView({ className }: PointsOfInterestView
             )}
           </div>
         ) : (
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {destinations.slice(0, isEditing ? destinations.length : 5).map((destination, index) => (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {pointsOfInterest.map((poi) => (
               <div
-                key={index}
-                className="flex items-center justify-between p-2 border rounded hover:bg-gray-50 transition-colors group"
+                key={poi.id}
+                className="border rounded-lg p-3 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <MapPin className="w-3 h-3 text-purple-600 flex-shrink-0" />
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium truncate">{destination.name}</span>
-                      {destination.link && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleLinkClick(destination.link!, e)}
-                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 h-auto opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Open link"
+                    <h4 className="font-medium text-sm truncate">{poi.destinationName}</h4>
+                    
+                    {poi.address && (
+                      <div className="flex items-center gap-1 text-xs text-gray-600 mt-1">
+                        <Map className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">{poi.address}</span>
+                      </div>
+                    )}
+                    
+                    {poi.notes && (
+                      <div className="flex items-start gap-1 text-xs text-gray-600 mt-1">
+                        <StickyNote className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                        <span className="line-clamp-2">{poi.notes}</span>
+                      </div>
+                    )}
+                    
+                    {poi.link && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <Link className="w-3 h-3 text-gray-500" />
+                        <button
+                          onClick={(e) => handleLinkClick(poi.link!, e)}
+                          className="text-xs text-blue-600 hover:text-blue-800 hover:underline truncate"
                         >
-                          <ExternalLink className="w-3 h-3" />
-                        </Button>
-                      )}
-                    </div>
-                    {destination.link && (
+                          {poi.link}
+                        </button>
+                      </div>
+                    )}
+                    
+                    {poi.trip && !tripId && (
                       <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                        <Link className="w-2.5 h-2.5" />
-                        <span className="truncate">{destination.link}</span>
+                        <Calendar className="w-3 h-3" />
+                        <span>Trip: {poi.trip.name}</span>
                       </div>
                     )}
                   </div>
+                  
+                  {isEditing && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(poi)}
+                        className="p-1 h-auto"
+                        disabled={saving}
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(poi.id)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
+                        disabled={saving}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                {isEditing && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeDestination(index)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto flex-shrink-0"
-                    disabled={saving}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                )}
               </div>
             ))}
-            {!isEditing && destinations.length > 5 && (
-              <div className="text-center pt-2">
-                <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
-                  View all {destinations.length} destinations
-                </Button>
-              </div>
-            )}
           </div>
         )}
       </CardContent>
