@@ -109,7 +109,6 @@ export default function Home() {
         deviceInfo = generateDeviceFingerprint()
         storeDeviceFingerprint(deviceInfo)
       }
-      console.log('[Login] Sending device fingerprint:', deviceInfo.fingerprint)
       
       const response = await fetch('/api/groups/join', {
         method: 'POST',
@@ -169,10 +168,6 @@ export default function Home() {
               <div className="space-y-4">
                 {/* Auto-login button - only shows if previous sessions exist */}
                 <AutoLoginButton showDivider={true} />
-                <div className="text-xs text-gray-500 text-center">
-                  {/* Temporary debug info */}
-                  Check browser console for device session info
-                </div>
                 
                 <Button 
                   onClick={() => setMode('create')}

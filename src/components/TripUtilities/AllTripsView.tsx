@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MapPin, Calendar, Trash2, Clock, ExternalLink, ChevronRight, X, Edit2 } from 'lucide-react'
 import ConfirmDialog from '../ConfirmDialog'
+import { formatDateForDisplay } from '@/lib/dateTimeUtils'
 
 interface Trip {
   id: string
@@ -162,7 +163,7 @@ export default function AllTripsView({ trips, onTripsChange, onEditTrip, classNa
                     </div>
                   )}
                   <p className="text-sm text-gray-500">
-                    {new Date(nextTrip.startDate).toLocaleDateString()} - {new Date(nextTrip.endDate).toLocaleDateString()}
+                    {formatDateForDisplay(nextTrip.startDate)} - {formatDateForDisplay(nextTrip.endDate)}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -354,7 +355,7 @@ function TripCard({ trip, onDelete, onEdit }: {
             </div>
           )}
           <p className="text-sm text-gray-500">
-            {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+            {formatDateForDisplay(trip.startDate)} - {formatDateForDisplay(trip.endDate)}
           </p>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -66,7 +66,6 @@ export function useDeviceSession() {
           storedDevice = generateDeviceFingerprint()
           storeDeviceFingerprint(storedDevice)
         }
-        console.log('[DeviceSession] Using fingerprint:', storedDevice.fingerprint)
         setDeviceInfo(storedDevice)
 
         // Get recent group accesses from localStorage
@@ -82,7 +81,6 @@ export function useDeviceSession() {
 
         if (response.ok) {
           const data = await response.json()
-          console.log('[DeviceSession] Server response:', data)
           setAvailableSessions(data.sessions || [])
         } else {
           console.warn('Failed to check device sessions:', await response.text())

@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameMonth, addDays, startOfWeek, endOfWeek } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { createAbsoluteDate, createAbsoluteDateRange } from '@/lib/dateTimeUtils'
 
 interface AppMonthlyCalendarProps {
   onTripSelect: (startDate: Date, endDate: Date) => void
@@ -33,29 +34,44 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
     selectedDates: []
   })
 
-  const currentMonthStart = startOfMonth(currentMonth)
-  const currentMonthEnd = endOfMonth(currentMonth)
+  // Create timezone-agnostic month boundaries
+  const getMonthStart = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    return createAbsoluteDate(`${year}-${String(month + 1).padStart(2, '0')}-01`)
+  }
+  
+  const getMonthEnd = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    // Get last day of month
+    const lastDay = new Date(year, month + 1, 0).getDate()
+    return createAbsoluteDate(`${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`)
+  }
+  
+  const currentMonthStart = getMonthStart(currentMonth)
+  const currentMonthEnd = getMonthEnd(currentMonth)
   const nextMonth = addMonths(currentMonth, 1)
-  const nextMonthStart = startOfMonth(nextMonth)
-  const nextMonthEnd = endOfMonth(nextMonth)
+  const nextMonthStart = getMonthStart(nextMonth)
+  const nextMonthEnd = getMonthEnd(nextMonth)
 
   // Get calendar grid days with proper week alignment
   const getCurrentMonthGrid = () => {
-    const monthDays = eachDayOfInterval({ start: currentMonthStart, end: currentMonthEnd })
-    const firstDayOfWeek = currentMonthStart.getDay() // 0 = Sunday, 1 = Monday, etc.
+    const days = createAbsoluteDateRange(currentMonthStart, currentMonthEnd)
     
-    // Add empty cells for proper day alignment
+    // Since our dates are timezone-agnostic (created with UTC), use UTC day
+    const firstDayOfWeek = currentMonthStart.getUTCDay() // 0 = Sunday, 1 = Monday, etc.
     const emptyCells = Array(firstDayOfWeek).fill(null)
-    return [...emptyCells, ...monthDays]
+    return [...emptyCells, ...days]
   }
 
   const getNextMonthGrid = () => {
-    const monthDays = eachDayOfInterval({ start: nextMonthStart, end: nextMonthEnd })
-    const firstDayOfWeek = nextMonthStart.getDay() // 0 = Sunday, 1 = Monday, etc.
+    const days = createAbsoluteDateRange(nextMonthStart, nextMonthEnd)
     
-    // Add empty cells for proper day alignment
+    // Since our dates are timezone-agnostic (created with UTC), use UTC day
+    const firstDayOfWeek = nextMonthStart.getUTCDay() // 0 = Sunday, 1 = Monday, etc.
     const emptyCells = Array(firstDayOfWeek).fill(null)
-    return [...emptyCells, ...monthDays]
+    return [...emptyCells, ...days]
   }
 
   const currentMonthDays = getCurrentMonthGrid()
@@ -63,17 +79,28 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
 
   // Convert existing trips to date ranges for display
   const tripRanges = useMemo(() => {
+    if (!existingTrips || existingTrips.length === 0) {
+      return []
+    }
+    
     return existingTrips.map(trip => {
-      const start = new Date(trip.start)
-      const end = new Date(trip.end)
+      // Ensure we have valid date strings
+      if (!trip.start || !trip.end) {
+        console.error('Invalid trip dates:', trip)
+        return null
+      }
+      
+      const start = createAbsoluteDate(trip.start)
+      const end = createAbsoluteDate(trip.end)
       const dates = eachDayOfInterval({ start, end })
+      
       return {
         ...trip,
         dates,
         startDate: start,
         endDate: end
       }
-    })
+    }).filter(Boolean)
   }, [existingTrips])
 
   const goToPreviousMonth = () => {
@@ -85,17 +112,42 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
   }
 
   const isDayInTrip = (date: Date): boolean => {
-    return tripRanges.some(trip => 
-      trip.dates.some(tripDate => 
-        format(tripDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-      )
-    )
+    // Since all our dates are timezone-agnostic (created with UTC), 
+    // we can safely use UTC methods for comparison
+    const year = date.getUTCFullYear()
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(date.getUTCDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+    
+    return tripRanges.some(trip => {
+      // Check if date falls within trip range
+      const tripStartYear = trip.startDate.getUTCFullYear()
+      const tripStartMonth = String(trip.startDate.getUTCMonth() + 1).padStart(2, '0')
+      const tripStartDay = String(trip.startDate.getUTCDate()).padStart(2, '0')
+      const tripStartStr = `${tripStartYear}-${tripStartMonth}-${tripStartDay}`
+      
+      const tripEndYear = trip.endDate.getUTCFullYear()
+      const tripEndMonth = String(trip.endDate.getUTCMonth() + 1).padStart(2, '0')
+      const tripEndDay = String(trip.endDate.getUTCDate()).padStart(2, '0')
+      const tripEndStr = `${tripEndYear}-${tripEndMonth}-${tripEndDay}`
+      
+      return dateStr >= tripStartStr && dateStr <= tripEndStr
+    })
   }
 
   const isDaySelected = (date: Date): boolean => {
-    return dragState.selectedDates.some(selectedDate => 
-      format(selectedDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-    )
+    const year = date.getUTCFullYear()
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(date.getUTCDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+    
+    return dragState.selectedDates.some(selectedDate => {
+      const selYear = selectedDate.getUTCFullYear()
+      const selMonth = String(selectedDate.getUTCMonth() + 1).padStart(2, '0')
+      const selDay = String(selectedDate.getUTCDate()).padStart(2, '0')
+      const selDateStr = `${selYear}-${selMonth}-${selDay}`
+      return selDateStr === dateStr
+    })
   }
 
   const handleMouseDown = (date: Date) => {
@@ -221,7 +273,7 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
                   <span className={`text-sm font-medium ${
                     isPastDate ? 'text-gray-400' : 'text-gray-900'
                   }`}>
-                    {format(date, 'd')}
+                    {date.getUTCDate()}
                   </span>
                   {isInTrip && (
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -232,11 +284,24 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
                 {isInTrip && (
                   <div className="text-xs text-blue-700 truncate">
                     {tripRanges
-                      .filter(trip => 
-                        trip.dates.some(tripDate => 
-                          format(tripDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-                        )
-                      )
+                      .filter(trip => {
+                        const year = date.getUTCFullYear()
+                        const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+                        const day = String(date.getUTCDate()).padStart(2, '0')
+                        const dateStr = `${year}-${month}-${day}`
+                        
+                        const tripStartYear = trip.startDate.getUTCFullYear()
+                        const tripStartMonth = String(trip.startDate.getUTCMonth() + 1).padStart(2, '0')
+                        const tripStartDay = String(trip.startDate.getUTCDate()).padStart(2, '0')
+                        const tripStartStr = `${tripStartYear}-${tripStartMonth}-${tripStartDay}`
+                        
+                        const tripEndYear = trip.endDate.getUTCFullYear()
+                        const tripEndMonth = String(trip.endDate.getUTCMonth() + 1).padStart(2, '0')
+                        const tripEndDay = String(trip.endDate.getUTCDate()).padStart(2, '0')
+                        const tripEndStr = `${tripEndYear}-${tripEndMonth}-${tripEndDay}`
+                        
+                        return dateStr >= tripStartStr && dateStr <= tripEndStr
+                      })
                       .map(trip => trip.title)
                       .join(', ')
                     }

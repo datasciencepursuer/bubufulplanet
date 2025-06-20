@@ -386,3 +386,39 @@ export const TIME_OPTIONS_12H = [
   '12:00', '12:30', '1:00', '1:30', '2:00', '2:30', '3:00', '3:30', '4:00', '4:30', '5:00', '5:30',
   '6:00', '6:30', '7:00', '7:30', '8:00', '8:30', '9:00', '9:30', '10:00', '10:30', '11:00', '11:30'
 ]
+
+/**
+ * Format a date string or Date object for display in a timezone-agnostic way
+ * This prevents the date from shifting due to timezone conversions
+ * @param date - Date string (YYYY-MM-DD) or Date object
+ * @param formatStr - Format string for date-fns (default: 'MMM d, yyyy')
+ * @returns Formatted date string
+ */
+export const formatDateForDisplay = (date: Date | string, formatStr: string = 'MMM d, yyyy'): string => {
+  try {
+    let dateToFormat: Date
+    
+    if (typeof date === 'string') {
+      // Create absolute date from string to avoid timezone shifts
+      dateToFormat = createAbsoluteDate(date)
+    } else {
+      dateToFormat = date
+    }
+    
+    // Use UTC methods to format the date to prevent timezone shifts
+    // For simple formats, we can do this manually
+    if (formatStr === 'MMM d, yyyy') {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      const month = months[dateToFormat.getUTCMonth()]
+      const day = dateToFormat.getUTCDate()
+      const year = dateToFormat.getUTCFullYear()
+      return `${month} ${day}, ${year}`
+    }
+    
+    // For other formats, use date-fns with UTC date
+    return format(dateToFormat, formatStr)
+  } catch (error) {
+    console.error('Date formatting error:', error)
+    return 'Invalid date'
+  }
+}

@@ -60,7 +60,14 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json({ trip }, { status: 201 });
+      // Normalize date formats in response
+      const normalizedTrip = {
+        ...trip,
+        startDate: trip.startDate.toISOString().split('T')[0],
+        endDate: trip.endDate.toISOString().split('T')[0]
+      };
+
+      return NextResponse.json({ trip: normalizedTrip }, { status: 201 });
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
@@ -100,7 +107,14 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      return NextResponse.json({ trips });
+      // Normalize date formats to ensure consistency
+      const normalizedTrips = trips.map(trip => ({
+        ...trip,
+        startDate: trip.startDate.toISOString().split('T')[0],
+        endDate: trip.endDate.toISOString().split('T')[0]
+      }));
+
+      return NextResponse.json({ trips: normalizedTrips });
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {

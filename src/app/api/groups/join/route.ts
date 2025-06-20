@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
 
     // Save device session if fingerprint provided
     if (deviceFingerprint) {
-      console.log(`[API] Creating device session for fingerprint: ${deviceFingerprint}, traveler: ${travelerName.trim()}, group: ${group.id}`)
       try {
         const userAgent = request.headers.get('user-agent') || 'unknown'
         const forwardedFor = request.headers.get('x-forwarded-for')
@@ -110,7 +109,6 @@ export async function POST(request: NextRequest) {
           }
         })
         
-        console.log(`Created new session for ${travelerName.trim()} on device ${deviceFingerprint}`)
       } catch (error) {
         // Don't fail the login if device session save fails
         console.error('[API] Failed to save device session:', error)

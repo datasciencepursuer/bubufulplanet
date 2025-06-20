@@ -56,14 +56,7 @@ export default function AppPage() {
       const response = await fetch('/api/groups/current')
       if (response.ok) {
         const data = await response.json()
-        console.log('Group info loaded:', data) // Debug log
         setGroupInfo({
-          name: data.group.name,
-          accessCode: data.group.accessCode,
-          travelerName: data.travelerName,
-          role: data.role
-        })
-        console.log('Set group info:', { // Debug log
           name: data.group.name,
           accessCode: data.group.accessCode,
           travelerName: data.travelerName,

@@ -124,8 +124,19 @@ export async function PUT(
       }
     })
 
+    // Normalize date formats in response
+    const normalizedTrip = updatedTrip ? {
+      ...updatedTrip,
+      startDate: updatedTrip.startDate.toISOString().split('T')[0],
+      endDate: updatedTrip.endDate.toISOString().split('T')[0],
+      tripDays: updatedTrip.tripDays.map(day => ({
+        ...day,
+        date: day.date.toISOString().split('T')[0]
+      }))
+    } : null
+
     return NextResponse.json({ 
-      trip: updatedTrip,
+      trip: normalizedTrip,
       datesChanged 
     })
   } catch (error) {
