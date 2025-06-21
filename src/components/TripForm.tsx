@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { format } from 'date-fns'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle } from 'lucide-react'
@@ -65,14 +64,14 @@ export default function TripForm({
     if (isEdit && existingTrip) {
       setName(existingTrip.name)
       setDestination(existingTrip.destination || '')
-      setEditStartDate(format(new Date(existingTrip.startDate), 'yyyy-MM-dd'))
-      setEditEndDate(format(new Date(existingTrip.endDate), 'yyyy-MM-dd'))
+      setEditStartDate(normalizeDate(existingTrip.startDate))
+      setEditEndDate(normalizeDate(existingTrip.endDate))
     } else {
       setName('')
       setDestination('')
       if (startDate && endDate) {
-        setEditStartDate(format(startDate, 'yyyy-MM-dd'))
-        setEditEndDate(format(endDate, 'yyyy-MM-dd'))
+        setEditStartDate(normalizeDate(startDate))
+        setEditEndDate(normalizeDate(endDate))
       }
     }
   }, [isEdit, existingTrip, startDate, endDate])
@@ -80,8 +79,8 @@ export default function TripForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    const submitStartDate = isEdit ? editStartDate : (startDate ? format(startDate, 'yyyy-MM-dd') : editStartDate)
-    const submitEndDate = isEdit ? editEndDate : (endDate ? format(endDate, 'yyyy-MM-dd') : editEndDate)
+    const submitStartDate = isEdit ? editStartDate : (startDate ? normalizeDate(startDate) : editStartDate)
+    const submitEndDate = isEdit ? editEndDate : (endDate ? normalizeDate(endDate) : editEndDate)
     
     const tripData = {
       name,
@@ -127,8 +126,8 @@ export default function TripForm({
 
   // Check if dates changed in edit mode
   const datesChanged = isEdit && existingTrip && (
-    editStartDate !== format(new Date(existingTrip.startDate), 'yyyy-MM-dd') ||
-    editEndDate !== format(new Date(existingTrip.endDate), 'yyyy-MM-dd')
+    editStartDate !== normalizeDate(existingTrip.startDate) ||
+    editEndDate !== normalizeDate(existingTrip.endDate)
   )
 
   return (
