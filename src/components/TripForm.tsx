@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Trash2 } from 'lucide-react'
 import { createAbsoluteDate, createAbsoluteDateRange, normalizeDate } from '@/lib/dateTimeUtils'
 import ConfirmDialog from './ConfirmDialog'
 
@@ -17,9 +17,11 @@ interface TripFormProps {
     endDate: string
   }) => void
   onCancel: () => void
+  onDelete?: () => void // Delete functionality for edit mode
   open?: boolean
   // Edit mode props
   isEdit?: boolean
+  allowDateEdit?: boolean // Allow date editing in create mode
   existingTrip?: {
     id: string
     name: string
@@ -34,8 +36,10 @@ export default function TripForm({
   endDate, 
   onSubmit, 
   onCancel, 
+  onDelete,
   open = true, 
   isEdit = false, 
+  allowDateEdit = false,
   existingTrip 
 }: TripFormProps) {
   const [name, setName] = useState('')
@@ -74,7 +78,7 @@ export default function TripForm({
         setEditEndDate(normalizeDate(endDate))
       }
     }
-  }, [isEdit, existingTrip, startDate, endDate])
+  }, [isEdit, existingTrip, startDate, endDate, allowDateEdit])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -139,6 +143,8 @@ export default function TripForm({
           <DialogDescription>
             {isEdit ? (
               `Edit your ${tripDuration}-day trip${currentStartDate && currentEndDate ? ` from ${formatAbsoluteDate(currentStartDate)} to ${formatAbsoluteDate(currentEndDate)}` : ''}`
+            ) : allowDateEdit ? (
+              `Plan your ${tripDuration}-day adventure${currentStartDate && currentEndDate ? ` from ${formatAbsoluteDate(currentStartDate)} to ${formatAbsoluteDate(currentEndDate)}` : ''}`
             ) : (
               `Plan your ${tripDuration}-day adventure from ${formatAbsoluteDate(startDate!)} to ${formatAbsoluteDate(endDate!)}`
             )}
@@ -150,7 +156,7 @@ export default function TripForm({
             {/* Date Section */}
             <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
               <h3 className="text-sm font-medium text-teal-800 mb-2">
-                {isEdit ? 'Trip Dates' : 'Selected Trip Dates'}
+                {isEdit ? 'Trip Dates' : allowDateEdit ? 'Trip Dates' : 'Selected Trip Dates'}
               </h3>
               
               {datesChanged && (
@@ -163,7 +169,7 @@ export default function TripForm({
                 </div>
               )}
               
-              {isEdit ? (
+              {(isEdit || allowDateEdit) ? (
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -250,12 +256,33 @@ export default function TripForm({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit">
-              {isEdit ? 'Update Trip' : 'Create Trip'}
-            </Button>
+            <div className="flex justify-between w-full">
+              {/* Left side - Delete button (only in edit mode) */}
+              <div>
+                {isEdit && onDelete && (
+                  <Button 
+                    type="button" 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={onDelete}
+                    className="gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Trip
+                  </Button>
+                )}
+              </div>
+              
+              {/* Right side - Cancel and Save buttons */}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {isEdit ? 'Update Trip' : 'Create Trip'}
+                </Button>
+              </div>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

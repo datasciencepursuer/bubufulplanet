@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session';
 import { prisma } from '@/lib/prisma';
-import { addDays, format, eachDayOfInterval } from 'date-fns';
-import { createAbsoluteDate, createAbsoluteDateRange } from '@/lib/dateTimeUtils';
+import { createAbsoluteDate, createAbsoluteDateRange, normalizeDate } from '@/lib/dateTimeUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,6 +50,13 @@ export async function POST(request: NextRequest) {
           });
         } catch (daysError) {
           console.error('Error creating trip days:', daysError);
+          if (daysError instanceof Error) {
+            console.error('Detailed days error:', {
+              message: daysError.message,
+              stack: daysError.stack,
+              name: daysError.name
+            });
+          }
           // Trip was created but days failed - clean up
           await prisma.trip.delete({ where: { id: trip.id } });
           return NextResponse.json(
@@ -60,11 +66,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Normalize date formats in response
+      // Normalize date formats in response using timezone-agnostic method
       const normalizedTrip = {
         ...trip,
-        startDate: trip.startDate.toISOString().split('T')[0],
-        endDate: trip.endDate.toISOString().split('T')[0]
+        startDate: normalizeDate(trip.startDate),
+        endDate: normalizeDate(trip.endDate)
       };
 
       return NextResponse.json({ trip: normalizedTrip }, { status: 201 });
@@ -107,11 +113,11 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      // Normalize date formats to ensure consistency
+      // Normalize date formats to ensure consistency using timezone-agnostic method
       const normalizedTrips = trips.map(trip => ({
         ...trip,
-        startDate: trip.startDate.toISOString().split('T')[0],
-        endDate: trip.endDate.toISOString().split('T')[0]
+        startDate: normalizeDate(trip.startDate),
+        endDate: normalizeDate(trip.endDate)
       }));
 
       return NextResponse.json({ trips: normalizedTrips });

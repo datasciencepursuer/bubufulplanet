@@ -11,6 +11,8 @@ import EventPropertiesPanel from '@/components/EventPropertiesPanel'
 import TripForm from '@/components/TripForm'
 import BearGlobeLoader from '@/components/BearGlobeLoader'
 import PointsOfInterestView from '@/components/TripUtilities/PointsOfInterestView'
+import SuccessMessage from '@/components/SuccessMessage'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import type { Trip, TripDay, Event, Expense } from '@prisma/client'
 import { normalizeDate, createAbsoluteDate, calculateDefaultEndTime, formatDateForDisplay } from '@/lib/dateTimeUtils'
 
@@ -46,6 +48,13 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set())
   const [deletingEventIds, setDeletingEventIds] = useState<Set<string>>(new Set())
   const [selectedEventForPanel, setSelectedEventForPanel] = useState<Event | null>(null)
+
+  // Success message state
+  const [successMessage, setSuccessMessage] = useState<string>('')
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -436,14 +445,40 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       // If dates changed, refresh all data since trip days would have been regenerated
       if (datesChanged) {
         await fetchTripData()
-        alert('Trip updated successfully. All events and expenses have been removed due to date changes.')
+        setSuccessMessage('Trip updated successfully. All events and expenses have been removed due to date changes.')
       } else {
-        alert('Trip updated successfully!')
+        setSuccessMessage('Trip updated successfully!')
       }
+      setShowSuccessMessage(true)
     } catch (error) {
       console.error('Error updating trip:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to update trip'
       alert(errorMessage + '. Please try again.')
+    }
+  }
+
+  const handleDeleteTrip = () => {
+    if (!trip) return
+    setShowDeleteConfirm(true)
+  }
+
+  const handleDeleteTripConfirm = async () => {
+    if (!trip) return
+    
+    try {
+      const response = await fetch(`/api/trips/${tripId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete trip')
+      }
+
+      // Navigate back to the main app page
+      router.push('/app')
+    } catch (error) {
+      console.error('Error deleting trip:', error)
+      alert('Failed to delete trip. Please try again.')
     }
   }
 
@@ -645,6 +680,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           }}
           onSubmit={handleTripEdit}
           onCancel={() => setShowTripEditForm(false)}
+          onDelete={handleDeleteTrip}
           open={showTripEditForm}
         />
       )}
@@ -673,6 +709,25 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           </div>
         </div>
       )}
+
+      {/* Success Message */}
+      <SuccessMessage
+        message={successMessage}
+        isVisible={showSuccessMessage}
+        onClose={() => setShowSuccessMessage(false)}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteTripConfirm}
+        title="Delete Trip"
+        message={trip ? `Are you sure you want to delete "${trip.name}"? This action cannot be undone and will delete all events and expenses.` : 'Are you sure you want to delete this trip?'}
+        confirmText="Delete Trip"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </div>
   )
 }

@@ -2,12 +2,13 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameMonth, addDays, startOfWeek, endOfWeek } from 'date-fns'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createAbsoluteDate, createAbsoluteDateRange } from '@/lib/dateTimeUtils'
 
 interface AppMonthlyCalendarProps {
   onTripSelect: (startDate: Date, endDate: Date) => void
+  onCreateTrip?: () => void
   existingTrips?: Array<{
     id: string
     title: string
@@ -16,7 +17,7 @@ interface AppMonthlyCalendarProps {
   }>
 }
 
-export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }: AppMonthlyCalendarProps) {
+export default function AppMonthlyCalendar({ onTripSelect, onCreateTrip, existingTrips = [] }: AppMonthlyCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(() => 
     startOfMonth(new Date())
   )
@@ -327,9 +328,21 @@ export default function AppMonthlyCalendar({ onTripSelect, existingTrips = [] }:
             Previous
           </Button>
           
-          <h2 className="text-xl font-semibold">
-            {format(currentMonth, 'MMMM yyyy')} - {format(nextMonth, 'MMMM yyyy')}
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-semibold">
+              {format(currentMonth, 'MMMM yyyy')} - {format(nextMonth, 'MMMM yyyy')}
+            </h2>
+            {onCreateTrip && (
+              <Button 
+                onClick={onCreateTrip}
+                size="sm"
+                className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Create Trip
+              </Button>
+            )}
+          </div>
           
           <Button variant="outline" size="sm" onClick={goToNextMonth}>
             Next

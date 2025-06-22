@@ -113,6 +113,23 @@ export default function AppPage() {
     }
   }
 
+  const handleCreateTrip = () => {
+    // Check if user has create permission
+    if (!groupInfo?.permissions?.create) {
+      alert('You do not have permission to create trips. Please ask your group adventurer for permission.')
+      return
+    }
+    // Set default dates to tomorrow and day after for user to adjust
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const dayAfter = new Date()
+    dayAfter.setDate(dayAfter.getDate() + 2)
+    
+    setSelectedDates({ start: tomorrow, end: dayAfter })
+    setEditingTrip(null)
+    setShowTripForm(true)
+  }
+
   const handleEditTrip = (trip: any) => {
     // Check if user has modify permission
     if (!groupInfo?.permissions?.modify) {
@@ -207,6 +224,21 @@ export default function AppPage() {
       console.error('Error deleting trip:', error)
       alert('Failed to delete trip. Please try again.')
     }
+  }
+
+  const handleDeleteTripFromEdit = () => {
+    if (!editingTrip) return
+    
+    // Check if user has modify permission
+    if (!groupInfo?.permissions?.modify) {
+      alert('You do not have permission to delete trips. Please ask your group adventurer for permission.')
+      return
+    }
+    
+    // Use the existing delete confirmation flow
+    setTripToDelete({ id: editingTrip.id, name: editingTrip.name })
+    setShowTripForm(false) // Close the edit modal
+    setShowDeleteConfirm(true)
   }
 
   // Categorize trips as current, upcoming, or past
@@ -358,7 +390,8 @@ export default function AppPage() {
             />
             
             <AppMonthlyCalendar 
-              onTripSelect={handleTripSelect} 
+              onTripSelect={handleTripSelect}
+              onCreateTrip={handleCreateTrip}
               existingTrips={trips.map(trip => ({
                 id: trip.id,
                 title: trip.name,
@@ -386,9 +419,12 @@ export default function AppPage() {
           onCancel={() => {
             setShowTripForm(false)
             setEditingTrip(null)
+            setSelectedDates(null)
           }}
+          onDelete={editingTrip ? handleDeleteTripFromEdit : undefined}
           open={showTripForm}
           isEdit={!!editingTrip}
+          allowDateEdit={!editingTrip} // Allow date editing in create mode
           existingTrip={editingTrip ? {
             id: editingTrip.id,
             name: editingTrip.name,

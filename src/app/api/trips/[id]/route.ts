@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { validateUnifiedSession } from '@/lib/unified-session'
-import { addDays, differenceInDays, format, eachDayOfInterval } from 'date-fns'
-import { createAbsoluteDate, createAbsoluteDateRange } from '@/lib/dateTimeUtils'
+import { createAbsoluteDate, createAbsoluteDateRange, normalizeDate } from '@/lib/dateTimeUtils'
 
 export async function PUT(
   request: Request,
@@ -60,10 +59,10 @@ export async function PUT(
       )
     }
 
-    // Check if dates changed
-    const oldStart = new Date(existingTrip.startDate)
-    const oldEnd = new Date(existingTrip.endDate)
-    const datesChanged = start.getTime() !== oldStart.getTime() || end.getTime() !== oldEnd.getTime()
+    // Check if dates changed using timezone-agnostic comparison
+    const oldStartNormalized = normalizeDate(existingTrip.startDate)
+    const oldEndNormalized = normalizeDate(existingTrip.endDate)
+    const datesChanged = startDate !== oldStartNormalized || endDate !== oldEndNormalized
 
     if (datesChanged) {
       // If dates changed, regenerate trip days
@@ -90,10 +89,7 @@ export async function PUT(
         const tripDaysData = dateRange.map((date, index) => ({
           tripId,
           date: date,
-          dayNumber: index + 1,
-          title: `Day ${index + 1}`,
-          createdAt: new Date(),
-          updatedAt: new Date()
+          dayNumber: index + 1
         }));
 
         if (tripDaysData.length > 0) {
@@ -124,14 +120,14 @@ export async function PUT(
       }
     })
 
-    // Normalize date formats in response
+    // Normalize date formats in response using timezone-agnostic method
     const normalizedTrip = updatedTrip ? {
       ...updatedTrip,
-      startDate: updatedTrip.startDate.toISOString().split('T')[0],
-      endDate: updatedTrip.endDate.toISOString().split('T')[0],
+      startDate: normalizeDate(updatedTrip.startDate),
+      endDate: normalizeDate(updatedTrip.endDate),
       tripDays: updatedTrip.tripDays.map(day => ({
         ...day,
-        date: day.date.toISOString().split('T')[0]
+        date: normalizeDate(day.date)
       }))
     } : null
 
@@ -141,8 +137,20 @@ export async function PUT(
     })
   } catch (error) {
     console.error('Error updating trip:', error)
+    
+    // Provide more specific error information
+    let errorMessage = 'Failed to update trip'
+    if (error instanceof Error) {
+      errorMessage = error.message
+      console.error('Detailed error:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      })
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to update trip' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
