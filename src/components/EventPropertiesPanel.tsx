@@ -2,7 +2,8 @@
 
 import { Calendar, Clock, MapPin, DollarSign, Palette, FileText, Edit, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import type { Event, Expense } from '@prisma/client'
+import type { Event } from '@prisma/client'
+import type { Expense } from '@/types/expense'
 import { getEventColor } from '@/lib/eventColors'
 import { formatDateRange, extractTimeString, normalizeDate } from '@/lib/tripDayUtils'
 

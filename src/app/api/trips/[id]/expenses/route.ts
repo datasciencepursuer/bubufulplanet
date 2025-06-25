@@ -4,14 +4,15 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     return await withUnifiedSessionContext(async (context) => {
       // Verify the trip belongs to the user's group
       const trip = await prisma.trip.findFirst({
         where: {
-          id: params.id,
+          id: id,
           groupId: context.groupId
         }
       });
@@ -26,7 +27,7 @@ export async function GET(
       // Get all expenses for the trip
       const expenses = await prisma.expense.findMany({
         where: {
-          tripId: params.id
+          tripId: id
         },
         include: {
           owner: true,

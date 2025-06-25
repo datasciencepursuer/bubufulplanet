@@ -20,13 +20,14 @@ const updateExpenseSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     return await withUnifiedSessionContext(async (context) => {
       const expense = await prisma.expense.findFirst({
         where: {
-          id: params.id,
+          id: id,
           groupId: context.groupId
         },
         include: {
@@ -65,9 +66,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     return await withUnifiedSessionContext(async (context) => {
       const body = await request.json();
       
@@ -85,7 +87,7 @@ export async function PUT(
       // Find the expense
       const expense = await prisma.expense.findFirst({
         where: {
-          id: params.id,
+          id: id,
           groupId: context.groupId
         },
         include: {
@@ -173,7 +175,7 @@ export async function PUT(
       const updatedExpense = await prisma.$transaction(async (tx) => {
         // Update expense fields
         const updated = await tx.expense.update({
-          where: { id: params.id },
+          where: { id: id },
           data: {
             description: data.description,
             amount: data.amount,
@@ -188,14 +190,14 @@ export async function PUT(
         if (data.participants) {
           // Delete existing participants
           await tx.expenseParticipant.deleteMany({
-            where: { expenseId: params.id }
+            where: { expenseId: id }
           });
 
           // Create new participants
           const amount = data.amount || expense.amount;
           await tx.expenseParticipant.createMany({
             data: data.participants.map(p => ({
-              expenseId: params.id,
+              expenseId: id,
               participantId: p.participantId,
               externalName: p.externalName,
               splitPercentage: p.splitPercentage,
@@ -206,7 +208,7 @@ export async function PUT(
 
         // Fetch and return the updated expense with relations
         return await tx.expense.findUnique({
-          where: { id: params.id },
+          where: { id: id },
           include: {
             owner: true,
             participants: {
@@ -237,14 +239,15 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     return await withUnifiedSessionContext(async (context) => {
       // Find the expense
       const expense = await prisma.expense.findFirst({
         where: {
-          id: params.id,
+          id: id,
           groupId: context.groupId
         }
       });
@@ -258,7 +261,7 @@ export async function DELETE(
 
       // Delete the expense (participants will be cascade deleted)
       await prisma.expense.delete({
-        where: { id: params.id }
+        where: { id: id }
       });
 
       return NextResponse.json({ success: true });

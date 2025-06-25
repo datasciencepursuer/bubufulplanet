@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { DollarSign, Calendar, Tag, User, Link as LinkIcon, Edit, X, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import type { Expense, Event } from '@prisma/client'
+import type { Event } from '@prisma/client'
+import type { Expense } from '@/types/expense'
 import { formatDateForDisplay } from '@/lib/dateTimeUtils'
 
 interface TripExpensesPanelProps {

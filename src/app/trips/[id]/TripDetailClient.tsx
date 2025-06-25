@@ -78,7 +78,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   // Expense state
   const [showExpenseModal, setShowExpenseModal] = useState(false)
   const [showExpensesPanel, setShowExpensesPanel] = useState(false)
-  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
+  const [selectedExpense, setSelectedExpense] = useState<Expense | undefined>(undefined)
   const [prefilledEventId, setPrefilledEventId] = useState<string | null>(null)
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null)
@@ -478,8 +478,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   
   const handleSaveExpense = async (expenseData: CreateExpenseRequest | UpdateExpenseRequest) => {
     try {
-      const isEditing = selectedExpense !== null
-      const url = isEditing ? `/api/expenses/${selectedExpense.id}` : '/api/expenses'
+      const isEditing = selectedExpense !== undefined
+      const url = isEditing ? `/api/expenses/${selectedExpense!.id}` : '/api/expenses'
       const method = isEditing ? 'PUT' : 'POST'
       
       const response = await fetch(url, {
@@ -503,7 +503,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       
       // Close modal and reset selected expense
       setShowExpenseModal(false)
-      setSelectedExpense(null)
+      setSelectedExpense(undefined)
       
       // Refresh trip data to get updated expenses
       await fetchTripData()
@@ -600,7 +600,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
                     alert('Unable to add expenses. No group members found.');
                     return;
                   }
-                  setSelectedExpense(null);
+                  setSelectedExpense(undefined);
                   setPrefilledEventId(null);
                   setShowExpenseModal(true);
                 }}
@@ -735,7 +735,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
                 alert('Unable to add expenses. No group members found.')
                 return
               }
-              setSelectedExpense(null)
+              setSelectedExpense(undefined)
               setPrefilledEventId(eventId)
               setShowExpenseModal(true)
             }}
@@ -842,7 +842,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           isOpen={showExpenseModal}
           onClose={() => {
             setShowExpenseModal(false)
-            setSelectedExpense(null)
+            setSelectedExpense(undefined)
             setPrefilledEventId(null)
           }}
           expense={selectedExpense}
@@ -869,7 +869,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
               
               // Close modal
               setShowExpenseModal(false)
-              setSelectedExpense(null)
+              setSelectedExpense(undefined)
               setPrefilledEventId(null)
               
               // Refresh trip data to get updated expenses
@@ -894,7 +894,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             alert('Unable to add expenses. No group members found.');
             return;
           }
-          setSelectedExpense(null);
+          setSelectedExpense(undefined);
           setPrefilledEventId(null);
           setShowExpensesPanel(false);
           setShowExpenseModal(true);

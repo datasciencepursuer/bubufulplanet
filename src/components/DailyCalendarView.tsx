@@ -351,7 +351,7 @@ export default function DailyCalendarView({
             ) : (
               <div className="space-y-0">
                 {(() => {
-                  const eventsWithGaps = []
+                  const eventsWithGaps: React.ReactElement[] = []
                   const sortedEvents = eventsForDay.sort((a, b) => a.startSlot.localeCompare(b.startSlot))
                   
                   sortedEvents.forEach((event, index) => {
