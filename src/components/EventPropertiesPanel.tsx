@@ -144,7 +144,7 @@ export default function EventPropertiesPanel({
                         )}
                       </div>
                       <div className="text-sm font-semibold text-gray-900 ml-2">
-                        ${expense.amount.toFixed(2)}
+                        ${Number(expense.amount).toFixed(2)}
                       </div>
                     </div>
                   </div>

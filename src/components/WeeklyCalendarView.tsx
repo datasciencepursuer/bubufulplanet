@@ -248,7 +248,7 @@ export default function WeeklyCalendarView({
   return (
     <div className="bg-white rounded-lg border flex flex-col h-full">
       {/* Week Navigation */}
-      <div className="flex justify-between items-center p-4 border-b flex-shrink-0">
+      <div className="flex justify-between items-center p-6 border-b gradient-bg flex-shrink-0">
         <div className="flex items-center space-x-2">
           <Button variant="outline" size="sm" onClick={goToPreviousWeek} disabled={!canGoToPrevious}>
             <ChevronsLeft className="h-4 w-4" />
@@ -259,7 +259,7 @@ export default function WeeklyCalendarView({
         </div>
         
         <div className="text-center">
-          <h2 className="text-xl font-semibold">
+          <h2 className="text-xl font-semibold text-white">
             {format(currentWeekStart, 'MMM d')} - {format(currentWeekEnd, 'MMM d, yyyy')}
           </h2>
         </div>

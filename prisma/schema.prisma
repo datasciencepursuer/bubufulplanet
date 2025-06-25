@@ -21,6 +21,7 @@ model Trip {
   packingItems     PackingItem[]
   pointsOfInterest PointOfInterest[]
   tripDays         TripDay[]
+  expenses         Expense[]
   group            TravelGroup?      @relation(fields: [groupId], references: [id])
 
   @@index([userId], map: "idx_trips_user_id")
@@ -71,16 +72,25 @@ model Event {
 model Expense {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   eventId     String?  @map("event_id") @db.Uuid
-  dayId       String   @map("day_id") @db.Uuid
+  dayId       String?  @map("day_id") @db.Uuid
+  tripId      String   @map("trip_id") @db.Uuid
   description String   @db.VarChar(255)
   amount      Decimal  @db.Decimal(10, 2)
   category    String?  @db.VarChar(100)
+  ownerId     String   @map("owner_id") @db.Uuid
+  groupId     String   @map("group_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  day         TripDay  @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  day         TripDay? @relation(fields: [dayId], references: [id], onDelete: Cascade)
   event       Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  owner       GroupMember @relation("ExpenseOwner", fields: [ownerId], references: [id])
+  participants ExpenseParticipant[]
 
   @@index([dayId], map: "idx_expenses_day_id")
   @@index([eventId], map: "idx_expenses_event_id")
+  @@index([tripId], map: "idx_expenses_trip_id")
+  @@index([ownerId], map: "idx_expenses_owner_id")
+  @@index([groupId], map: "idx_expenses_group_id")
   @@map("expenses")
 }
 
@@ -124,6 +134,8 @@ model GroupMember {
   createdBy     String?       @map("created_by") @db.Uuid
   travelGroup   TravelGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdGroups TravelGroup[] @relation("GroupCreator")
+  ownedExpenses Expense[]     @relation("ExpenseOwner")
+  expenseParticipations ExpenseParticipant[]
 
   @@unique([groupId, travelerName], name: "unique_group_traveler")
   @@index([groupId], map: "idx_group_members_group_id")
@@ -199,4 +211,23 @@ model PointOfInterest {
   @@index([groupId], map: "idx_points_of_interest_group_id")
   @@index([tripId], map: "idx_points_of_interest_trip_id")
   @@map("points_of_interest")
+}
+
+model ExpenseParticipant {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expenseId       String      @map("expense_id") @db.Uuid
+  participantId   String?     @map("participant_id") @db.Uuid
+  externalName    String?     @map("external_name") @db.VarChar(255)
+  splitPercentage Decimal     @map("split_percentage") @db.Decimal(5, 2) @default(0)
+  amountOwed      Decimal     @map("amount_owed") @db.Decimal(10, 2)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  expense     Expense      @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  participant GroupMember? @relation(fields: [participantId], references: [id])
+  
+  @@unique([expenseId, participantId])
+  @@unique([expenseId, externalName])
+  @@index([expenseId], map: "idx_expense_participants_expense_id")
+  @@index([participantId], map: "idx_expense_participants_participant_id")
+  @@map("expense_participants")
 }

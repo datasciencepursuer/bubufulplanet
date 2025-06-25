@@ -8,28 +8,25 @@ export async function GET(request: NextRequest) {
       // Get all expenses for trips in the user's group
       const expenses = await prisma.expense.findMany({
         where: {
-          event: {
-            day: {
-              trip: {
-                groupId: context.groupId
-              }
-            }
-          }
+          groupId: context.groupId
         },
         include: {
           event: {
             include: {
-              day: {
-                include: {
-                  trip: {
-                    select: {
-                      id: true,
-                      name: true,
-                      destination: true
-                    }
-                  }
-                }
-              }
+              day: true
+            }
+          },
+          trip: {
+            select: {
+              id: true,
+              name: true,
+              destination: true
+            }
+          },
+          owner: true,
+          participants: {
+            include: {
+              participant: true
             }
           }
         },
@@ -39,20 +36,21 @@ export async function GET(request: NextRequest) {
       });
 
       // Transform the data to include trip and event information
-      const formattedExpenses = expenses
-        .filter(expense => expense.event && expense.event.day && expense.event.day.trip)
-        .map(expense => ({
-          id: expense.id,
-          description: expense.description,
-          amount: expense.amount,
-          category: expense.category,
-          eventId: expense.eventId,
-          tripId: expense.event!.day.trip.id,
-          eventTitle: expense.event!.title,
-          tripName: expense.event!.day.trip.name,
-          tripDestination: expense.event!.day.trip.destination || 'Unknown',
-          eventDate: expense.event!.day.date.toISOString().split('T')[0]
-        }));
+      const formattedExpenses = expenses.map(expense => ({
+        id: expense.id,
+        description: expense.description,
+        amount: expense.amount,
+        category: expense.category,
+        eventId: expense.eventId,
+        tripId: expense.tripId,
+        eventTitle: expense.event?.title || null,
+        tripName: expense.trip.name,
+        tripDestination: expense.trip.destination || 'Unknown',
+        eventDate: expense.event?.day?.date ? expense.event.day.date.toISOString().split('T')[0] : null,
+        createdAt: expense.createdAt,
+        owner: expense.owner,
+        participants: expense.participants
+      }));
 
       return NextResponse.json({ expenses: formattedExpenses });
     });

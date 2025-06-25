@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Calendar, MapPin, Users, CalendarDays, Edit, Map, X } from 'lucide-react'
+import { ArrowLeft, Calendar, MapPin, Users, CalendarDays, Edit, Map, X, DollarSign } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import WeeklyCalendarView from '@/components/WeeklyCalendarView'
 import DailyCalendarView from '@/components/DailyCalendarView'
@@ -13,7 +13,11 @@ import BearGlobeLoader from '@/components/BearGlobeLoader'
 import PointsOfInterestView from '@/components/TripUtilities/PointsOfInterestView'
 import SuccessMessage from '@/components/SuccessMessage'
 import ConfirmDialog from '@/components/ConfirmDialog'
-import type { Trip, TripDay, Event, Expense } from '@prisma/client'
+import ExpenseModal from '@/components/ExpenseModal'
+import TripExpensesPanel from '@/components/TripExpensesPanel'
+import type { Trip, TripDay, Event, GroupMember } from '@prisma/client'
+import type { Expense } from '@/types/expense'
+import type { CreateExpenseRequest, UpdateExpenseRequest } from '@/types/expense'
 import { normalizeDate, createAbsoluteDate, calculateDefaultEndTime, formatDateForDisplay } from '@/lib/dateTimeUtils'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
@@ -70,6 +74,14 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   
   // Points of Interest state
   const [showPointsOfInterest, setShowPointsOfInterest] = useState(false)
+  
+  // Expense state
+  const [showExpenseModal, setShowExpenseModal] = useState(false)
+  const [showExpensesPanel, setShowExpensesPanel] = useState(false)
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
+  const [prefilledEventId, setPrefilledEventId] = useState<string | null>(null)
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null)
 
   const fetchTripData = useCallback(async () => {
     try {
@@ -107,6 +119,18 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       if (expensesResponse.ok) {
         const expensesData = await expensesResponse.json()
         setExpenses(expensesData.expenses || [])
+      }
+      
+      // Fetch group members
+      const membersResponse = await fetch('/api/groups/members', {
+        credentials: 'include'
+      })
+      if (membersResponse.ok) {
+        const membersData = await membersResponse.json()
+        console.log('Group members fetched:', membersData.members)
+        setGroupMembers(membersData.members || [])
+      } else {
+        console.error('Failed to fetch group members:', membersResponse.status)
       }
 
     } catch (err) {
@@ -212,10 +236,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     setSelectedEventForPanel(null)
   }
 
-  const handleSaveEvent = async (
-    eventData: EventApiData, 
-    expenses: { description: string; amount: number; category?: string }[]
-  ) => {
+  const handleSaveEvent = async (eventData: EventApiData) => {
     try {
       if (selectedEvent) {
         // Optimistic update for existing event
@@ -241,28 +262,12 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           setSelectedEventForPanel(updatedEvent)
         }
         
-        // Optimistically update expenses
-        setExpenses(prevExpenses => {
-          // Remove old expenses for this event
-          const filteredExpenses = prevExpenses.filter(e => e.eventId !== selectedEvent.id)
-          // Add new expenses with temporary IDs
-          const newExpenses = expenses.map((exp, index) => ({
-            id: `temp-${selectedEvent.id}-${index}`,
-            eventId: selectedEvent.id,
-            dayId: selectedEvent.dayId,
-            description: exp.description,
-            amount: exp.amount as any, // The server will handle proper Decimal conversion
-            category: exp.category || null,
-            createdAt: new Date()
-          } as Expense))
-          return [...filteredExpenses, ...newExpenses]
-        })
         
         // Update existing event
         const response = await fetch(`/api/events/${selectedEvent.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event: eventData, expenses })
+          body: JSON.stringify({ event: eventData })
         })
 
         if (!response.ok) {
@@ -272,13 +277,6 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           )
           if (selectedEventForPanel?.id === selectedEvent.id) {
             setSelectedEventForPanel(selectedEvent)
-          }
-          
-          // Revert expenses by re-fetching from server
-          const expensesResponse = await fetch(`/api/events/expenses?tripId=${tripId}`)
-          if (expensesResponse.ok) {
-            const expensesData = await expensesResponse.json()
-            setExpenses(expensesData.expenses || [])
           }
           
           const errorText = await response.text()
@@ -302,7 +300,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         const response = await fetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event: eventData, expenses })
+          body: JSON.stringify({ event: eventData })
         })
 
         if (!response.ok) {
@@ -391,25 +389,21 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         throw new Error('Failed to delete event')
       }
 
-      // Refresh events and expenses to ensure consistency
-      const eventsResponse = await fetch(`/api/events?tripId=${tripId}`)
-      if (eventsResponse.ok) {
-        const eventsData = await eventsResponse.json()
-        setEvents(eventsData.events || [])
-      }
-
-      const expensesResponse = await fetch(`/api/events/expenses?tripId=${tripId}`)
-      if (expensesResponse.ok) {
-        const expensesData = await expensesResponse.json()
-        setExpenses(expensesData.expenses || [])
-      }
+      // Success! Show success message
+      setShowSuccessMessage(true)
+      setSuccessMessage('Event deleted successfully!')
+      
+      // Optimistic update was successful, no need to refresh from server
 
     } catch (err) {
       console.error('Error deleting event:', err)
       // Revert the optimistic update on error
       setEvents(previousEvents)
       setExpenses(previousExpenses)
-      alert('Failed to delete event. Please try again.')
+      
+      // Show error message with success message component
+      setShowSuccessMessage(true)
+      setSuccessMessage('Failed to delete event. Please try again.')
     }
   }
 
@@ -481,6 +475,84 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       alert('Failed to delete trip. Please try again.')
     }
   }
+  
+  const handleSaveExpense = async (expenseData: CreateExpenseRequest | UpdateExpenseRequest) => {
+    try {
+      const isEditing = selectedExpense !== null
+      const url = isEditing ? `/api/expenses/${selectedExpense.id}` : '/api/expenses'
+      const method = isEditing ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expenseData)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('Expense save error:', errorData)
+        if (errorData.details) {
+          console.error('Validation details:', errorData.details)
+        }
+        throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} expense`)
+      }
+
+      // Show success message
+      setShowSuccessMessage(true)
+      setSuccessMessage(`Expense ${isEditing ? 'updated' : 'created'} successfully!`)
+      
+      // Close modal and reset selected expense
+      setShowExpenseModal(false)
+      setSelectedExpense(null)
+      
+      // Refresh trip data to get updated expenses
+      await fetchTripData()
+    } catch (error) {
+      console.error('Error saving expense:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save expense'
+      alert(errorMessage + '. Please try again.')
+    }
+  }
+  
+  const handleEditExpense = (expense: Expense) => {
+    setSelectedExpense(expense)
+    setShowExpensesPanel(false)
+    setShowExpenseModal(true)
+  }
+  
+  const handleDeleteExpense = (expense: Expense) => {
+    setExpenseToDelete(expense)
+  }
+  
+  
+  const confirmDeleteExpense = async () => {
+    if (!expenseToDelete) return
+    
+    try {
+      const response = await fetch(`/api/expenses/${expenseToDelete.id}`, {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete expense')
+      }
+      
+      // Show success message
+      setShowSuccessMessage(true)
+      setSuccessMessage('Expense deleted successfully!')
+      
+      // Clear the expense to delete
+      setExpenseToDelete(null)
+      
+      // Refresh trip data to get updated expenses
+      await fetchTripData()
+    } catch (error) {
+      console.error('Error deleting expense:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete expense'
+      alert(errorMessage + '. Please try again.')
+    }
+  }
 
   if (loading) {
     return <BearGlobeLoader />
@@ -520,6 +592,32 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
               <h1 className="text-3xl font-bold text-gray-900">{trip.name}</h1>
             </div>
             <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  if (groupMembers.length === 0) {
+                    alert('Unable to add expenses. No group members found.');
+                    return;
+                  }
+                  setSelectedExpense(null);
+                  setPrefilledEventId(null);
+                  setShowExpenseModal(true);
+                }}
+                className="gap-2"
+              >
+                <DollarSign className="h-4 w-4" />
+                Add Expense
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowExpensesPanel(true)}
+                className="gap-2"
+              >
+                <DollarSign className="h-4 w-4" />
+                View Expenses ({expenses.length})
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm"
@@ -632,6 +730,15 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             onTimeRangeSelect={handleTimeRangeSelect}
             onEventClick={handleEventClick}
             onEventSelect={handleEventSelect}
+            onAddExpenseToEvent={(eventId) => {
+              if (groupMembers.length === 0) {
+                alert('Unable to add expenses. No group members found.')
+                return
+              }
+              setSelectedExpense(null)
+              setPrefilledEventId(eventId)
+              setShowExpenseModal(true)
+            }}
             initialDate={selectedDailyDate}
           />
         )}
@@ -725,6 +832,85 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         title="Delete Trip"
         message={trip ? `Are you sure you want to delete "${trip.name}"? This action cannot be undone and will delete all events and expenses.` : 'Are you sure you want to delete this trip?'}
         confirmText="Delete Trip"
+        cancelText="Cancel"
+        variant="destructive"
+      />
+      
+      {/* Expense Modal */}
+      {showExpenseModal && groupMembers.length > 0 && (
+        <ExpenseModal
+          isOpen={showExpenseModal}
+          onClose={() => {
+            setShowExpenseModal(false)
+            setSelectedExpense(null)
+            setPrefilledEventId(null)
+          }}
+          expense={selectedExpense}
+          tripId={tripId}
+          tripName={trip?.name}
+          eventId={prefilledEventId || undefined}
+          groupMembers={groupMembers}
+          events={events}
+          onSave={handleSaveExpense}
+          onDelete={async (expenseId: string) => {
+            try {
+              const response = await fetch(`/api/expenses/${expenseId}`, {
+                method: 'DELETE'
+              })
+              
+              if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Failed to delete expense')
+              }
+              
+              // Show success message
+              setShowSuccessMessage(true)
+              setSuccessMessage('Expense deleted successfully!')
+              
+              // Close modal
+              setShowExpenseModal(false)
+              setSelectedExpense(null)
+              setPrefilledEventId(null)
+              
+              // Refresh trip data to get updated expenses
+              await fetchTripData()
+            } catch (error) {
+              console.error('Error deleting expense:', error)
+              const errorMessage = error instanceof Error ? error.message : 'Failed to delete expense'
+              alert(errorMessage + '. Please try again.')
+            }
+          }}
+        />
+      )}
+      
+      {/* Trip Expenses Panel */}
+      <TripExpensesPanel
+        expenses={expenses}
+        events={events}
+        isOpen={showExpensesPanel}
+        onClose={() => setShowExpensesPanel(false)}
+        onAddExpense={() => {
+          if (groupMembers.length === 0) {
+            alert('Unable to add expenses. No group members found.');
+            return;
+          }
+          setSelectedExpense(null);
+          setPrefilledEventId(null);
+          setShowExpensesPanel(false);
+          setShowExpenseModal(true);
+        }}
+        onEditExpense={handleEditExpense}
+        onDeleteExpense={handleDeleteExpense}
+      />
+      
+      {/* Expense Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!expenseToDelete}
+        onClose={() => setExpenseToDelete(null)}
+        onConfirm={confirmDeleteExpense}
+        title="Delete Expense"
+        message={expenseToDelete ? `Are you sure you want to delete this expense: "${expenseToDelete.description}"? This action cannot be undone.` : ''}
+        confirmText="Delete Expense"
         cancelText="Cancel"
         variant="destructive"
       />

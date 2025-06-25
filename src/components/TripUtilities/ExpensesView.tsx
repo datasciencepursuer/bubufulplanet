@@ -3,19 +3,36 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DollarSign, ChevronRight } from 'lucide-react'
+import { DollarSign, ChevronRight, TrendingUp, TrendingDown, Users, MapPin } from 'lucide-react'
 
-interface Expense {
-  id: string
-  description: string
-  amount: number | string
-  category: string
-  eventId: string
-  tripId: string
-  eventTitle: string
-  tripName: string
-  tripDestination: string
-  eventDate: string
+interface PersonalExpenseSummary {
+  currentMemberId: string
+  currentMemberName: string
+  totalExpensesAcrossAllTrips: number
+  totalYouOwe: number
+  totalOwedToYou: number
+  netBalance: number
+  tripBreakdowns: {
+    tripId: string
+    tripName: string
+    tripDestination: string | null
+    totalExpenses: number
+    yourShare: number
+    youOwe: number
+    owedToYou: number
+  }[]
+  peopleYouOwe: {
+    memberId: string
+    memberName: string
+    amount: number
+    trips: { tripId: string; tripName: string; amount: number }[]
+  }[]
+  peopleWhoOweYou: {
+    memberId: string
+    memberName: string
+    amount: number
+    trips: { tripId: string; tripName: string; amount: number }[]
+  }[]
 }
 
 interface ExpensesViewProps {
@@ -23,10 +40,10 @@ interface ExpensesViewProps {
 }
 
 export default function ExpensesView({ className }: ExpensesViewProps) {
-  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [summary, setSummary] = useState<PersonalExpenseSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showAll, setShowAll] = useState(false)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadExpenses()
@@ -34,50 +51,20 @@ export default function ExpensesView({ className }: ExpensesViewProps) {
 
   const loadExpenses = async () => {
     try {
-      setLoading(true)
-      const response = await fetch('/api/expenses/all')
+      const response = await fetch('/api/expenses/personal-summary')
       
-      if (response.ok) {
-        const data = await response.json()
-        setExpenses(data.expenses || [])
-      } else {
+      if (!response.ok) {
         throw new Error('Failed to load expenses')
       }
-    } catch (error) {
-      console.error('Error loading expenses:', error)
-      setError('Failed to load expenses')
+      
+      const data = await response.json()
+      setSummary(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load expenses')
     } finally {
       setLoading(false)
     }
   }
-
-  const calculateTotalExpenses = () => {
-    return expenses.reduce((total, expense) => {
-      const amount = typeof expense.amount === 'number' ? expense.amount : parseFloat(expense.amount.toString())
-      return total + (isNaN(amount) ? 0 : amount)
-    }, 0)
-  }
-
-  const getExpensesByCategory = () => {
-    const categoryTotals: Record<string, number> = {}
-    
-    expenses.forEach(expense => {
-      const category = expense.category || 'Uncategorized'
-      const amount = typeof expense.amount === 'number' ? expense.amount : parseFloat(expense.amount.toString())
-      
-      if (!isNaN(amount)) {
-        categoryTotals[category] = (categoryTotals[category] || 0) + amount
-      }
-    })
-    
-    return Object.entries(categoryTotals)
-      .map(([category, amount]) => ({ category, amount }))
-      .sort((a, b) => b.amount - a.amount)
-  }
-
-  const totalExpenses = calculateTotalExpenses()
-  const expensesByCategory = getExpensesByCategory()
-  const recentExpenses = expenses.slice(0, showAll ? expenses.length : 5)
 
   if (loading) {
     return (
@@ -85,7 +72,7 @@ export default function ExpensesView({ className }: ExpensesViewProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-green-600" />
-            Expenses
+            My Expenses
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -103,7 +90,7 @@ export default function ExpensesView({ className }: ExpensesViewProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-green-600" />
-            Expenses
+            My Expenses
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -116,6 +103,19 @@ export default function ExpensesView({ className }: ExpensesViewProps) {
     )
   }
 
+  if (!summary) {
+    return null
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount)
+  }
+
   return (
     <Card className={className}>
       <CardHeader>
@@ -123,98 +123,207 @@ export default function ExpensesView({ className }: ExpensesViewProps) {
           <div>
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-green-600" />
-              Expenses
+              My Expenses
             </CardTitle>
             <CardDescription>
-              ${totalExpenses.toFixed(2)} across {expenses.length} expense{expenses.length !== 1 ? 's' : ''}
+              Hi {summary.currentMemberName}! Here's your expense summary
             </CardDescription>
           </div>
-          {expenses.length > 5 && (
-            <Button
-              onClick={() => setShowAll(!showAll)}
-              variant="ghost"
-              size="sm"
-              className="gap-1"
-            >
-              {showAll ? 'Show Less' : `View All ${expenses.length}`}
-              <ChevronRight className={`w-4 h-4 transition-transform ${showAll ? 'rotate-90' : ''}`} />
-            </Button>
-          )}
         </div>
       </CardHeader>
       <CardContent>
-        {expenses.length === 0 ? (
-          <div className="text-center py-6">
-            <DollarSign className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-            <p className="text-sm text-gray-600 mb-2">No expenses yet</p>
-            <p className="text-xs text-gray-500">Expenses will appear when you add them to trip events</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Summary Stats */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center p-2 bg-gray-50 rounded">
-                <div className="text-sm font-semibold text-green-600">${totalExpenses.toFixed(2)}</div>
-                <div className="text-xs text-gray-600">Total</div>
-              </div>
-              <div className="text-center p-2 bg-gray-50 rounded">
-                <div className="text-sm font-semibold text-blue-600">{expensesByCategory.length}</div>
-                <div className="text-xs text-gray-600">Categories</div>
-              </div>
-              <div className="text-center p-2 bg-gray-50 rounded">
-                <div className="text-sm font-semibold text-purple-600">
-                  ${expenses.length > 0 ? (totalExpenses / expenses.length).toFixed(2) : '0.00'}
+        <div className="space-y-4">
+          {/* Balance Overview */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-red-600 font-medium">You Owe</p>
+                  <p className="text-lg font-bold text-red-700">{formatCurrency(summary.totalYouOwe)}</p>
                 </div>
-                <div className="text-xs text-gray-600">Avg/Item</div>
+                <TrendingDown className="w-5 h-5 text-red-500" />
               </div>
             </div>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-green-600 font-medium">Owed to You</p>
+                  <p className="text-lg font-bold text-green-700">{formatCurrency(summary.totalOwedToYou)}</p>
+                </div>
+                <TrendingUp className="w-5 h-5 text-green-500" />
+              </div>
+            </div>
+          </div>
 
-            {/* Top Categories */}
-            {expensesByCategory.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium mb-2">Top Categories</h4>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {expensesByCategory.slice(0, showAll ? expensesByCategory.length : 3).map(({ category, amount }) => (
-                    <div key={category} className="flex items-center justify-between text-sm">
-                      <span className="truncate">{category}</span>
-                      <span className="font-medium">${amount.toFixed(2)}</span>
+          {/* Net Balance */}
+          <div className={`rounded-lg p-3 ${summary.netBalance >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+            <p className="text-sm font-medium text-gray-700">Net Balance</p>
+            <p className={`text-xl font-bold ${summary.netBalance >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+              {formatCurrency(Math.abs(summary.netBalance))}
+              <span className="text-sm font-normal ml-2">
+                {summary.netBalance >= 0 ? 'to receive' : 'to pay'}
+              </span>
+            </p>
+          </div>
+
+          {/* Trip Breakdown */}
+          {summary.tripBreakdowns.length > 0 && (
+            <div className="border-t pt-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const newSections = new Set(expandedSections)
+                  if (newSections.has('trips')) {
+                    newSections.delete('trips')
+                  } else {
+                    newSections.add('trips')
+                  }
+                  setExpandedSections(newSections)
+                }}
+                className="w-full justify-between p-2 hover:bg-gray-50"
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  <MapPin className="w-4 h-4" />
+                  Cost per Trip
+                </span>
+                <ChevronRight className={`w-4 h-4 transition-transform ${expandedSections.has('trips') ? 'rotate-90' : ''}`} />
+              </Button>
+              
+              {expandedSections.has('trips') && (
+                <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                  {summary.tripBreakdowns.map((trip) => (
+                    <div key={trip.tripId} className="bg-gray-50 rounded p-3 text-sm">
+                      <div className="font-medium text-gray-900">{trip.tripName}</div>
+                      <div className="text-xs text-gray-500 mb-2">{trip.tripDestination || 'No destination'}</div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-gray-600">Total:</span>
+                          <span className="font-medium ml-1">{formatCurrency(trip.totalExpenses)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Your share:</span>
+                          <span className="font-medium ml-1">{formatCurrency(trip.yourShare)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">You owe:</span>
+                          <span className="font-medium text-red-600 ml-1">{formatCurrency(trip.youOwe)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Owed to you:</span>
+                          <span className="font-medium text-green-600 ml-1">{formatCurrency(trip.owedToYou)}</span>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          )}
 
-            {/* Recent Expenses */}
-            <div>
-              <h4 className="text-sm font-medium mb-2">Recent Expenses</h4>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {recentExpenses.map((expense) => {
-                  const amount = typeof expense.amount === 'number' ? expense.amount : parseFloat(expense.amount.toString())
-                  return (
-                    <div key={expense.id} className="p-2 border rounded text-sm">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium truncate">{expense.description}</span>
-                        <span className="font-semibold">${amount.toFixed(2)}</span>
+          {/* People You Owe */}
+          {summary.peopleYouOwe.length > 0 && (
+            <div className="border-t pt-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const newSections = new Set(expandedSections)
+                  if (newSections.has('owe')) {
+                    newSections.delete('owe')
+                  } else {
+                    newSections.add('owe')
+                  }
+                  setExpandedSections(newSections)
+                }}
+                className="w-full justify-between p-2 hover:bg-gray-50"
+              >
+                <span className="flex items-center gap-2 font-medium text-red-700">
+                  <Users className="w-4 h-4" />
+                  Who You Owe ({summary.peopleYouOwe.length})
+                </span>
+                <ChevronRight className={`w-4 h-4 transition-transform ${expandedSections.has('owe') ? 'rotate-90' : ''}`} />
+              </Button>
+              
+              {expandedSections.has('owe') && (
+                <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                  {summary.peopleYouOwe.map((person) => (
+                    <div key={person.memberId} className="bg-red-50 rounded p-3">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-medium text-gray-900">{person.memberName}</span>
+                        <span className="font-bold text-red-700">{formatCurrency(person.amount)}</span>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-gray-600">
-                        <span className="truncate">{expense.tripName}</span>
-                        <span>{expense.category || 'Uncategorized'}</span>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        {person.trips.map((trip) => (
+                          <div key={trip.tripId} className="flex justify-between">
+                            <span className="truncate mr-2">{trip.tripName}</span>
+                            <span className="font-medium">{formatCurrency(trip.amount)}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  )
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
+          )}
 
-            {/* Development Notice */}
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded text-xs">
-              <div className="font-medium text-blue-900 mb-1">🚧 Under Development</div>
-              <p className="text-blue-800">
-                Charts, exports, and advanced filtering coming soon!
-              </p>
+          {/* People Who Owe You */}
+          {summary.peopleWhoOweYou.length > 0 && (
+            <div className="border-t pt-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const newSections = new Set(expandedSections)
+                  if (newSections.has('owed')) {
+                    newSections.delete('owed')
+                  } else {
+                    newSections.add('owed')
+                  }
+                  setExpandedSections(newSections)
+                }}
+                className="w-full justify-between p-2 hover:bg-gray-50"
+              >
+                <span className="flex items-center gap-2 font-medium text-green-700">
+                  <Users className="w-4 h-4" />
+                  Who Owes You ({summary.peopleWhoOweYou.length})
+                </span>
+                <ChevronRight className={`w-4 h-4 transition-transform ${expandedSections.has('owed') ? 'rotate-90' : ''}`} />
+              </Button>
+              
+              {expandedSections.has('owed') && (
+                <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                  {summary.peopleWhoOweYou.map((person) => (
+                    <div key={person.memberId} className="bg-green-50 rounded p-3">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-medium text-gray-900">{person.memberName}</span>
+                        <span className="font-bold text-green-700">{formatCurrency(person.amount)}</span>
+                      </div>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        {person.trips.map((trip) => (
+                          <div key={trip.tripId} className="flex justify-between">
+                            <span className="truncate mr-2">{trip.tripName}</span>
+                            <span className="font-medium">{formatCurrency(trip.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
+
+          {/* No Expenses Message */}
+          {summary.totalExpensesAcrossAllTrips === 0 && (
+            <div className="text-center py-6">
+              <DollarSign className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+              <p className="text-sm text-gray-600">No expenses yet</p>
+              <p className="text-xs text-gray-500 mt-1">Start tracking expenses in your trips!</p>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

@@ -28,12 +28,11 @@ type EventApiData = {
   color: string
 }
 
-type ExpenseInsert = { description: string; amount: number; category?: string }
 
 interface EventModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (event: EventApiData, expenses: ExpenseInsert[]) => void
+  onSave: (event: EventApiData) => void
   onDelete?: (eventId: string) => void
   event?: Event | null
   dayId: string
@@ -67,34 +66,10 @@ export default function EventModal({
     color: DEFAULT_EVENT_COLOR
   })
 
-  const [expenses, setExpenses] = useState<ExpenseInsert[]>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [destinations, setDestinations] = useState<Destination[]>([])
   const [showDestinationDropdown, setShowDestinationDropdown] = useState(false)
 
-  const fetchExistingExpenses = useCallback(async (eventId: string) => {
-    try {
-      const response = await fetch(`/api/events/${eventId}`)
-      
-      if (!response.ok) {
-        console.error('Error fetching event expenses:', response.statusText)
-        return
-      }
-
-      const data = await response.json()
-      
-      if (data.event?.expenses) {
-        const existingExpenses = data.event.expenses.map((expense: Expense) => ({
-          description: expense.description,
-          amount: expense.amount,
-          category: expense.category || ''
-        }))
-        setExpenses(existingExpenses)
-      }
-    } catch (error) {
-      console.error('Error fetching existing expenses:', error)
-    }
-  }, [])
 
   const fetchDestinations = useCallback(async () => {
     try {
@@ -142,7 +117,6 @@ export default function EventModal({
         loadout: event.loadout || '',
         color: event.color || DEFAULT_EVENT_COLOR
       })
-      fetchExistingExpenses(event.id)
     } else {
       setFormData({
         dayId: dayId,
@@ -155,9 +129,8 @@ export default function EventModal({
         loadout: '',
         color: DEFAULT_EVENT_COLOR
       })
-      setExpenses([])
     }
-  }, [event, dayId, startSlot, endSlot, fetchExistingExpenses, fetchDestinations])
+  }, [event, dayId, startSlot, endSlot, fetchDestinations])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -168,23 +141,10 @@ export default function EventModal({
       finalFormData.endSlot = getNextTimeSlot(finalFormData.startSlot)
     }
     
-    onSave(finalFormData, expenses)
+    onSave(finalFormData)
     onClose()
   }
 
-  const addExpense = () => {
-    setExpenses([...expenses, { description: '', amount: 0, category: '' }])
-  }
-
-  const updateExpense = (index: number, field: string, value: any) => {
-    const newExpenses = [...expenses]
-    newExpenses[index] = { ...newExpenses[index], [field]: value }
-    setExpenses(newExpenses)
-  }
-
-  const removeExpense = (index: number) => {
-    setExpenses(expenses.filter((_, i) => i !== index))
-  }
 
   const handleDeleteConfirm = () => {
     if (!event || !onDelete) return
@@ -374,56 +334,6 @@ export default function EventModal({
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Expenses */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium">Expenses</label>
-              <Button type="button" onClick={addExpense} size="sm">
-                Add Expense
-              </Button>
-            </div>
-            {expenses.map((expense, index) => (
-              <div key={index} className="grid grid-cols-12 gap-2 mb-2">
-                <input
-                  type="text"
-                  value={expense.description}
-                  onChange={(e) => updateExpense(index, 'description', e.target.value)}
-                  className="col-span-6 p-2 border rounded-md"
-                  placeholder="Description"
-                />
-                <input
-                  type="number"
-                  value={expense.amount}
-                  onChange={(e) => updateExpense(index, 'amount', parseFloat(e.target.value) || 0)}
-                  className="col-span-3 p-2 border rounded-md"
-                  placeholder="Amount"
-                  step="0.01"
-                />
-                <input
-                  type="text"
-                  value={expense.category || ''}
-                  onChange={(e) => updateExpense(index, 'category', e.target.value)}
-                  className="col-span-2 p-2 border rounded-md"
-                  placeholder="Category"
-                />
-                <Button
-                  type="button"
-                  onClick={() => removeExpense(index)}
-                  size="sm"
-                  variant="destructive"
-                  className="col-span-1"
-                >
-                  ×
-                </Button>
-              </div>
-            ))}
-            {expenses.length > 0 && (
-              <div className="text-right mt-2">
-                <span className="font-medium">Total: ${expenses.reduce((sum, exp) => sum + exp.amount, 0).toFixed(2)}</span>
-              </div>
-            )}
           </div>
 
           <div className="flex justify-between gap-2 pt-4">
