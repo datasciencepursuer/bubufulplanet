@@ -51,6 +51,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const [selectedDailyDate, setSelectedDailyDate] = useState<string | null>(null)
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set())
   const [deletingEventIds, setDeletingEventIds] = useState<Set<string>>(new Set())
+  const [deletingExpenseIds, setDeletingExpenseIds] = useState<Set<string>>(new Set())
   const [selectedEventForPanel, setSelectedEventForPanel] = useState<Event | null>(null)
 
   // Success message state
@@ -296,58 +297,89 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           throw new Error(errorData.error || errorData.details || `Failed to update event: ${response.statusText}`)
         }
       } else {
-        // Create new event
-        const response = await fetch('/api/events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event: eventData })
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          let errorData
-          try {
-            errorData = JSON.parse(errorText)
-          } catch {
-            errorData = { error: errorText || response.statusText }
-          }
-          
-          console.error('Event creation failed:', {
-            status: response.status,
-            statusText: response.statusText,
-            responseText: errorText,
-            error: errorData
-          })
-          throw new Error(errorData.error || errorData.details || `Failed to create event: ${response.statusText}`)
+        // Create new event with optimistic update
+        const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        const optimisticEvent: Event = {
+          id: tempId,
+          dayId: eventData.dayId,
+          title: eventData.title,
+          startSlot: eventData.startSlot,
+          endSlot: eventData.endSlot,
+          location: eventData.location,
+          notes: eventData.notes,
+          weather: eventData.weather,
+          loadout: eventData.loadout,
+          color: eventData.color,
+          createdAt: new Date()
         }
         
-        // Get the created event to track its ID
-        const responseData = await response.json()
-        if (responseData.event?.id) {
-          setNewEventIds(prev => new Set(prev).add(responseData.event.id))
-          // Remove the ID from new events after animation completes
-          setTimeout(() => {
+        // Add optimistic event to UI immediately
+        setEvents(prevEvents => [...prevEvents, optimisticEvent])
+        setNewEventIds(prev => new Set(prev).add(tempId))
+        
+        try {
+          const response = await fetch('/api/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event: eventData })
+          })
+
+          if (!response.ok) {
+            // Remove optimistic event on error
+            setEvents(prevEvents => prevEvents.filter(e => e.id !== tempId))
             setNewEventIds(prev => {
-              const next = new Set(prev)
-              next.delete(responseData.event.id)
-              return next
+              const newSet = new Set(prev)
+              newSet.delete(tempId)
+              return newSet
             })
-          }, 1000)
+            
+            const errorText = await response.text()
+            let errorData
+            try {
+              errorData = JSON.parse(errorText)
+            } catch {
+              errorData = { error: errorText || response.statusText }
+            }
+            
+            console.error('Event creation failed:', {
+              status: response.status,
+              statusText: response.statusText,
+              responseText: errorText,
+              error: errorData
+            })
+            throw new Error(errorData.error || errorData.details || `Failed to create event: ${response.statusText}`)
+          }
+          
+          // Get the created event to replace the temporary one
+          const responseData = await response.json()
+          if (responseData.event?.id) {
+            // Replace temporary event with real event
+            setEvents(prevEvents => 
+              prevEvents.map(e => e.id === tempId ? responseData.event : e)
+            )
+            setNewEventIds(prev => {
+              const newSet = new Set(prev)
+              newSet.delete(tempId)
+              newSet.add(responseData.event.id)
+              return newSet
+            })
+            
+            // Remove the ID from new events after animation completes
+            setTimeout(() => {
+              setNewEventIds(prev => {
+                const next = new Set(prev)
+                next.delete(responseData.event.id)
+                return next
+              })
+            }, 1000)
+          }
+        } catch (error) {
+          // Error handling is done above in the response check
+          throw error
         }
       }
 
-      // Refresh events and expenses from server to ensure consistency
-      const eventsResponse = await fetch(`/api/events?tripId=${tripId}`)
-      if (eventsResponse.ok) {
-        const eventsData = await eventsResponse.json()
-        setEvents(eventsData.events || [])
-      }
-
-      const expensesResponse = await fetch(`/api/events/expenses?tripId=${tripId}`)
-      if (expensesResponse.ok) {
-        const expensesData = await expensesResponse.json()
-        setExpenses(expensesData.expenses || [])
-      }
+      // No need to refresh from server since we're using optimistic updates
 
     } catch (err) {
       console.error('Error saving event:', err)
@@ -528,8 +560,31 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const confirmDeleteExpense = async () => {
     if (!expenseToDelete) return
     
+    const expenseId = expenseToDelete.id
+    
     try {
-      const response = await fetch(`/api/expenses/${expenseToDelete.id}`, {
+      // Start visual deletion feedback
+      setDeletingExpenseIds(prev => new Set([...prev, expenseId]))
+      
+      // Clear the expense to delete dialog
+      setExpenseToDelete(null)
+      
+      // Wait for fade-out animation
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Save previous state for potential rollback
+      const previousExpenses = [...expenses]
+      
+      // Optimistically remove expense from UI
+      setExpenses(prev => prev.filter(expense => expense.id !== expenseId))
+      setDeletingExpenseIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(expenseId)
+        return newSet
+      })
+      
+      // Make API call
+      const response = await fetch(`/api/expenses/${expenseId}`, {
         method: 'DELETE'
       })
       
@@ -542,13 +597,23 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       setShowSuccessMessage(true)
       setSuccessMessage('Expense deleted successfully!')
       
-      // Clear the expense to delete
-      setExpenseToDelete(null)
-      
-      // Refresh trip data to get updated expenses
-      await fetchTripData()
     } catch (error) {
       console.error('Error deleting expense:', error)
+      
+      // Rollback optimistic update on error
+      const previousExpenses = expenses.filter(expense => expense.id !== expenseId)
+      if (previousExpenses.length !== expenses.length) {
+        // Re-fetch to ensure data consistency on error
+        await fetchTripData()
+      }
+      
+      // Clear deleting state
+      setDeletingExpenseIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(expenseId)
+        return newSet
+      })
+      
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete expense'
       alert(errorMessage + '. Please try again.')
     }
@@ -739,6 +804,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
               setPrefilledEventId(eventId)
               setShowExpenseModal(true)
             }}
+            onDeleteEvent={handleDeleteEvent}
             initialDate={selectedDailyDate}
           />
         )}
@@ -854,6 +920,29 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           onSave={handleSaveExpense}
           onDelete={async (expenseId: string) => {
             try {
+              // Start visual deletion feedback
+              setDeletingExpenseIds(prev => new Set([...prev, expenseId]))
+              
+              // Close modal immediately
+              setShowExpenseModal(false)
+              setSelectedExpense(undefined)
+              setPrefilledEventId(null)
+              
+              // Wait for fade-out animation
+              await new Promise(resolve => setTimeout(resolve, 200))
+              
+              // Save previous state for potential rollback
+              const previousExpenses = [...expenses]
+              
+              // Optimistically remove expense from UI
+              setExpenses(prev => prev.filter(expense => expense.id !== expenseId))
+              setDeletingExpenseIds(prev => {
+                const newSet = new Set(prev)
+                newSet.delete(expenseId)
+                return newSet
+              })
+              
+              // Make API call
               const response = await fetch(`/api/expenses/${expenseId}`, {
                 method: 'DELETE'
               })
@@ -867,15 +956,23 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
               setShowSuccessMessage(true)
               setSuccessMessage('Expense deleted successfully!')
               
-              // Close modal
-              setShowExpenseModal(false)
-              setSelectedExpense(undefined)
-              setPrefilledEventId(null)
-              
-              // Refresh trip data to get updated expenses
-              await fetchTripData()
             } catch (error) {
               console.error('Error deleting expense:', error)
+              
+              // Rollback optimistic update on error
+              const previousExpenses = expenses.filter(expense => expense.id !== expenseId)
+              if (previousExpenses.length !== expenses.length) {
+                // Re-fetch to ensure data consistency on error
+                await fetchTripData()
+              }
+              
+              // Clear deleting state
+              setDeletingExpenseIds(prev => {
+                const newSet = new Set(prev)
+                newSet.delete(expenseId)
+                return newSet
+              })
+              
               const errorMessage = error instanceof Error ? error.message : 'Failed to delete expense'
               alert(errorMessage + '. Please try again.')
             }
@@ -901,6 +998,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         }}
         onEditExpense={handleEditExpense}
         onDeleteExpense={handleDeleteExpense}
+        deletingExpenseIds={deletingExpenseIds}
       />
       
       {/* Expense Delete Confirmation Dialog */}

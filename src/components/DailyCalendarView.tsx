@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { format, addDays, subDays, parseISO } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, DollarSign, Calendar, Clock, Edit, MapPin, FileText } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, DollarSign, Calendar, Clock, Edit, MapPin, FileText, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Event, TripDay } from '@prisma/client'
 import { EVENT_COLORS, getEventColor } from '@/lib/eventColors'
@@ -23,6 +23,7 @@ interface DailyCalendarViewProps {
   onEventClick: (event: Event) => void
   onEventSelect?: (event: Event, position: { top: number; left: number }) => void
   onAddExpenseToEvent?: (eventId: string) => void
+  onDeleteEvent?: (eventId: string) => void
   initialDate?: string | null
 }
 
@@ -39,6 +40,7 @@ export default function DailyCalendarView({
   onEventClick,
   onEventSelect,
   onAddExpenseToEvent,
+  onDeleteEvent,
   initialDate
 }: DailyCalendarViewProps) {
   const startDate = parseISO(tripStartDate)
@@ -424,6 +426,21 @@ export default function DailyCalendarView({
                             >
                               <Edit className="h-5 w-5" />
                             </Button>
+                            {onDeleteEvent && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onDeleteEvent(event.id)
+                                }}
+                                className="h-10 w-10 p-0 hover:bg-red-50 hover:text-red-600"
+                                title="Delete event"
+                                disabled={deletingEventIds?.has(event.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                         

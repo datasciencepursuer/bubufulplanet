@@ -15,6 +15,7 @@ interface TripExpensesPanelProps {
   onEditExpense?: (expense: Expense) => void
   onDeleteExpense?: (expense: Expense) => void
   onAddExpense?: () => void
+  deletingExpenseIds?: Set<string>
 }
 
 export default function TripExpensesPanel({
@@ -24,7 +25,8 @@ export default function TripExpensesPanel({
   onClose,
   onEditExpense,
   onDeleteExpense,
-  onAddExpense
+  onAddExpense,
+  deletingExpenseIds = new Set()
 }: TripExpensesPanelProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
@@ -152,6 +154,7 @@ export default function TripExpensesPanel({
                       expense={expense} 
                       onEdit={onEditExpense}
                       onDelete={onDeleteExpense}
+                      isDeleting={deletingExpenseIds.has(expense.id)}
                     />
                   ))}
                 </div>
@@ -187,6 +190,7 @@ export default function TripExpensesPanel({
                         onEdit={onEditExpense}
                         onDelete={onDeleteExpense}
                         isNested
+                        isDeleting={deletingExpenseIds.has(expense.id)}
                       />
                     ))}
                   </div>
@@ -215,17 +219,19 @@ function ExpenseItem({
   expense, 
   onEdit,
   onDelete,
-  isNested = false
+  isNested = false,
+  isDeleting = false
 }: { 
   expense: Expense
   onEdit?: (expense: Expense) => void
   onDelete?: (expense: Expense) => void
   isNested?: boolean
+  isDeleting?: boolean
 }) {
   return (
-    <div className={`bg-gray-50 p-3 rounded hover:bg-gray-100 hover:shadow-sm transition-all cursor-pointer ${isNested ? 'text-sm' : ''}`}
-         onClick={() => onEdit && onEdit(expense)}
-         title="Click to edit expense">
+    <div className={`bg-gray-50 p-3 rounded hover:bg-gray-100 hover:shadow-sm transition-all cursor-pointer ${isNested ? 'text-sm' : ''} ${isDeleting ? 'opacity-50 animate-pulse' : ''}`}
+         onClick={() => !isDeleting && onEdit && onEdit(expense)}
+         title={isDeleting ? "Deleting expense..." : "Click to edit expense"}>
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
           <div className="flex items-start gap-2">
