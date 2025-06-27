@@ -223,11 +223,11 @@ export default function Home() {
                           disabled={loading}
                         />
                       </div>
-                      <div className="w-28">
+                      <div className="w-32">
                         <select
                           value={member.role}
                           onChange={(e) => updateMember(index, 'role', e.target.value as 'adventurer' | 'party member')}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-200 focus:outline-none transition-all duration-200"
+                          className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-200 focus:outline-none transition-all duration-200 text-sm"
                           disabled={index === 0 || loading}
                         >
                           <option value="adventurer">Adventurer</option>
