@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { MapPin, Calendar, Trash2, Clock, ExternalLink, ChevronRight, X, Edit2 } from 'lucide-react'
 import ConfirmDialog from '../ConfirmDialog'
 import { formatDateForDisplay } from '@/lib/dateTimeUtils'
+import { useNotify } from '@/hooks/useNotify'
 
 interface Trip {
   id: string
@@ -25,6 +26,7 @@ interface AllTripsViewProps {
 }
 
 export default function AllTripsView({ trips, onTripsChange, onEditTrip, className }: AllTripsViewProps) {
+  const { error } = useNotify()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
   const [showAllModal, setShowAllModal] = useState(false)
@@ -85,9 +87,9 @@ export default function AllTripsView({ trips, onTripsChange, onEditTrip, classNa
 
       onTripsChange()
       setTripToDelete(null)
-    } catch (error) {
-      console.error('Error deleting trip:', error)
-      alert('Failed to delete trip. Please try again.')
+    } catch (err) {
+      console.error('Error deleting trip:', err)
+      error('Delete Failed', 'Failed to delete trip. Please try again.')
     }
   }
 

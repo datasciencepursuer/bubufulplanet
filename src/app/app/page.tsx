@@ -13,8 +13,10 @@ import { MapPin, Calendar as CalendarIcon, DollarSign, Settings, ArrowLeft, Plus
 import ConfirmDialog from '@/components/ConfirmDialog'
 import BearGlobeLoader from '@/components/BearGlobeLoader'
 import { useDeviceSession } from '@/hooks/useDeviceSession'
+import { useNotify } from '@/hooks/useNotify'
 
 export default function AppPage() {
+  const { warning } = useNotify()
   const [showTripForm, setShowTripForm] = useState(false)
   const [selectedDates, setSelectedDates] = useState<{ start: Date; end: Date } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -86,7 +88,7 @@ export default function AppPage() {
   const handleTripSelect = (start: Date, end: Date) => {
     // Check if user has create permission
     if (!groupInfo?.permissions?.create) {
-      alert('You do not have permission to create trips. Please ask your group adventurer for permission.')
+      warning('Permission Denied', 'You do not have permission to create trips. Please ask your group adventurer for permission.')
       return
     }
     setSelectedDates({ start, end })

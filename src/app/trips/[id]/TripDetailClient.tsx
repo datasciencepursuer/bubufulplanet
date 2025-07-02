@@ -11,13 +11,13 @@ import EventPropertiesPanel from '@/components/EventPropertiesPanel'
 import TripForm from '@/components/TripForm'
 import BearGlobeLoader from '@/components/BearGlobeLoader'
 import PointsOfInterestView from '@/components/TripUtilities/PointsOfInterestView'
-import SuccessMessage from '@/components/SuccessMessage'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import ExpenseModal from '@/components/ExpenseModal'
 import TripExpensesPanel from '@/components/TripExpensesPanel'
 import type { Trip, TripDay, Event, GroupMember } from '@prisma/client'
 import type { Expense } from '@/types/expense'
 import type { CreateExpenseRequest, UpdateExpenseRequest } from '@/types/expense'
+import { useNotify } from '@/hooks/useNotify'
 import { normalizeDate, createAbsoluteDate, calculateDefaultEndTime, formatDateForDisplay } from '@/lib/dateTimeUtils'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
@@ -41,6 +41,7 @@ interface TripDetailClientProps {
 
 export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const router = useRouter()
+  const { success, error: notifyError } = useNotify()
   const [trip, setTrip] = useState<Trip | null>(null)
   const [tripDays, setTripDays] = useState<TripDay[]>([])
   const [events, setEvents] = useState<Event[]>([])
@@ -54,9 +55,6 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const [deletingExpenseIds, setDeletingExpenseIds] = useState<Set<string>>(new Set())
   const [selectedEventForPanel, setSelectedEventForPanel] = useState<Event | null>(null)
 
-  // Success message state
-  const [successMessage, setSuccessMessage] = useState<string>('')
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
 
   // Delete confirmation state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -156,7 +154,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     console.log('Date range selected:', { dayIds })
     if (!dayIds.length) {
       console.error('No dayIds provided for date range select')
-      alert('Error: Cannot create event - no days selected')
+      notifyError('Error', 'Cannot create event - no days selected')
       return
     }
     // For multi-day events, use the first day
@@ -171,7 +169,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const handleTimeSlotClick = (dayId: string, time: string, date?: string) => {
     if (!dayId) {
       console.error('No dayId provided for time slot click')
-      alert('Error: Cannot create event - no day selected')
+      notifyError('Error', 'Cannot create event - no day selected')
       return
     }
     
@@ -193,7 +191,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const handleTimeRangeSelect = (dayId: string, startTime: string, endTime: string, endDate?: string, startDate?: string) => {
     if (!dayId) {
       console.error('No dayId provided for time range select')
-      alert('Error: Cannot create event - no day selected')
+      notifyError('Error', 'Cannot create event - no day selected')
       return
     }
     
@@ -384,7 +382,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     } catch (err) {
       console.error('Error saving event:', err)
       const errorMessage = err instanceof Error ? err.message : 'Failed to save event'
-      alert(errorMessage + '. Please try again.')
+      notifyError('Error', errorMessage + '. Please try again.')
     }
   }
 
@@ -422,8 +420,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       }
 
       // Success! Show success message
-      setShowSuccessMessage(true)
-      setSuccessMessage('Event deleted successfully!')
+      success('Event Deleted', 'Event deleted successfully!')
       
       // Optimistic update was successful, no need to refresh from server
 
@@ -433,9 +430,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       setEvents(previousEvents)
       setExpenses(previousExpenses)
       
-      // Show error message with success message component
-      setShowSuccessMessage(true)
-      setSuccessMessage('Failed to delete event. Please try again.')
+      // Show error message
+      notifyError('Delete Failed', 'Failed to delete event. Please try again.')
     }
   }
 
@@ -471,15 +467,14 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       // If dates changed, refresh all data since trip days would have been regenerated
       if (datesChanged) {
         await fetchTripData()
-        setSuccessMessage('Trip updated successfully. All events and expenses have been removed due to date changes.')
+        success('Trip Updated', 'Trip updated successfully. All events and expenses have been removed due to date changes.')
       } else {
-        setSuccessMessage('Trip updated successfully!')
+        success('Trip Updated', 'Trip updated successfully!')
       }
-      setShowSuccessMessage(true)
     } catch (error) {
       console.error('Error updating trip:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to update trip'
-      alert(errorMessage + '. Please try again.')
+      notifyError('Update Failed', errorMessage + '. Please try again.')
     }
   }
 
@@ -504,7 +499,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       router.push('/app')
     } catch (error) {
       console.error('Error deleting trip:', error)
-      alert('Failed to delete trip. Please try again.')
+      notifyError('Delete Failed', 'Failed to delete trip. Please try again.')
     }
   }
   
@@ -530,8 +525,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       }
 
       // Show success message
-      setShowSuccessMessage(true)
-      setSuccessMessage(`Expense ${isEditing ? 'updated' : 'created'} successfully!`)
+      success('Expense Saved', `Expense ${isEditing ? 'updated' : 'created'} successfully!`)
       
       // Close modal and reset selected expense
       setShowExpenseModal(false)
@@ -542,7 +536,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     } catch (error) {
       console.error('Error saving expense:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to save expense'
-      alert(errorMessage + '. Please try again.')
+      notifyError('Save Failed', errorMessage + '. Please try again.')
     }
   }
   
@@ -594,8 +588,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       }
       
       // Show success message
-      setShowSuccessMessage(true)
-      setSuccessMessage('Expense deleted successfully!')
+      success('Expense Deleted', 'Expense deleted successfully!')
       
     } catch (error) {
       console.error('Error deleting expense:', error)
@@ -615,7 +608,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
       })
       
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete expense'
-      alert(errorMessage + '. Please try again.')
+      notifyError('Delete Failed', errorMessage + '. Please try again.')
     }
   }
 
@@ -662,7 +655,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
                 size="sm"
                 onClick={() => {
                   if (groupMembers.length === 0) {
-                    alert('Unable to add expenses. No group members found.');
+                    notifyError('Error', 'Unable to add expenses. No group members found.')
                     return;
                   }
                   setSelectedExpense(undefined);
@@ -797,7 +790,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             onEventSelect={handleEventSelect}
             onAddExpenseToEvent={(eventId) => {
               if (groupMembers.length === 0) {
-                alert('Unable to add expenses. No group members found.')
+                notifyError('Error', 'Unable to add expenses. No group members found.')
                 return
               }
               setSelectedExpense(undefined)
@@ -883,12 +876,6 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         </div>
       )}
 
-      {/* Success Message */}
-      <SuccessMessage
-        message={successMessage}
-        isVisible={showSuccessMessage}
-        onClose={() => setShowSuccessMessage(false)}
-      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
@@ -953,8 +940,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
               }
               
               // Show success message
-              setShowSuccessMessage(true)
-              setSuccessMessage('Expense deleted successfully!')
+              success('Expense Deleted', 'Expense deleted successfully!')
               
             } catch (error) {
               console.error('Error deleting expense:', error)
@@ -974,7 +960,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
               })
               
               const errorMessage = error instanceof Error ? error.message : 'Failed to delete expense'
-              alert(errorMessage + '. Please try again.')
+              notifyError('Error', errorMessage + '. Please try again.')
             }
           }}
         />
@@ -988,7 +974,7 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         onClose={() => setShowExpensesPanel(false)}
         onAddExpense={() => {
           if (groupMembers.length === 0) {
-            alert('Unable to add expenses. No group members found.');
+            notifyError('Error', 'Unable to add expenses. No group members found.')
             return;
           }
           setSelectedExpense(undefined);

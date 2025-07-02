@@ -7,6 +7,7 @@ import { UserPlus, Settings, Trash2, Shield, Eye, Edit, Plus } from 'lucide-reac
 import { usePermissions } from '@/hooks/usePermissions'
 import { getRoleDisplay, getPermissionDisplay } from '@/lib/permissions'
 import ConfirmDialog from './ConfirmDialog'
+import { useNotify } from '@/hooks/useNotify'
 
 interface GroupMember {
   id: string
@@ -22,6 +23,7 @@ interface GroupMember {
 }
 
 export default function GroupMembersManagement() {
+  const { error } = useNotify()
   const [members, setMembers] = useState<GroupMember[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddMember, setShowAddMember] = useState(false)
@@ -68,11 +70,11 @@ export default function GroupMembersManagement() {
         loadMembers()
       } else {
         const data = await response.json()
-        alert(data.error || 'Failed to add member')
+        error('Add Member Failed', data.error || 'Failed to add member')
       }
-    } catch (error) {
-      console.error('Error adding member:', error)
-      alert('Failed to add member')
+    } catch (err) {
+      console.error('Error adding member:', err)
+      error('Add Member Failed', 'Failed to add member. Please try again.')
     }
   }
 
@@ -89,11 +91,11 @@ export default function GroupMembersManagement() {
         loadMembers()
       } else {
         const data = await response.json()
-        alert(data.error || 'Failed to update permissions')
+        error('Update Failed', data.error || 'Failed to update permissions')
       }
-    } catch (error) {
-      console.error('Error updating permissions:', error)
-      alert('Failed to update permissions')
+    } catch (err) {
+      console.error('Error updating permissions:', err)
+      error('Update Failed', 'Failed to update permissions. Please try again.')
     }
   }
 
@@ -108,11 +110,11 @@ export default function GroupMembersManagement() {
         loadMembers()
       } else {
         const data = await response.json()
-        alert(data.error || 'Failed to remove member')
+        error('Remove Failed', data.error || 'Failed to remove member')
       }
-    } catch (error) {
-      console.error('Error removing member:', error)
-      alert('Failed to remove member')
+    } catch (err) {
+      console.error('Error removing member:', err)
+      error('Remove Failed', 'Failed to remove member. Please try again.')
     }
   }
 

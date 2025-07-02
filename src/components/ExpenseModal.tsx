@@ -12,6 +12,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import type { Expense, CreateExpenseRequest, UpdateExpenseRequest } from '@/types/expense';
 import type { GroupMember, Event } from '@prisma/client';
 import { formatCurrency, calculateEvenSplit, validateSplitPercentages } from '@/types/expense';
+import { useNotify } from '@/hooks/useNotify';
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -58,6 +59,7 @@ export default function ExpenseModal({
   events = []
 }: ExpenseModalProps) {
   console.log('ExpenseModal - groupMembers:', groupMembers)
+  const { error } = useNotify();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExternalForm, setShowExternalForm] = useState(false);
   const [splitMode, setSplitMode] = useState<'even' | 'custom'>('even');
@@ -238,13 +240,14 @@ export default function ExpenseModal({
     e.preventDefault();
     
     const selectedParticipants = participants.filter(p => p.isSelected);
+    
     if (selectedParticipants.length === 0) {
-      alert('Please select at least one participant');
+      error('Validation Error', 'Please select at least one participant');
       return;
     }
     
     if (!validateSplitPercentages(selectedParticipants)) {
-      alert('Split percentages must sum to 100%');
+      error('Validation Error', 'Split percentages must sum to 100%');
       return;
     }
     
@@ -286,9 +289,9 @@ export default function ExpenseModal({
       
       await onSave(expenseData);
       onClose();
-    } catch (error) {
-      console.error('Error saving expense:', error);
-      alert('Failed to save expense');
+    } catch (err) {
+      console.error('Error saving expense:', err);
+      error('Save Failed', 'Failed to save expense. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
