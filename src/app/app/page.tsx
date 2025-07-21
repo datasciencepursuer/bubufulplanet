@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import AppMonthlyCalendar from '@/components/AppMonthlyCalendar'
+import MobileTripsList from '@/components/MobileTripsList'
 import TripForm from '@/components/TripForm'
 import AllTripsView from '@/components/TripUtilities/AllTripsView'
 import ExpensesView from '@/components/TripUtilities/ExpensesView'
@@ -285,22 +286,23 @@ export default function AppPage() {
       <header className="bg-white border-b sticky top-0 z-40">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 lg:gap-4 min-w-0 flex-1">
               <Button 
                 variant="ghost" 
                 size="sm"
                 onClick={() => router.push('/')}
-                className="gap-2"
+                className="gap-1 lg:gap-2"
               >
-                <ArrowLeft className="w-4 h-4" /> Back
+                <ArrowLeft className="w-4 h-4" /> 
+                <span className="hidden sm:inline">Back</span>
               </Button>
-              <div>
-                <h1 className="text-lg font-semibold">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base lg:text-lg font-semibold truncate">
                   {groupInfo ? groupInfo.name : 'My Trips'}
                 </h1>
                 {groupInfo && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <span>Access Code:</span>
+                  <div className="flex items-center gap-2 text-xs lg:text-sm text-gray-500">
+                    <span className="hidden sm:inline">Access Code:</span>
                     <span className="font-mono font-medium">{groupInfo.accessCode}</span>
                     <button
                       onClick={handleCopyAccessCode}
@@ -323,8 +325,8 @@ export default function AppPage() {
               </div>
             </div>
             
-            {/* Center Brand */}
-            <div className="flex flex-col items-center justify-center">
+            {/* Center Brand - Hide on small screens */}
+            <div className="hidden lg:flex flex-col items-center justify-center">
               <h2 className="text-xl font-bold bg-gradient-to-r from-teal-800 to-teal-600 bg-clip-text text-transparent">
                 Bubuful Planet
               </h2>
@@ -333,22 +335,24 @@ export default function AppPage() {
               </p>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1 lg:gap-4">
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={() => router.push('/group-settings')}
-                className="gap-2"
+                className="gap-1 lg:gap-2"
               >
-                <Users className="w-4 h-4" /> Group Settings
+                <Users className="w-4 h-4" /> 
+                <span className="hidden sm:inline">Group Settings</span>
               </Button>
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={handleLogout}
-                className="gap-2"
+                className="gap-1 lg:gap-2"
               >
-                <LogOut className="w-4 h-4" /> Logout
+                <LogOut className="w-4 h-4" /> 
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>
@@ -359,52 +363,90 @@ export default function AppPage() {
       <div className="container mx-auto px-4 py-8">
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-2 space-y-4 lg:space-y-4">
             {/* Group Title and Welcome */}
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h2 className="text-3xl font-bold mb-2">
-                  {groupInfo ? `${groupInfo.name} - Plan Your Trips` : 'Plan Your Trips'}
+            <div className="mb-4 lg:mb-6">
+              {/* Mobile: Simple title */}
+              <div className="lg:hidden mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Your Trips
                 </h2>
-                <p className="text-gray-600">Drag and select dates on the calendar to create a new trip</p>
+                {groupInfo && groupInfo.travelerName && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'} {groupInfo.travelerName}!
+                  </p>
+                )}
               </div>
-              
-              {/* Welcome Card */}
-              {(() => {
-                console.log('Welcome card render check:', { groupInfo, travelerName: groupInfo?.travelerName, role: groupInfo?.role })
-                return groupInfo && groupInfo.travelerName && (
-                  <Card className="bg-teal-50 border-teal-200 max-w-sm flex-shrink-0">
-                    <CardContent className="pt-4">
-                      <p className="text-lg text-teal-700 font-medium">
-                        Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'} {groupInfo.travelerName}!
-                      </p>
-                    </CardContent>
-                  </Card>
-                )
-              })()}
+
+              {/* Desktop: Full layout */}
+              <div className="hidden lg:flex lg:justify-between lg:items-start space-y-4 lg:space-y-0">
+                <div>
+                  <h2 className="text-3xl font-bold mb-2">
+                    {groupInfo ? `${groupInfo.name} - Plan Your Trips` : 'Plan Your Trips'}
+                  </h2>
+                  <p className="text-gray-600">
+                    Drag and select dates on the calendar to create a new trip
+                  </p>
+                </div>
+                
+                {/* Welcome Card */}
+                {(() => {
+                  console.log('Welcome card render check:', { groupInfo, travelerName: groupInfo?.travelerName, role: groupInfo?.role })
+                  return groupInfo && groupInfo.travelerName && (
+                    <Card className="bg-teal-50 border-teal-200 max-w-sm flex-shrink-0">
+                      <CardContent className="pt-4">
+                        <p className="text-lg text-teal-700 font-medium">
+                          Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'} {groupInfo.travelerName}!
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )
+                })()}
+              </div>
             </div>
             
-            {/* Next Trip Card - Moved from utility cards */}
-            <AllTripsView 
-              trips={trips} 
-              onTripsChange={loadTrips}
-              onEditTrip={handleEditTrip}
-            />
-            
-            <AppMonthlyCalendar 
-              onTripSelect={handleTripSelect}
-              onCreateTrip={handleCreateTrip}
-              existingTrips={trips.map(trip => ({
-                id: trip.id,
-                title: trip.name,
-                start: trip.startDate,
-                end: trip.endDate
-              }))}
-            />
+            {/* Desktop Trip Management */}
+            <div className="hidden lg:block">
+              {/* Next Trip Card - Moved from utility cards */}
+              <AllTripsView 
+                trips={trips} 
+                onTripsChange={loadTrips}
+                onEditTrip={handleEditTrip}
+              />
+              
+              <AppMonthlyCalendar 
+                onTripSelect={handleTripSelect}
+                onCreateTrip={handleCreateTrip}
+                existingTrips={trips.map(trip => ({
+                  id: trip.id,
+                  title: trip.name,
+                  start: trip.startDate,
+                  end: trip.endDate
+                }))}
+              />
+            </div>
+
+            {/* Mobile Trip Management */}
+            <div className="lg:hidden space-y-6">
+              <MobileTripsList
+                trips={trips}
+                onTripClick={(tripId) => router.push(`/trips/${tripId}`)}
+                onCreateTrip={handleCreateTrip}
+                onEditTrip={handleEditTrip}
+                onDeleteTrip={handleDeleteTripClick}
+                permissions={groupInfo?.permissions}
+              />
+              
+              {/* Mobile Utility Sections */}
+              <div className="space-y-4">
+                <PointsOfInterestView className="w-full" />
+                <ExpensesView className="w-full" />
+              </div>
+            </div>
           </div>
           
-          <div className="h-full flex flex-col space-y-4">
-            {/* Remaining Utility Cards - Swapped order */}
+          {/* Desktop Utility Sidebar */}
+          <div className="hidden lg:flex h-full flex-col space-y-4">
             <div className="flex-1 flex flex-col space-y-4">
               <PointsOfInterestView className="flex-1" />
               <ExpensesView className="flex-1" />

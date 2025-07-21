@@ -6,6 +6,7 @@ import { ArrowLeft, Calendar, MapPin, Users, CalendarDays, Edit, Map, X, DollarS
 import { Button } from '@/components/ui/button'
 import WeeklyCalendarView from '@/components/WeeklyCalendarView'
 import DailyCalendarView from '@/components/DailyCalendarView'
+import MobileCalendarView from '@/components/MobileCalendarView'
 import EventModal from '@/components/EventModal'
 import EventPropertiesPanel from '@/components/EventPropertiesPanel'
 import TripForm from '@/components/TripForm'
@@ -635,21 +636,62 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
+      <div className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 lg:py-8">
+        <div className="mb-4 lg:mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4 space-y-4 lg:space-y-0">
+            <div className="flex items-center min-w-0">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => router.push('/app')}
-                className="mr-4"
+                className="mr-2 lg:mr-4"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <h1 className="text-3xl font-bold text-gray-900">{trip.name}</h1>
+              <h1 className="text-xl lg:text-3xl font-bold text-gray-900 truncate">{trip.name}</h1>
             </div>
-            <div className="flex gap-2">
+            
+            {/* Mobile Action Button - Show only key actions */}
+            <div className="flex gap-1 lg:hidden">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  if (groupMembers.length === 0) {
+                    notifyError('Error', 'Unable to add expenses. No group members found.')
+                    return;
+                  }
+                  setSelectedExpense(undefined);
+                  setPrefilledEventId(null);
+                  setShowExpenseModal(true);
+                }}
+                className="gap-1"
+              >
+                <DollarSign className="h-4 w-4" />
+                Add
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowExpensesPanel(true)}
+                className="gap-1"
+              >
+                <DollarSign className="h-4 w-4" />
+                {expenses.length}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowTripEditForm(true)}
+                className="gap-1"
+              >
+                <Edit className="h-4 w-4" />
+                Edit
+              </Button>
+            </div>
+            
+            {/* Desktop Action Buttons */}
+            <div className="hidden lg:flex gap-2">
               <Button 
                 variant="outline" 
                 size="sm"
@@ -697,16 +739,18 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             </div>
           </div>
           
-          <div className="flex flex-wrap items-center gap-4 text-gray-600">
+          <div className="flex flex-wrap items-center gap-2 lg:gap-4 text-sm lg:text-base text-gray-600">
             {trip.destination && (
               <div className="flex items-center">
                 <MapPin className="h-4 w-4 mr-1" />
-                {trip.destination}
+                <span className="truncate">{trip.destination}</span>
               </div>
             )}
             <div className="flex items-center">
               <Calendar className="h-4 w-4 mr-1" />
-              {formatDateForDisplay(trip.startDate)} - {formatDateForDisplay(trip.endDate)}
+              <span className="text-xs lg:text-sm">
+                {formatDateForDisplay(trip.startDate)} - {formatDateForDisplay(trip.endDate)}
+              </span>
             </div>
             <div className="flex items-center">
               <Users className="h-4 w-4 mr-1" />
@@ -715,8 +759,8 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           </div>
         </div>
 
-        {/* View Selector */}
-        <div className="mb-6">
+        {/* View Selector - Only show on desktop */}
+        <div className="mb-6 hidden md:block">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Trip Schedule</h2>
             <div className="flex items-center space-x-2">
@@ -741,6 +785,11 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             </div>
           </div>
         </div>
+
+        {/* Mobile Title */}
+        <div className="mb-4 md:hidden">
+          <h2 className="text-xl font-semibold">Trip Schedule</h2>
+        </div>
       </div>
 
       {/* Calendar View - Takes remaining height */}
@@ -758,25 +807,10 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
           }
         }}
       >
-        {calendarView === 'weekly' ? (
-          <WeeklyCalendarView
-            key={`weekly-${trip.id}`}
-            tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
-            tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
-            tripDays={tripDays}
-            events={events}
-            selectedEventId={selectedEventForPanel?.id}
-            newEventIds={newEventIds}
-            deletingEventIds={deletingEventIds}
-            onTimeSlotClick={handleTimeSlotClick}
-            onTimeRangeSelect={handleTimeRangeSelect}
-            onEventClick={handleEventClick}
-            onEventSelect={handleEventSelect}
-            onDayHeaderClick={handleDayHeaderClick}
-          />
-        ) : (
-          <DailyCalendarView
-            key={`daily-${trip.id}`}
+        {/* Mobile View - Always use mobile calendar on small screens */}
+        <div className="md:hidden h-full">
+          <MobileCalendarView
+            key={`mobile-${trip.id}`}
             tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
             tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
             tripDays={tripDays}
@@ -800,7 +834,54 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
             onDeleteEvent={handleDeleteEvent}
             initialDate={selectedDailyDate}
           />
-        )}
+        </div>
+
+        {/* Desktop View - Use existing calendar views */}
+        <div className="hidden md:block h-full">
+          {calendarView === 'weekly' ? (
+            <WeeklyCalendarView
+              key={`weekly-${trip.id}`}
+              tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
+              tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
+              tripDays={tripDays}
+              events={events}
+              selectedEventId={selectedEventForPanel?.id}
+              newEventIds={newEventIds}
+              deletingEventIds={deletingEventIds}
+              onTimeSlotClick={handleTimeSlotClick}
+              onTimeRangeSelect={handleTimeRangeSelect}
+              onEventClick={handleEventClick}
+              onEventSelect={handleEventSelect}
+              onDayHeaderClick={handleDayHeaderClick}
+            />
+          ) : (
+            <DailyCalendarView
+              key={`daily-${trip.id}`}
+              tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
+              tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
+              tripDays={tripDays}
+              events={events}
+              selectedEventId={selectedEventForPanel?.id}
+              newEventIds={newEventIds}
+              deletingEventIds={deletingEventIds}
+              onTimeSlotClick={handleTimeSlotClick}
+              onTimeRangeSelect={handleTimeRangeSelect}
+              onEventClick={handleEventClick}
+              onEventSelect={handleEventSelect}
+              onAddExpenseToEvent={(eventId) => {
+                if (groupMembers.length === 0) {
+                  notifyError('Error', 'Unable to add expenses. No group members found.')
+                  return
+                }
+                setSelectedExpense(undefined)
+                setPrefilledEventId(eventId)
+                setShowExpenseModal(true)
+              }}
+              onDeleteEvent={handleDeleteEvent}
+              initialDate={selectedDailyDate}
+            />
+          )}
+        </div>
       </div>
 
       {/* Side Event Properties Panel - For both weekly and daily views */}
