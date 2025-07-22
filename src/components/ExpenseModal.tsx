@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { X, Plus, UserPlus } from 'lucide-react';
+import { X, Plus, UserPlus, Trash2 } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import type { Expense, CreateExpenseRequest, UpdateExpenseRequest } from '@/types/expense';
 import type { GroupMember, Event } from '@prisma/client';
@@ -550,29 +550,42 @@ export default function ExpenseModal({
             )}
           </div>
           
-          <div className="flex justify-between pt-4">
-            <div>
-              {expense && onDelete && (
-                <Button 
-                  type="button" 
-                  variant="destructive"
+          {/* Button layout with integrated delete icon */}
+          <div className="pt-6">
+            <div className="flex items-center justify-between">
+              {/* Delete icon button - positioned on the left */}
+              {expense && onDelete ? (
+                <button
+                  type="button"
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={isSubmitting}
+                  className="flex items-center justify-center w-10 h-10 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Delete Expense"
                 >
-                  Delete
-                </Button>
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              ) : (
+                <div className="w-10" />
               )}
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isSubmitting || Math.abs(totalPercentage - 100) > 0.01}
-              >
-                {isSubmitting ? 'Saving...' : (expense ? 'Update' : 'Create')}
-              </Button>
+              
+              {/* Cancel/Save buttons */}
+              <div className="flex gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={onClose}
+                  className="px-6"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting || Math.abs(totalPercentage - 100) > 0.01}
+                  className="px-6"
+                >
+                  {isSubmitting ? 'Saving...' : (expense ? 'Update' : 'Create')}
+                </Button>
+              </div>
             </div>
           </div>
         </form>

@@ -48,7 +48,13 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      return NextResponse.json({ expenses })
+      const response = NextResponse.json({ expenses });
+      
+      // Add cache headers for expenses data
+      response.headers.set('Cache-Control', 'private, max-age=120, stale-while-revalidate=240'); // 2 min cache, 4 min stale
+      response.headers.set('ETag', `expenses-${context.groupId}-${tripId}-${Date.now()}`);
+      
+      return response;
     })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {

@@ -3,6 +3,8 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { NotificationProvider } from "@/contexts/NotificationContext"
 import { NotificationContainer } from "@/components/NotificationContainer"
+import QueryProvider from "@/providers/QueryProvider"
+import { DataCacheProvider } from "@/contexts/DataCacheContext"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -19,12 +21,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <NotificationProvider>
-          <main className="min-h-screen bg-background">
-            {children}
-          </main>
-          <NotificationContainer />
-        </NotificationProvider>
+        <QueryProvider>
+          <NotificationProvider>
+            <DataCacheProvider>
+              <main className="min-h-screen bg-background">
+                {children}
+              </main>
+              <NotificationContainer />
+            </DataCacheProvider>
+          </NotificationProvider>
+        </QueryProvider>
       </body>
     </html>
   )

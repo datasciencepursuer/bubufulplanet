@@ -336,26 +336,40 @@ export default function EventModal({
             </div>
           </div>
 
-          <div className="flex justify-between gap-2 pt-4">
-            <div>
-              {event && onDelete && (
-                <Button
+          {/* Button layout with integrated delete icon */}
+          <div className="pt-6">
+            <div className="flex items-center justify-between">
+              {/* Delete icon button - positioned on the left */}
+              {event && onDelete ? (
+                <button
                   type="button"
-                  variant="destructive"
                   onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center justify-center w-10 h-10 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  title="Delete Event"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              ) : (
+                <div className="w-10" />
               )}
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {event ? 'Update' : 'Create'}
-              </Button>
+              
+              {/* Cancel/Save buttons */}
+              <div className="flex gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={onClose}
+                  className="px-6"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit"
+                  className="px-6"
+                >
+                  {event ? 'Update' : 'Create'}
+                </Button>
+              </div>
             </div>
           </div>
         </form>

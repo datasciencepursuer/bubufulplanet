@@ -20,6 +20,9 @@ import type { Expense } from '@/types/expense'
 import type { CreateExpenseRequest, UpdateExpenseRequest } from '@/types/expense'
 import { useNotify } from '@/hooks/useNotify'
 import { normalizeDate, createAbsoluteDate, calculateDefaultEndTime, formatDateForDisplay } from '@/lib/dateTimeUtils'
+import { useTripData, useCreateExpense, useUpdateExpense, useDeleteExpense, useCreateEvent, useUpdateEvent, useDeleteEvent, useUpdateTrip } from '@/hooks/useTrip'
+import { useDataCache } from '@/contexts/DataCacheContext'
+import { useQueryClient } from '@tanstack/react-query'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 
@@ -38,20 +41,55 @@ type EventApiData = {
 
 interface TripDetailClientProps {
   tripId: string
+  initialData?: {
+    trip: Trip
+    days: TripDay[]
+    events: Event[]
+    expenses: Expense[]
+  }
 }
 
-export default function TripDetailClient({ tripId }: TripDetailClientProps) {
+export default function TripDetailClient({ tripId, initialData }: TripDetailClientProps) {
   const router = useRouter()
   const { success, error: notifyError } = useNotify()
-  const [trip, setTrip] = useState<Trip | null>(null)
-  const [tripDays, setTripDays] = useState<TripDay[]>([])
-  const [events, setEvents] = useState<Event[]>([])
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+  
+  // If we have initial data, prefill the cache
+  useEffect(() => {
+    if (initialData) {
+      queryClient.setQueryData(['trip', tripId], initialData.trip)
+      queryClient.setQueryData(['tripDays', tripId], initialData.days)
+      queryClient.setQueryData(['events', tripId], initialData.events)
+      queryClient.setQueryData(['expenses', tripId], initialData.expenses)
+    }
+  }, [initialData, tripId, queryClient])
+
+  // Use React Query hooks for data fetching
+  const {
+    trip,
+    days: tripDays = [],
+    events = [],
+    expenses = [],
+    isLoading: loading,
+    isError,
+    error
+  } = useTripData(tripId)
+  
+  // Get group members from cache context
+  const { groupMembers, isLoadingMembers } = useDataCache()
+  
+  // React Query mutations
+  const createExpenseMutation = useCreateExpense(tripId)
+  const updateExpenseMutation = useUpdateExpense(tripId)
+  const deleteExpenseMutation = useDeleteExpense(tripId)
+  const createEventMutation = useCreateEvent(tripId)
+  const updateEventMutation = useUpdateEvent(tripId)
+  const deleteEventMutation = useDeleteEvent(tripId)
+  const updateTripMutation = useUpdateTrip(tripId)
   const [calendarView, setCalendarView] = useState<'daily' | 'weekly'>('weekly')
   const [selectedDailyDate, setSelectedDailyDate] = useState<string | null>(null)
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set())
+  const [newExpenseIds, setNewExpenseIds] = useState<Set<string>>(new Set())
   const [deletingEventIds, setDeletingEventIds] = useState<Set<string>>(new Set())
   const [deletingExpenseIds, setDeletingExpenseIds] = useState<Set<string>>(new Set())
   const [selectedEventForPanel, setSelectedEventForPanel] = useState<Event | null>(null)
@@ -80,73 +118,12 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   const [showExpensesPanel, setShowExpensesPanel] = useState(false)
   const [selectedExpense, setSelectedExpense] = useState<Expense | undefined>(undefined)
   const [prefilledEventId, setPrefilledEventId] = useState<string | null>(null)
-  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null)
 
-  const fetchTripData = useCallback(async () => {
-    try {
-      setLoading(true)
-      
-      // Fetch trip details
-      const tripResponse = await fetch(`/api/trips?id=${tripId}`)
-      if (!tripResponse.ok) {
-        throw new Error('Failed to fetch trip')
-      }
-      const tripData = await tripResponse.json()
-      
-      if (!tripData.trips || tripData.trips.length === 0) {
-        throw new Error('Trip not found')
-      }
-      
-      setTrip(tripData.trips[0])
-
-      // Fetch trip days
-      const daysResponse = await fetch(`/api/trips/${tripId}/days`)
-      if (daysResponse.ok) {
-        const daysData = await daysResponse.json()
-        setTripDays(daysData.tripDays || [])
-      }
-
-      // Fetch events
-      const eventsResponse = await fetch(`/api/events?tripId=${tripId}`)
-      if (eventsResponse.ok) {
-        const eventsData = await eventsResponse.json()
-        setEvents(eventsData.events || [])
-      }
-
-      // Fetch expenses
-      const expensesResponse = await fetch(`/api/events/expenses?tripId=${tripId}`)
-      if (expensesResponse.ok) {
-        const expensesData = await expensesResponse.json()
-        setExpenses(expensesData.expenses || [])
-      }
-      
-      // Fetch group members
-      const membersResponse = await fetch('/api/groups/members', {
-        credentials: 'include'
-      })
-      if (membersResponse.ok) {
-        const membersData = await membersResponse.json()
-        console.log('Group members fetched:', membersData.members)
-        setGroupMembers(membersData.members || [])
-      } else {
-        console.error('Failed to fetch group members:', membersResponse.status)
-      }
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-    } finally {
-      setLoading(false)
-    }
-  }, [tripId])
-
-  useEffect(() => {
-    fetchTripData()
-  }, [fetchTripData])
 
   // Helper function to get date from dayId
   const getDateForDayId = (dayId: string): string => {
-    const day = tripDays.find(d => d.id === dayId)
+    const day = tripDays?.find(d => d.id === dayId)
     return day?.date ? normalizeDate(day.date) : normalizeDate(new Date())
   }
 
@@ -237,153 +214,21 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   }
 
   const handleSaveEvent = async (eventData: EventApiData) => {
-    try {
-      if (selectedEvent) {
-        // Optimistic update for existing event
-        const updatedEvent: Event = {
-          ...selectedEvent,
-          title: eventData.title,
-          startSlot: eventData.startSlot,
-          endSlot: eventData.endSlot,
-          location: eventData.location,
-          notes: eventData.notes,
-          weather: eventData.weather,
-          loadout: eventData.loadout,
-          color: eventData.color
-        }
-        
-        // Update events state optimistically
-        setEvents(prevEvents => 
-          prevEvents.map(e => e.id === selectedEvent.id ? updatedEvent : e)
-        )
-        
-        // Update selected event for panel if it's the same event
-        if (selectedEventForPanel?.id === selectedEvent.id) {
-          setSelectedEventForPanel(updatedEvent)
-        }
-        
-        
-        // Update existing event
-        const response = await fetch(`/api/events/${selectedEvent.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event: eventData })
-        })
-
-        if (!response.ok) {
-          // Revert optimistic update on error
-          setEvents(prevEvents => 
-            prevEvents.map(e => e.id === selectedEvent.id ? selectedEvent : e)
-          )
-          if (selectedEventForPanel?.id === selectedEvent.id) {
-            setSelectedEventForPanel(selectedEvent)
-          }
-          
-          const errorText = await response.text()
-          let errorData
-          try {
-            errorData = JSON.parse(errorText)
-          } catch {
-            errorData = { error: errorText || response.statusText }
-          }
-          
-          console.error('Event update failed:', {
-            status: response.status,
-            statusText: response.statusText,
-            responseText: errorText,
-            error: errorData
-          })
-          throw new Error(errorData.error || errorData.details || `Failed to update event: ${response.statusText}`)
-        }
-      } else {
-        // Create new event with optimistic update
-        const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        const optimisticEvent: Event = {
-          id: tempId,
-          dayId: eventData.dayId,
-          title: eventData.title,
-          startSlot: eventData.startSlot,
-          endSlot: eventData.endSlot,
-          location: eventData.location,
-          notes: eventData.notes,
-          weather: eventData.weather,
-          loadout: eventData.loadout,
-          color: eventData.color,
-          createdAt: new Date()
-        }
-        
-        // Add optimistic event to UI immediately
-        setEvents(prevEvents => [...prevEvents, optimisticEvent])
-        setNewEventIds(prev => new Set(prev).add(tempId))
-        
-        try {
-          const response = await fetch('/api/events', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event: eventData })
-          })
-
-          if (!response.ok) {
-            // Remove optimistic event on error
-            setEvents(prevEvents => prevEvents.filter(e => e.id !== tempId))
-            setNewEventIds(prev => {
-              const newSet = new Set(prev)
-              newSet.delete(tempId)
-              return newSet
-            })
-            
-            const errorText = await response.text()
-            let errorData
-            try {
-              errorData = JSON.parse(errorText)
-            } catch {
-              errorData = { error: errorText || response.statusText }
-            }
-            
-            console.error('Event creation failed:', {
-              status: response.status,
-              statusText: response.statusText,
-              responseText: errorText,
-              error: errorData
-            })
-            throw new Error(errorData.error || errorData.details || `Failed to create event: ${response.statusText}`)
-          }
-          
-          // Get the created event to replace the temporary one
-          const responseData = await response.json()
-          if (responseData.event?.id) {
-            // Replace temporary event with real event
-            setEvents(prevEvents => 
-              prevEvents.map(e => e.id === tempId ? responseData.event : e)
-            )
-            setNewEventIds(prev => {
-              const newSet = new Set(prev)
-              newSet.delete(tempId)
-              newSet.add(responseData.event.id)
-              return newSet
-            })
-            
-            // Remove the ID from new events after animation completes
-            setTimeout(() => {
-              setNewEventIds(prev => {
-                const next = new Set(prev)
-                next.delete(responseData.event.id)
-                return next
-              })
-            }, 1000)
-          }
-        } catch (error) {
-          // Error handling is done above in the response check
-          throw error
-        }
-      }
-
-      // No need to refresh from server since we're using optimistic updates
-
-    } catch (err) {
-      console.error('Error saving event:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save event'
-      notifyError('Error', errorMessage + '. Please try again.')
+    const isEditing = selectedEvent !== undefined
+    
+    // Close modal immediately
+    setIsModalOpen(false)
+    setSelectedEvent(null)
+    
+    if (isEditing) {
+      // Use React Query mutation for updates
+      updateEventMutation.mutate({
+        id: selectedEvent!.id,
+        ...eventData
+      })
+    } else {
+      // Use React Query mutation for creates (with optimistic updates)
+      createEventMutation.mutate(eventData)
     }
   }
 
@@ -399,41 +244,15 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     // Wait a brief moment for fade-out animation
     await new Promise(resolve => setTimeout(resolve, 200))
     
-    // Optimistic update - remove the event from UI
-    const previousEvents = events
-    const previousExpenses = expenses
-    
-    setEvents(events.filter(e => e.id !== eventId))
-    setExpenses(expenses.filter(e => e.eventId !== eventId))
+    // Clear deleting state
     setDeletingEventIds(prev => {
       const newSet = new Set(prev)
       newSet.delete(eventId)
       return newSet
     })
     
-    try {
-      const response = await fetch(`/api/events/${eventId}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to delete event')
-      }
-
-      // Success! Show success message
-      success('Event Deleted', 'Event deleted successfully!')
-      
-      // Optimistic update was successful, no need to refresh from server
-
-    } catch (err) {
-      console.error('Error deleting event:', err)
-      // Revert the optimistic update on error
-      setEvents(previousEvents)
-      setExpenses(previousExpenses)
-      
-      // Show error message
-      notifyError('Delete Failed', 'Failed to delete event. Please try again.')
-    }
+    // Use React Query mutation for delete (with optimistic updates)
+    deleteEventMutation.mutate(eventId)
   }
 
   const handleDayHeaderClick = (date: string) => {
@@ -447,36 +266,11 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     startDate: string
     endDate: string
   }) => {
-    try {
-      const response = await fetch(`/api/trips/${tripId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tripData)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || `Failed to update trip: ${response.statusText}`)
-      }
-
-      const { trip: updatedTrip, datesChanged } = await response.json()
-      
-      // Update local state
-      setTrip(updatedTrip)
-      setShowTripEditForm(false)
-
-      // If dates changed, refresh all data since trip days would have been regenerated
-      if (datesChanged) {
-        await fetchTripData()
-        success('Trip Updated', 'Trip updated successfully. All events and expenses have been removed due to date changes.')
-      } else {
-        success('Trip Updated', 'Trip updated successfully!')
-      }
-    } catch (error) {
-      console.error('Error updating trip:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update trip'
-      notifyError('Update Failed', errorMessage + '. Please try again.')
-    }
+    // Close modal immediately
+    setShowTripEditForm(false)
+    
+    // Use React Query mutation for trip updates
+    updateTripMutation.mutate(tripData)
   }
 
   const handleDeleteTrip = () => {
@@ -505,39 +299,27 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
   }
   
   const handleSaveExpense = async (expenseData: CreateExpenseRequest | UpdateExpenseRequest) => {
-    try {
-      const isEditing = selectedExpense !== undefined
-      const url = isEditing ? `/api/expenses/${selectedExpense!.id}` : '/api/expenses'
-      const method = isEditing ? 'PUT' : 'POST'
-      
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(expenseData)
+    const isEditing = selectedExpense !== undefined
+    
+    // Close modal immediately for better UX
+    setShowExpenseModal(false)
+    setSelectedExpense(undefined)
+    setPrefilledEventId(null)
+    
+    if (isEditing) {
+      // Use React Query mutation for updates
+      updateExpenseMutation.mutate({
+        id: selectedExpense!.id,
+        ...(expenseData as UpdateExpenseRequest)
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Expense save error:', errorData)
-        if (errorData.details) {
-          console.error('Validation details:', errorData.details)
-        }
-        throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} expense`)
+    } else {
+      // Use React Query mutation for creates (with optimistic updates)
+      // Ensure tripId is included for create requests
+      const createData: CreateExpenseRequest = {
+        ...(expenseData as CreateExpenseRequest),
+        tripId: tripId // Ensure tripId is always present for creates
       }
-
-      // Show success message
-      success('Expense Saved', `Expense ${isEditing ? 'updated' : 'created'} successfully!`)
-      
-      // Close modal and reset selected expense
-      setShowExpenseModal(false)
-      setSelectedExpense(undefined)
-      
-      // Refresh trip data to get updated expenses
-      await fetchTripData()
-    } catch (error) {
-      console.error('Error saving expense:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save expense'
-      notifyError('Save Failed', errorMessage + '. Please try again.')
+      createExpenseMutation.mutate(createData)
     }
   }
   
@@ -557,72 +339,24 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
     
     const expenseId = expenseToDelete.id
     
-    try {
-      // Start visual deletion feedback
-      setDeletingExpenseIds(prev => new Set([...prev, expenseId]))
-      
-      // Clear the expense to delete dialog
-      setExpenseToDelete(null)
-      
-      // Wait for fade-out animation
-      await new Promise(resolve => setTimeout(resolve, 200))
-      
-      // Save previous state for potential rollback
-      const previousExpenses = [...expenses]
-      
-      // Optimistically remove expense from UI
-      setExpenses(prev => prev.filter(expense => expense.id !== expenseId))
-      setDeletingExpenseIds(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(expenseId)
-        return newSet
-      })
-      
-      // Make API call
-      const response = await fetch(`/api/expenses/${expenseId}`, {
-        method: 'DELETE'
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to delete expense')
-      }
-      
-      // Show success message
-      success('Expense Deleted', 'Expense deleted successfully!')
-      
-    } catch (error) {
-      console.error('Error deleting expense:', error)
-      
-      // Rollback optimistic update on error
-      const previousExpenses = expenses.filter(expense => expense.id !== expenseId)
-      if (previousExpenses.length !== expenses.length) {
-        // Re-fetch to ensure data consistency on error
-        await fetchTripData()
-      }
-      
-      // Clear deleting state
-      setDeletingExpenseIds(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(expenseId)
-        return newSet
-      })
-      
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete expense'
-      notifyError('Delete Failed', errorMessage + '. Please try again.')
-    }
+    // Clear the expense to delete dialog
+    setExpenseToDelete(null)
+    
+    // Use React Query mutation for delete (with optimistic updates)
+    deleteExpenseMutation.mutate(expenseId)
   }
 
-  if (loading) {
+  // Show loading spinner only if we don't have initial data and we're loading
+  if ((loading && !initialData) || isLoadingMembers) {
     return <BearGlobeLoader />
   }
 
-  if (error || !trip) {
+  if (isError || !trip) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            {error || 'Trip not found'}
+            {error?.message || 'Trip not found'}
           </h2>
           <Button onClick={() => router.push('/app')} variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -970,83 +704,6 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         variant="destructive"
       />
       
-      {/* Expense Modal */}
-      {showExpenseModal && groupMembers.length > 0 && (
-        <ExpenseModal
-          isOpen={showExpenseModal}
-          onClose={() => {
-            setShowExpenseModal(false)
-            setSelectedExpense(undefined)
-            setPrefilledEventId(null)
-          }}
-          expense={selectedExpense}
-          tripId={tripId}
-          tripName={trip?.name}
-          eventId={prefilledEventId || undefined}
-          groupMembers={groupMembers}
-          events={events}
-          onSave={handleSaveExpense}
-          onDelete={async (expenseId: string) => {
-            try {
-              // Start visual deletion feedback
-              setDeletingExpenseIds(prev => new Set([...prev, expenseId]))
-              
-              // Close modal immediately
-              setShowExpenseModal(false)
-              setSelectedExpense(undefined)
-              setPrefilledEventId(null)
-              
-              // Wait for fade-out animation
-              await new Promise(resolve => setTimeout(resolve, 200))
-              
-              // Save previous state for potential rollback
-              const previousExpenses = [...expenses]
-              
-              // Optimistically remove expense from UI
-              setExpenses(prev => prev.filter(expense => expense.id !== expenseId))
-              setDeletingExpenseIds(prev => {
-                const newSet = new Set(prev)
-                newSet.delete(expenseId)
-                return newSet
-              })
-              
-              // Make API call
-              const response = await fetch(`/api/expenses/${expenseId}`, {
-                method: 'DELETE'
-              })
-              
-              if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.error || 'Failed to delete expense')
-              }
-              
-              // Show success message
-              success('Expense Deleted', 'Expense deleted successfully!')
-              
-            } catch (error) {
-              console.error('Error deleting expense:', error)
-              
-              // Rollback optimistic update on error
-              const previousExpenses = expenses.filter(expense => expense.id !== expenseId)
-              if (previousExpenses.length !== expenses.length) {
-                // Re-fetch to ensure data consistency on error
-                await fetchTripData()
-              }
-              
-              // Clear deleting state
-              setDeletingExpenseIds(prev => {
-                const newSet = new Set(prev)
-                newSet.delete(expenseId)
-                return newSet
-              })
-              
-              const errorMessage = error instanceof Error ? error.message : 'Failed to delete expense'
-              notifyError('Error', errorMessage + '. Please try again.')
-            }
-          }}
-        />
-      )}
-      
       {/* Trip Expenses Panel */}
       <TripExpensesPanel
         expenses={expenses}
@@ -1066,8 +723,34 @@ export default function TripDetailClient({ tripId }: TripDetailClientProps) {
         onEditExpense={handleEditExpense}
         onDeleteExpense={handleDeleteExpense}
         deletingExpenseIds={deletingExpenseIds}
+        newExpenseIds={newExpenseIds}
       />
       
+      {/* Expense Modal */}
+      {showExpenseModal && groupMembers.length > 0 && (
+        <ExpenseModal
+          isOpen={showExpenseModal}
+          onClose={() => {
+            setShowExpenseModal(false)
+            setSelectedExpense(undefined)
+            setPrefilledEventId(null)
+          }}
+          expense={selectedExpense}
+          tripId={tripId}
+          tripName={trip?.name}
+          eventId={prefilledEventId || undefined}
+          groupMembers={groupMembers}
+          events={events}
+          onSave={handleSaveExpense}
+          onDelete={async (expenseId: string) => {
+            setShowExpenseModal(false)
+            setSelectedExpense(undefined)
+            setPrefilledEventId(null)
+            deleteExpenseMutation.mutate(expenseId)
+          }}
+        />
+      )}
+
       {/* Expense Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={!!expenseToDelete}

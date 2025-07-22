@@ -47,7 +47,13 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      return NextResponse.json({ events })
+      const response = NextResponse.json({ events });
+      
+      // Add cache headers for events data
+      response.headers.set('Cache-Control', 'private, max-age=180, stale-while-revalidate=300'); // 3 min cache, 5 min stale
+      response.headers.set('ETag', `events-${context.groupId}-${tripId || dayId || 'all'}-${Date.now()}`);
+      
+      return response;
     })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {

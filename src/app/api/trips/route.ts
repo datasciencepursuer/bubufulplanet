@@ -120,7 +120,13 @@ export async function GET(request: NextRequest) {
         endDate: normalizeDate(trip.endDate)
       }));
 
-      return NextResponse.json({ trips: normalizedTrips });
+      const response = NextResponse.json({ trips: normalizedTrips });
+      
+      // Add cache headers for trip data
+      response.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600'); // 5 min cache, 10 min stale
+      response.headers.set('ETag', `trips-${context.groupId}-${Date.now()}`);
+      
+      return response;
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {

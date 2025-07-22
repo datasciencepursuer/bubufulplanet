@@ -40,7 +40,13 @@ export async function GET() {
       isCurrentUser: member.travelerName === travelerName
     }))
 
-    return NextResponse.json({ members: transformedMembers })
+    const response = NextResponse.json({ members: transformedMembers });
+    
+    // Add cache headers for group members data (longer cache since it changes infrequently)
+    response.headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=1200'); // 10 min cache, 20 min stale
+    response.headers.set('ETag', `members-${groupId}-${Date.now()}`);
+    
+    return response;
 
   } catch (error) {
     console.error('Error in members GET:', error)

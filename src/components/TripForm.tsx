@@ -256,31 +256,40 @@ export default function TripForm({
           </div>
 
           <DialogFooter>
-            <div className="flex justify-between w-full">
-              {/* Left side - Delete button (only in edit mode) */}
-              <div>
-                {isEdit && onDelete && (
+            {/* Button layout with integrated delete icon */}
+            <div className="w-full pt-2">
+              <div className="flex items-center justify-between">
+                {/* Delete icon button - positioned on the left */}
+                {isEdit && onDelete ? (
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className="flex items-center justify-center w-10 h-10 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    title="Delete Trip"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                ) : (
+                  <div className="w-10" />
+                )}
+                
+                {/* Cancel/Save buttons */}
+                <div className="flex gap-3">
                   <Button 
                     type="button" 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={onDelete}
-                    className="gap-2"
+                    variant="outline" 
+                    onClick={onCancel}
+                    className="px-6"
                   >
-                    <Trash2 className="h-4 w-4" />
-                    Delete Trip
+                    Cancel
                   </Button>
-                )}
-              </div>
-              
-              {/* Right side - Cancel and Save buttons */}
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={onCancel}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  {isEdit ? 'Update Trip' : 'Create Trip'}
-                </Button>
+                  <Button 
+                    type="submit"
+                    className="px-6"
+                  >
+                    {isEdit ? 'Update Trip' : 'Create Trip'}
+                  </Button>
+                </div>
               </div>
             </div>
           </DialogFooter>
