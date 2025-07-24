@@ -193,16 +193,55 @@ export async function PUT(
             where: { expenseId: id }
           });
 
+          // Handle external participants - create or find existing ones
+          const participantsToCreate = [];
+          for (const p of data.participants) {
+            if (p.externalName && !p.participantId) {
+              // Find or create external participant
+              let externalParticipant = await tx.externalParticipant.findFirst({
+                where: {
+                  groupId: context.groupId,
+                  name: p.externalName
+                }
+              });
+
+              if (!externalParticipant) {
+                externalParticipant = await tx.externalParticipant.create({
+                  data: {
+                    groupId: context.groupId,
+                    name: p.externalName
+                  }
+                });
+              } else {
+                // Update last used timestamp
+                await tx.externalParticipant.update({
+                  where: { id: externalParticipant.id },
+                  data: { lastUsedAt: new Date() }
+                });
+              }
+
+              participantsToCreate.push({
+                expenseId: id,
+                participantId: p.participantId,
+                externalParticipantId: externalParticipant.id,
+                externalName: p.externalName,
+                splitPercentage: p.splitPercentage,
+                amountOwed: Number(data.amount || expense.amount) * p.splitPercentage / 100
+              });
+            } else {
+              participantsToCreate.push({
+                expenseId: id,
+                participantId: p.participantId,
+                externalName: p.externalName,
+                splitPercentage: p.splitPercentage,
+                amountOwed: Number(data.amount || expense.amount) * p.splitPercentage / 100
+              });
+            }
+          }
+
           // Create new participants
-          const amount = data.amount || expense.amount;
           await tx.expenseParticipant.createMany({
-            data: data.participants.map(p => ({
-              expenseId: id,
-              participantId: p.participantId,
-              externalName: p.externalName,
-              splitPercentage: p.splitPercentage,
-              amountOwed: Number(amount) * p.splitPercentage / 100
-            }))
+            data: participantsToCreate
           });
         }
 

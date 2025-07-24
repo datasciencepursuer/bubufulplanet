@@ -73,6 +73,8 @@ export default function ExpenseModal({
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [participants, setParticipants] = useState<ParticipantEntry[]>([]);
   const [externalName, setExternalName] = useState('');
+  const [externalParticipants, setExternalParticipants] = useState<{id: string, name: string}[]>([]);
+  const [showExternalSuggestions, setShowExternalSuggestions] = useState(false);
   
   // Track initialization to prevent unnecessary resets
   const initializedRef = useRef<string | null>(null);
@@ -212,6 +214,26 @@ export default function ExpenseModal({
       return updated;
     });
   };
+
+  // Fetch external participants for suggestions
+  const fetchExternalParticipants = async () => {
+    try {
+      const response = await fetch('/api/external-participants');
+      if (response.ok) {
+        const data = await response.json();
+        setExternalParticipants(data.externalParticipants || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch external participants:', error);
+    }
+  };
+
+  // Fetch external participants when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchExternalParticipants();
+    }
+  }, [isOpen]);
   
   const handleAddExternal = () => {
     if (!externalName.trim()) return;
@@ -230,6 +252,10 @@ export default function ExpenseModal({
     
     setExternalName('');
     setShowExternalForm(false);
+    setShowExternalSuggestions(false);
+    
+    // Refresh external participants list to include the new one
+    fetchExternalParticipants();
   };
   
   const handleRemoveParticipant = (index: number) => {
@@ -513,13 +539,65 @@ export default function ExpenseModal({
               )}
               
               {showExternalForm && (
-                <div className="flex gap-2 pt-2 border-t">
-                  <Input
-                    value={externalName}
-                    onChange={(e) => setExternalName(e.target.value)}
-                    placeholder="External participant name"
-                    className="flex-1"
-                  />
+                <div className="pt-2 border-t space-y-2">
+                  {/* External participant suggestions */}
+                  {externalParticipants.length > 0 && (
+                    <div>
+                      <Label className="text-sm text-gray-600">Recent external participants:</Label>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {externalParticipants.slice(0, 5).map((participant) => (
+                          <Button
+                            key={participant.id}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="text-xs h-7"
+                            onClick={() => {
+                              setExternalName(participant.name);
+                              setShowExternalSuggestions(false);
+                            }}
+                          >
+                            {participant.name}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Input
+                        value={externalName}
+                        onChange={(e) => {
+                          setExternalName(e.target.value);
+                          setShowExternalSuggestions(e.target.value.length > 0);
+                        }}
+                        placeholder="External participant name"
+                        className="w-full"
+                      />
+                      
+                      {/* Filtered suggestions dropdown */}
+                      {showExternalSuggestions && externalName.trim() && (
+                        <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-32 overflow-y-auto">
+                          {externalParticipants
+                            .filter(p => p.name.toLowerCase().includes(externalName.toLowerCase()))
+                            .slice(0, 5)
+                            .map((participant) => (
+                              <button
+                                key={participant.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
+                                onClick={() => {
+                                  setExternalName(participant.name);
+                                  setShowExternalSuggestions(false);
+                                }}
+                              >
+                                {participant.name}
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
                   <Button
                     type="button"
                     size="sm"
@@ -535,10 +613,12 @@ export default function ExpenseModal({
                     onClick={() => {
                       setShowExternalForm(false);
                       setExternalName('');
+                      setShowExternalSuggestions(false);
                     }}
                   >
                     Cancel
                   </Button>
+                </div>
                 </div>
               )}
             </div>

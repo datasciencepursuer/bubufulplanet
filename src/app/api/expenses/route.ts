@@ -112,6 +112,50 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Handle external participants - create or find existing ones
+      const participantsToCreate = [];
+      for (const p of data.participants) {
+        if (p.externalName && !p.participantId) {
+          // Find or create external participant
+          let externalParticipant = await prisma.externalParticipant.findFirst({
+            where: {
+              groupId: context.groupId,
+              name: p.externalName
+            }
+          });
+
+          if (!externalParticipant) {
+            externalParticipant = await prisma.externalParticipant.create({
+              data: {
+                groupId: context.groupId,
+                name: p.externalName
+              }
+            });
+          } else {
+            // Update last used timestamp
+            await prisma.externalParticipant.update({
+              where: { id: externalParticipant.id },
+              data: { lastUsedAt: new Date() }
+            });
+          }
+
+          participantsToCreate.push({
+            participantId: p.participantId,
+            externalParticipantId: externalParticipant.id,
+            externalName: p.externalName,
+            splitPercentage: p.splitPercentage,
+            amountOwed: (data.amount * p.splitPercentage / 100)
+          });
+        } else {
+          participantsToCreate.push({
+            participantId: p.participantId,
+            externalName: p.externalName,
+            splitPercentage: p.splitPercentage,
+            amountOwed: (data.amount * p.splitPercentage / 100)
+          });
+        }
+      }
+
       // Create the expense with participants
       const expense = await prisma.expense.create({
         data: {
@@ -124,19 +168,15 @@ export async function POST(request: NextRequest) {
           eventId: data.eventId,
           groupId: context.groupId,
           participants: {
-            create: data.participants.map(p => ({
-              participantId: p.participantId,
-              externalName: p.externalName,
-              splitPercentage: p.splitPercentage,
-              amountOwed: (data.amount * p.splitPercentage / 100)
-            }))
+            create: participantsToCreate
           }
         },
         include: {
           owner: true,
           participants: {
             include: {
-              participant: true
+              participant: true,
+              externalParticipant: true
             }
           },
           trip: true,
@@ -180,7 +220,8 @@ export async function GET(request: NextRequest) {
           owner: true,
           participants: {
             include: {
-              participant: true
+              participant: true,
+              externalParticipant: true
             }
           },
           trip: true,

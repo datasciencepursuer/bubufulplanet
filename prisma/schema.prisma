@@ -115,10 +115,11 @@ model TravelGroup {
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy        String?           @map("created_by") @db.Uuid
-  groupMembers     GroupMember[]
-  pointsOfInterest PointOfInterest[]
-  createdByMember  GroupMember?      @relation("GroupCreator", fields: [createdBy], references: [id])
-  trips            Trip[]
+  groupMembers        GroupMember[]
+  pointsOfInterest    PointOfInterest[]
+  externalParticipants ExternalParticipant[]
+  createdByMember     GroupMember?      @relation("GroupCreator", fields: [createdBy], references: [id])
+  trips               Trip[]
 
   @@index([accessCode], map: "idx_travel_groups_access_code")
   @@map("travel_groups")
@@ -214,20 +215,40 @@ model PointOfInterest {
 }
 
 model ExpenseParticipant {
-  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  expenseId       String      @map("expense_id") @db.Uuid
-  participantId   String?     @map("participant_id") @db.Uuid
-  externalName    String?     @map("external_name") @db.VarChar(255)
-  splitPercentage Decimal     @map("split_percentage") @db.Decimal(5, 2) @default(0)
-  amountOwed      Decimal     @map("amount_owed") @db.Decimal(10, 2)
-  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expenseId              String               @map("expense_id") @db.Uuid
+  participantId          String?              @map("participant_id") @db.Uuid
+  externalParticipantId  String?              @map("external_participant_id") @db.Uuid
+  externalName           String?              @map("external_name") @db.VarChar(255)
+  splitPercentage        Decimal              @map("split_percentage") @db.Decimal(5, 2) @default(0)
+  amountOwed             Decimal              @map("amount_owed") @db.Decimal(10, 2)
+  createdAt              DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   
-  expense     Expense      @relation(fields: [expenseId], references: [id], onDelete: Cascade)
-  participant GroupMember? @relation(fields: [participantId], references: [id])
+  expense             Expense               @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  participant         GroupMember?          @relation(fields: [participantId], references: [id])
+  externalParticipant ExternalParticipant?  @relation(fields: [externalParticipantId], references: [id], onDelete: SetNull)
   
   @@unique([expenseId, participantId])
   @@unique([expenseId, externalName])
   @@index([expenseId], map: "idx_expense_participants_expense_id")
   @@index([participantId], map: "idx_expense_participants_participant_id")
+  @@index([externalParticipantId], map: "idx_expense_participants_external_participant_id")
   @@map("expense_participants")
+}
+
+model ExternalParticipant {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId       String   @map("group_id") @db.Uuid
+  name          String   @db.VarChar(255)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt    DateTime @default(now()) @map("last_used_at") @db.Timestamptz(6)
+
+  group         TravelGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  expenseParticipations ExpenseParticipant[]
+
+  @@unique([groupId, name])
+  @@index([groupId], map: "idx_external_participants_group_id")
+  @@index([name], map: "idx_external_participants_name") 
+  @@index([lastUsedAt], map: "idx_external_participants_last_used")
+  @@map("external_participants")
 }
