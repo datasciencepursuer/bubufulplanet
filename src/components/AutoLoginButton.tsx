@@ -84,9 +84,9 @@ export function AutoLoginButton({ className = '', showDivider = false }: AutoLog
         )}
       </button>
       
-      <div className="text-center text-sm text-gray-600">
+      <div className="text-center text-sm text-white">
         <div className="font-medium">{mostRecentSession.groupName}</div>
-        <div className="text-xs">
+        <div className="text-xs text-white/80">
           Last accessed: {new Date(mostRecentSession.lastLogin).toLocaleDateString()}
         </div>
       </div>

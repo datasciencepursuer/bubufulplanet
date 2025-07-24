@@ -175,10 +175,6 @@ export default function Home() {
                   <div className="relative w-full h-full rounded-full overflow-hidden shadow-2xl">
                     <div className="absolute inset-0 bg-gradient-to-br from-teal-400 via-cyan-500 to-teal-600 animate-slow-spin"></div>
                     
-                    {/* Continent patterns */}
-                    <div className="absolute top-1/4 left-1/3 w-16 h-12 bg-teal-700/60 rounded-full blur-sm"></div>
-                    <div className="absolute bottom-1/3 right-1/4 w-20 h-16 bg-cyan-700/60 rounded-full blur-sm"></div>
-                    <div className="absolute top-1/2 left-1/6 w-12 h-8 bg-teal-800/60 rounded-full blur-sm"></div>
                     
                     {/* Cloud layers */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-drift"></div>
@@ -189,7 +185,7 @@ export default function Home() {
                   </div>
                   
                   {/* Orbiting ring */}
-                  <div className="absolute inset-0 rounded-full border border-teal-300/40 animate-orbit" style={{transform: 'rotateX(75deg)'}}></div>
+                  <div className="absolute inset-0 rounded-full border-4 border-teal-800/90 animate-orbit shadow-lg" style={{transform: 'rotateX(75deg)'}}></div>
                 </div>
               </div>
               
@@ -199,7 +195,7 @@ export default function Home() {
                   Bubuful Planet
                 </h1>
                 <p className="text-lg lg:text-xl text-teal-100 font-light leading-relaxed">
-                  Explore the universe together • Plan your adventures across the cosmos
+                  Plan it beautifully
                 </p>
               </div>
             </div>
