@@ -15,7 +15,19 @@ const updateExpenseSchema = z.object({
     participantId: z.string().uuid().optional(),
     externalName: z.string().max(255).optional(),
     splitPercentage: z.number().min(0).max(100)
-  })).min(1).optional()
+  })).min(1).optional(),
+  lineItems: z.array(z.object({
+    id: z.string().uuid().optional(), // For updates
+    description: z.string().min(1).max(255),
+    amount: z.number().positive(),
+    quantity: z.number().int().positive().default(1),
+    category: z.string().max(100).optional(),
+    participants: z.array(z.object({
+      participantId: z.string().uuid().optional(),
+      externalName: z.string().max(255).optional(),
+      splitPercentage: z.number().min(0).max(100)
+    })).min(1)
+  })).optional()
 });
 
 export async function GET(
@@ -34,7 +46,18 @@ export async function GET(
           owner: true,
           participants: {
             include: {
-              participant: true
+              participant: true,
+              externalParticipant: true
+            }
+          },
+          lineItems: {
+            include: {
+              participants: {
+                include: {
+                  participant: true,
+                  externalParticipant: true
+                }
+              }
             }
           },
           trip: true,
@@ -119,8 +142,8 @@ export async function PUT(
         }
       }
 
-      // Verify participants if provided
-      if (data.participants) {
+      // Verify participants if provided (expense-level splitting)
+      if (data.participants && !data.lineItems) {
         // Verify all participant IDs belong to the group
         const participantIds = data.participants
           .filter(p => p.participantId)
@@ -149,6 +172,41 @@ export async function PUT(
             { error: 'Split percentages must sum to 100%' },
             { status: 400 }
           );
+        }
+      }
+
+      // Verify line items and their participants if provided
+      if (data.lineItems) {
+        for (const lineItem of data.lineItems) {
+          // Verify all participant IDs belong to the group
+          const participantIds = lineItem.participants
+            .filter(p => p.participantId)
+            .map(p => p.participantId!);
+
+          if (participantIds.length > 0) {
+            const validParticipants = await prisma.groupMember.findMany({
+              where: {
+                id: { in: participantIds },
+                groupId: context.groupId
+              }
+            });
+
+            if (validParticipants.length !== participantIds.length) {
+              return NextResponse.json(
+                { error: `All participants in line item "${lineItem.description}" must be members of the group` },
+                { status: 400 }
+              );
+            }
+          }
+
+          // Verify percentages sum to 100
+          const totalPercentage = lineItem.participants.reduce((sum, p) => sum + p.splitPercentage, 0);
+          if (Math.abs(totalPercentage - 100) > 0.01) {
+            return NextResponse.json(
+              { error: `Line item "${lineItem.description}" split percentages must sum to 100%` },
+              { status: 400 }
+            );
+          }
         }
       }
 
@@ -186,8 +244,35 @@ export async function PUT(
           }
         });
 
-        // Update participants if provided
-        if (data.participants) {
+        // Helper function to handle external participants
+        const handleExternalParticipant = async (name: string) => {
+          let externalParticipant = await tx.externalParticipant.findFirst({
+            where: {
+              groupId: context.groupId,
+              name: name
+            }
+          });
+
+          if (!externalParticipant) {
+            externalParticipant = await tx.externalParticipant.create({
+              data: {
+                groupId: context.groupId,
+                name: name
+              }
+            });
+          } else {
+            // Update last used timestamp
+            await tx.externalParticipant.update({
+              where: { id: externalParticipant.id },
+              data: { lastUsedAt: new Date() }
+            });
+          }
+
+          return externalParticipant;
+        };
+
+        // Update participants if provided (expense-level splitting)
+        if (data.participants && !data.lineItems) {
           // Delete existing participants
           await tx.expenseParticipant.deleteMany({
             where: { expenseId: id }
@@ -197,29 +282,7 @@ export async function PUT(
           const participantsToCreate = [];
           for (const p of data.participants) {
             if (p.externalName && !p.participantId) {
-              // Find or create external participant
-              let externalParticipant = await tx.externalParticipant.findFirst({
-                where: {
-                  groupId: context.groupId,
-                  name: p.externalName
-                }
-              });
-
-              if (!externalParticipant) {
-                externalParticipant = await tx.externalParticipant.create({
-                  data: {
-                    groupId: context.groupId,
-                    name: p.externalName
-                  }
-                });
-              } else {
-                // Update last used timestamp
-                await tx.externalParticipant.update({
-                  where: { id: externalParticipant.id },
-                  data: { lastUsedAt: new Date() }
-                });
-              }
-
+              const externalParticipant = await handleExternalParticipant(p.externalName);
               participantsToCreate.push({
                 expenseId: id,
                 participantId: p.participantId,
@@ -245,6 +308,54 @@ export async function PUT(
           });
         }
 
+        // Update line items if provided
+        if (data.lineItems) {
+          // Delete existing participants and line items
+          await tx.expenseParticipant.deleteMany({
+            where: { expenseId: id }
+          });
+          await tx.expenseLineItem.deleteMany({
+            where: { expenseId: id }
+          });
+
+          // Create new line items
+          for (const lineItem of data.lineItems) {
+            const lineItemParticipants = [];
+            for (const p of lineItem.participants) {
+              if (p.externalName && !p.participantId) {
+                const externalParticipant = await handleExternalParticipant(p.externalName);
+                lineItemParticipants.push({
+                  participantId: p.participantId,
+                  externalParticipantId: externalParticipant.id,
+                  externalName: p.externalName,
+                  splitPercentage: p.splitPercentage,
+                  amountOwed: (lineItem.amount * lineItem.quantity * p.splitPercentage / 100)
+                });
+              } else {
+                lineItemParticipants.push({
+                  participantId: p.participantId,
+                  externalName: p.externalName,
+                  splitPercentage: p.splitPercentage,
+                  amountOwed: (lineItem.amount * lineItem.quantity * p.splitPercentage / 100)
+                });
+              }
+            }
+            
+            await tx.expenseLineItem.create({
+              data: {
+                expenseId: id,
+                description: lineItem.description,
+                amount: lineItem.amount,
+                quantity: lineItem.quantity || 1,
+                category: lineItem.category,
+                participants: {
+                  create: lineItemParticipants
+                }
+              }
+            });
+          }
+        }
+
         // Fetch and return the updated expense with relations
         return await tx.expense.findUnique({
           where: { id: id },
@@ -252,7 +363,18 @@ export async function PUT(
             owner: true,
             participants: {
               include: {
-                participant: true
+                participant: true,
+                externalParticipant: true
+              }
+            },
+            lineItems: {
+              include: {
+                participants: {
+                  include: {
+                    participant: true,
+                    externalParticipant: true
+                  }
+                }
               }
             },
             trip: true,

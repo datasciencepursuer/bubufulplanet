@@ -85,6 +85,7 @@ model Expense {
   trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
   owner       GroupMember @relation("ExpenseOwner", fields: [ownerId], references: [id])
   participants ExpenseParticipant[]
+  lineItems   ExpenseLineItem[]
 
   @@index([dayId], map: "idx_expenses_day_id")
   @@index([eventId], map: "idx_expenses_event_id")
@@ -137,6 +138,7 @@ model GroupMember {
   createdGroups TravelGroup[] @relation("GroupCreator")
   ownedExpenses Expense[]     @relation("ExpenseOwner")
   expenseParticipations ExpenseParticipant[]
+  lineItemParticipations LineItemParticipant[]
 
   @@unique([groupId, travelerName], name: "unique_group_traveler")
   @@index([groupId], map: "idx_group_members_group_id")
@@ -245,10 +247,49 @@ model ExternalParticipant {
 
   group         TravelGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   expenseParticipations ExpenseParticipant[]
+  lineItemParticipations LineItemParticipant[]
 
   @@unique([groupId, name])
   @@index([groupId], map: "idx_external_participants_group_id")
   @@index([name], map: "idx_external_participants_name") 
   @@index([lastUsedAt], map: "idx_external_participants_last_used")
   @@map("external_participants")
+}
+
+model ExpenseLineItem {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expenseId   String   @map("expense_id") @db.Uuid
+  description String   @db.VarChar(255)
+  amount      Decimal  @db.Decimal(10, 2)
+  quantity    Int      @default(1)
+  category    String?  @db.VarChar(100)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  participants LineItemParticipant[]
+
+  @@index([expenseId], map: "idx_expense_line_items_expense_id")
+  @@map("expense_line_items")
+}
+
+model LineItemParticipant {
+  id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lineItemId             String               @map("line_item_id") @db.Uuid
+  participantId          String?              @map("participant_id") @db.Uuid
+  externalParticipantId  String?              @map("external_participant_id") @db.Uuid
+  externalName           String?              @map("external_name") @db.VarChar(255)
+  splitPercentage        Decimal              @map("split_percentage") @db.Decimal(5, 2) @default(0)
+  amountOwed             Decimal              @map("amount_owed") @db.Decimal(10, 2)
+  createdAt              DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  lineItem            ExpenseLineItem       @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
+  participant         GroupMember?          @relation(fields: [participantId], references: [id])
+  externalParticipant ExternalParticipant?  @relation(fields: [externalParticipantId], references: [id], onDelete: SetNull)
+  
+  @@unique([lineItemId, participantId])
+  @@unique([lineItemId, externalName])
+  @@index([lineItemId], map: "idx_line_item_participants_line_item_id")
+  @@index([participantId], map: "idx_line_item_participants_participant_id")
+  @@index([externalParticipantId], map: "idx_line_item_participants_external_participant_id")
+  @@map("line_item_participants")
 }

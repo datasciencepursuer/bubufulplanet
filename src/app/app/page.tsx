@@ -285,8 +285,9 @@ export default function AppPage() {
       {/* App Header */}
       <header className="bg-white border-b sticky top-0 z-40">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2 lg:gap-4 min-w-0 flex-1">
+          <div className="grid grid-cols-3 items-center h-16">
+            {/* Left Section */}
+            <div className="flex items-center gap-2 lg:gap-4 min-w-0">
               <Button 
                 variant="ghost" 
                 size="sm"
@@ -296,7 +297,7 @@ export default function AppPage() {
                 <ArrowLeft className="w-4 h-4" /> 
                 <span className="hidden sm:inline">Back</span>
               </Button>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0">
                 <h1 className="text-base lg:text-lg font-semibold truncate">
                   {groupInfo ? groupInfo.name : 'My Trips'}
                 </h1>
@@ -325,17 +326,18 @@ export default function AppPage() {
               </div>
             </div>
             
-            {/* Center Brand - Hide on small screens */}
-            <div className="hidden lg:flex flex-col items-center justify-center">
-              <h2 className="text-xl font-bold bg-gradient-to-r from-teal-800 to-teal-600 bg-clip-text text-transparent">
+            {/* Center Brand */}
+            <div className="flex flex-col items-center justify-center">
+              <h2 className="text-lg lg:text-xl font-bold bg-gradient-to-r from-teal-800 to-teal-600 bg-clip-text text-transparent">
                 Bubuful Planet
               </h2>
-              <p className="text-xs text-gray-500 italic">
+              <p className="text-xs text-gray-500 italic hidden sm:block">
                 Plan it beautifully
               </p>
             </div>
             
-            <div className="flex items-center gap-1 lg:gap-4">
+            {/* Right Section */}
+            <div className="flex items-center gap-1 lg:gap-4 justify-end">
               <Button 
                 variant="outline" 
                 size="sm"
@@ -406,7 +408,7 @@ export default function AppPage() {
             </div>
             
             {/* Desktop Trip Management */}
-            <div className="hidden lg:block">
+            <div className="hidden lg:block space-y-4">
               {/* Next Trip Card - Moved from utility cards */}
               <AllTripsView 
                 trips={trips} 

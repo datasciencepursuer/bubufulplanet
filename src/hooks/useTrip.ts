@@ -165,14 +165,14 @@ export function useCreateExpense(tripId: string) {
         groupId: '', // Will be filled by server response
         dayId: newExpense.dayId || undefined,
         eventId: newExpense.eventId || undefined,
-        participants: newExpense.participants.map(p => ({
+        participants: newExpense.participants?.map(p => ({
           id: `temp-participant-${Math.random().toString(36).substr(2, 9)}`,
           expenseId: tempId,
           participantId: p.participantId || undefined,
           externalName: p.externalName || undefined,
           splitPercentage: p.splitPercentage,
           amountOwed: 0 // Temporary value for optimistic update
-        })),
+        })) || [],
         owner: {
           id: newExpense.ownerId,
           travelerName: 'Loading...' // Will be filled by server response

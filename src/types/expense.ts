@@ -9,6 +9,38 @@ export interface ExpenseParticipant {
     id: string;
     travelerName: string;
   };
+  externalParticipant?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface LineItemParticipant {
+  id: string;
+  lineItemId: string;
+  participantId?: string;
+  externalName?: string;
+  splitPercentage: number;
+  amountOwed: number;
+  participant?: {
+    id: string;
+    travelerName: string;
+  };
+  externalParticipant?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface ExpenseLineItem {
+  id: string;
+  expenseId: string;
+  description: string;
+  amount: number;
+  quantity: number;
+  category?: string;
+  createdAt: string;
+  participants: LineItemParticipant[];
 }
 
 export interface Expense {
@@ -27,6 +59,7 @@ export interface Expense {
     travelerName: string;
   };
   participants: ExpenseParticipant[];
+  lineItems?: ExpenseLineItem[];
   trip?: {
     id: string;
     name: string;
@@ -53,10 +86,21 @@ export interface CreateExpenseRequest {
   tripId: string;
   dayId?: string;
   eventId?: string;
-  participants: {
+  participants?: {
     participantId?: string;
     externalName?: string;
     splitPercentage: number;
+  }[];
+  lineItems?: {
+    description: string;
+    amount: number;
+    quantity?: number;
+    category?: string;
+    participants: {
+      participantId?: string;
+      externalName?: string;
+      splitPercentage: number;
+    }[];
   }[];
 }
 
@@ -71,6 +115,18 @@ export interface UpdateExpenseRequest {
     participantId?: string;
     externalName?: string;
     splitPercentage: number;
+  }[];
+  lineItems?: {
+    id?: string;
+    description: string;
+    amount: number;
+    quantity?: number;
+    category?: string;
+    participants: {
+      participantId?: string;
+      externalName?: string;
+      splitPercentage: number;
+    }[];
   }[];
 }
 

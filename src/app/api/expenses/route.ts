@@ -16,7 +16,18 @@ const createExpenseSchema = z.object({
     participantId: z.string().uuid().optional(),
     externalName: z.string().max(255).optional(),
     splitPercentage: z.number().min(0).max(100)
-  })).min(1)
+  })).min(1).optional(),
+  lineItems: z.array(z.object({
+    description: z.string().min(1).max(255),
+    amount: z.number().positive(),
+    quantity: z.number().int().positive().default(1),
+    category: z.string().max(100).optional(),
+    participants: z.array(z.object({
+      participantId: z.string().uuid().optional(),
+      externalName: z.string().max(255).optional(),
+      splitPercentage: z.number().min(0).max(100)
+    })).min(1)
+  })).optional()
 });
 
 export async function POST(request: NextRequest) {
@@ -67,8 +78,10 @@ export async function POST(request: NextRequest) {
 
       // Verify all participant IDs belong to the group
       const participantIds = data.participants
-        .filter(p => p.participantId)
-        .map(p => p.participantId!);
+        ? data.participants
+            .filter(p => p.participantId)
+            .map(p => p.participantId!)
+        : [];
 
       if (participantIds.length > 0) {
         const validParticipants = await prisma.groupMember.findMany({
@@ -86,13 +99,28 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Verify percentages sum to 100
-      const totalPercentage = data.participants.reduce((sum, p) => sum + p.splitPercentage, 0);
-      if (Math.abs(totalPercentage - 100) > 0.01) {
-        return NextResponse.json(
-          { error: 'Split percentages must sum to 100%' },
-          { status: 400 }
-        );
+      // Verify percentages sum to 100 for participants (if using participant-level splitting)
+      if (data.participants && !data.lineItems) {
+        const totalPercentage = data.participants.reduce((sum, p) => sum + p.splitPercentage, 0);
+        if (Math.abs(totalPercentage - 100) > 0.01) {
+          return NextResponse.json(
+            { error: 'Split percentages must sum to 100%' },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Verify line item percentages sum to 100
+      if (data.lineItems) {
+        for (const lineItem of data.lineItems) {
+          const totalPercentage = lineItem.participants.reduce((sum, p) => sum + p.splitPercentage, 0);
+          if (Math.abs(totalPercentage - 100) > 0.01) {
+            return NextResponse.json(
+              { error: `Line item "${lineItem.description}" split percentages must sum to 100%` },
+              { status: 400 }
+            );
+          }
+        }
       }
 
       // Verify dayId if provided
@@ -112,51 +140,58 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Handle external participants - create or find existing ones
-      const participantsToCreate = [];
-      for (const p of data.participants) {
-        if (p.externalName && !p.participantId) {
-          // Find or create external participant
-          let externalParticipant = await prisma.externalParticipant.findFirst({
-            where: {
+      // Helper function to handle external participants
+      const handleExternalParticipant = async (name: string) => {
+        let externalParticipant = await prisma.externalParticipant.findFirst({
+          where: {
+            groupId: context.groupId,
+            name: name
+          }
+        });
+
+        if (!externalParticipant) {
+          externalParticipant = await prisma.externalParticipant.create({
+            data: {
               groupId: context.groupId,
-              name: p.externalName
+              name: name
             }
           });
+        } else {
+          // Update last used timestamp
+          await prisma.externalParticipant.update({
+            where: { id: externalParticipant.id },
+            data: { lastUsedAt: new Date() }
+          });
+        }
 
-          if (!externalParticipant) {
-            externalParticipant = await prisma.externalParticipant.create({
-              data: {
-                groupId: context.groupId,
-                name: p.externalName
-              }
+        return externalParticipant;
+      };
+
+      // Handle external participants for expense-level splitting
+      const participantsToCreate = [];
+      if (data.participants && !data.lineItems) {
+        for (const p of data.participants) {
+          if (p.externalName && !p.participantId) {
+            const externalParticipant = await handleExternalParticipant(p.externalName);
+            participantsToCreate.push({
+              participantId: p.participantId,
+              externalParticipantId: externalParticipant.id,
+              externalName: p.externalName,
+              splitPercentage: p.splitPercentage,
+              amountOwed: (data.amount * p.splitPercentage / 100)
             });
           } else {
-            // Update last used timestamp
-            await prisma.externalParticipant.update({
-              where: { id: externalParticipant.id },
-              data: { lastUsedAt: new Date() }
+            participantsToCreate.push({
+              participantId: p.participantId,
+              externalName: p.externalName,
+              splitPercentage: p.splitPercentage,
+              amountOwed: (data.amount * p.splitPercentage / 100)
             });
           }
-
-          participantsToCreate.push({
-            participantId: p.participantId,
-            externalParticipantId: externalParticipant.id,
-            externalName: p.externalName,
-            splitPercentage: p.splitPercentage,
-            amountOwed: (data.amount * p.splitPercentage / 100)
-          });
-        } else {
-          participantsToCreate.push({
-            participantId: p.participantId,
-            externalName: p.externalName,
-            splitPercentage: p.splitPercentage,
-            amountOwed: (data.amount * p.splitPercentage / 100)
-          });
         }
       }
 
-      // Create the expense with participants
+      // Create the expense with participants or line items
       const expense = await prisma.expense.create({
         data: {
           description: data.description,
@@ -167,9 +202,43 @@ export async function POST(request: NextRequest) {
           dayId: data.dayId,
           eventId: data.eventId,
           groupId: context.groupId,
-          participants: {
+          participants: data.participants && !data.lineItems ? {
             create: participantsToCreate
-          }
+          } : undefined,
+          lineItems: data.lineItems ? {
+            create: await Promise.all(data.lineItems.map(async (lineItem) => {
+              const lineItemParticipants = [];
+              for (const p of lineItem.participants) {
+                if (p.externalName && !p.participantId) {
+                  const externalParticipant = await handleExternalParticipant(p.externalName);
+                  lineItemParticipants.push({
+                    participantId: p.participantId,
+                    externalParticipantId: externalParticipant.id,
+                    externalName: p.externalName,
+                    splitPercentage: p.splitPercentage,
+                    amountOwed: (lineItem.amount * lineItem.quantity * p.splitPercentage / 100)
+                  });
+                } else {
+                  lineItemParticipants.push({
+                    participantId: p.participantId,
+                    externalName: p.externalName,
+                    splitPercentage: p.splitPercentage,
+                    amountOwed: (lineItem.amount * lineItem.quantity * p.splitPercentage / 100)
+                  });
+                }
+              }
+              
+              return {
+                description: lineItem.description,
+                amount: lineItem.amount,
+                quantity: lineItem.quantity || 1,
+                category: lineItem.category,
+                participants: {
+                  create: lineItemParticipants
+                }
+              };
+            }))
+          } : undefined
         },
         include: {
           owner: true,
@@ -177,6 +246,16 @@ export async function POST(request: NextRequest) {
             include: {
               participant: true,
               externalParticipant: true
+            }
+          },
+          lineItems: {
+            include: {
+              participants: {
+                include: {
+                  participant: true,
+                  externalParticipant: true
+                }
+              }
             }
           },
           trip: true,
@@ -222,6 +301,16 @@ export async function GET(request: NextRequest) {
             include: {
               participant: true,
               externalParticipant: true
+            }
+          },
+          lineItems: {
+            include: {
+              participants: {
+                include: {
+                  participant: true,
+                  externalParticipant: true
+                }
+              }
             }
           },
           trip: true,

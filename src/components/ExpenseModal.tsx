@@ -35,6 +35,15 @@ interface ParticipantEntry {
   isSelected: boolean;
 }
 
+interface LineItemEntry {
+  id?: string;
+  description: string;
+  amount: string;
+  quantity: number;
+  category?: string;
+  participants: ParticipantEntry[];
+}
+
 const EXPENSE_CATEGORIES = [
   'Food & Dining',
   'Transportation',
@@ -62,7 +71,8 @@ export default function ExpenseModal({
   const { error } = useNotify();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExternalForm, setShowExternalForm] = useState(false);
-  const [splitMode, setSplitMode] = useState<'even' | 'custom'>('even');
+  const [splitMode, setSplitMode] = useState<'itemized' | 'participants'>('participants');
+  const [customSplitFocusIndex, setCustomSplitFocusIndex] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   // Form fields
@@ -72,12 +82,43 @@ export default function ExpenseModal({
   const [ownerId, setOwnerId] = useState('');
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [participants, setParticipants] = useState<ParticipantEntry[]>([]);
+  const [lineItems, setLineItems] = useState<LineItemEntry[]>([]);
   const [externalName, setExternalName] = useState('');
   const [externalParticipants, setExternalParticipants] = useState<{id: string, name: string}[]>([]);
   const [showExternalSuggestions, setShowExternalSuggestions] = useState(false);
   
   // Track initialization to prevent unnecessary resets
   const initializedRef = useRef<string | null>(null);
+  
+  // Helper function to format number to 2 decimal places
+  const formatToTwoDecimals = (value: string): string => {
+    // Allow empty string
+    if (value === '') return '';
+    
+    // Remove any non-numeric characters except decimal point
+    const numericValue = value.replace(/[^0-9.]/g, '');
+    
+    // Handle leading decimal point
+    if (numericValue.startsWith('.')) {
+      return '0' + numericValue.substring(0, 3); // '0.' + up to 2 digits
+    }
+    
+    // Split by decimal point
+    const parts = numericValue.split('.');
+    
+    // If there's more than one decimal point, keep only the first one
+    if (parts.length > 2) {
+      return parts[0] + '.' + parts.slice(1).join('').substring(0, 2);
+    }
+    
+    // If there's a decimal part, limit it to 2 digits
+    if (parts.length === 2) {
+      return parts[0] + '.' + parts[1].substring(0, 2);
+    }
+    
+    // Return the numeric value as is
+    return numericValue;
+  };
   
   
   // Initialize form when modal opens or expense changes
@@ -104,42 +145,83 @@ export default function ExpenseModal({
       setOwnerId(expense.ownerId);
       setSelectedEventId(expense.eventId || '');
       
-      // Set up participants
-      const participantEntries: ParticipantEntry[] = [];
-      
-      // Add existing participants
-      expense.participants.forEach(p => {
-        participantEntries.push({
-          participantId: p.participantId,
-          externalName: p.externalName,
-          splitPercentage: Number(p.splitPercentage),
-          isSelected: true
-        });
-      });
-      
-      // Add unselected group members
-      groupMembers.forEach(member => {
-        const isAlreadyParticipant = expense.participants.some(
-          p => p.participantId === member.id
-        );
-        if (!isAlreadyParticipant) {
-          participantEntries.push({
-            participantId: member.id,
-            splitPercentage: 0,
-            isSelected: false
+      if (expense.lineItems && expense.lineItems.length > 0) {
+        // Load line items mode
+        setSplitMode('itemized');
+        
+        const lineItemEntries: LineItemEntry[] = expense.lineItems.map(lineItem => {
+          const participantEntries: ParticipantEntry[] = [];
+          
+          // Add existing line item participants
+          lineItem.participants.forEach(p => {
+            participantEntries.push({
+              participantId: p.participantId,
+              externalName: p.externalName,
+              splitPercentage: Number(p.splitPercentage),
+              isSelected: true
+            });
           });
-        }
-      });
-      
-      setParticipants(participantEntries);
-      
-      // Determine split mode
-      const selectedParticipants = participantEntries.filter(p => p.isSelected);
-      const equalSplit = selectedParticipants.length > 0 ? 100 / selectedParticipants.length : 0;
-      const isEven = selectedParticipants.every(p => 
-        Math.abs(Number(p.splitPercentage) - equalSplit) < 0.01
-      );
-      setSplitMode(isEven ? 'even' : 'custom');
+          
+          // Add unselected group members
+          groupMembers.forEach(member => {
+            const isAlreadyParticipant = lineItem.participants.some(
+              p => p.participantId === member.id
+            );
+            if (!isAlreadyParticipant) {
+              participantEntries.push({
+                participantId: member.id,
+                splitPercentage: 0,
+                isSelected: false
+              });
+            }
+          });
+          
+          return {
+            id: lineItem.id,
+            description: lineItem.description,
+            amount: lineItem.amount.toString(),
+            quantity: lineItem.quantity,
+            category: lineItem.category || '',
+            participants: participantEntries
+          };
+        });
+        
+        setLineItems(lineItemEntries);
+        setParticipants([]);
+      } else {
+        // Load participants mode
+        setSplitMode('participants');
+        
+        // Set up participants
+        const participantEntries: ParticipantEntry[] = [];
+        
+        // Add existing participants
+        expense.participants.forEach(p => {
+          participantEntries.push({
+            participantId: p.participantId,
+            externalName: p.externalName,
+            splitPercentage: Number(p.splitPercentage),
+            isSelected: true
+          });
+        });
+        
+        // Add unselected group members
+        groupMembers.forEach(member => {
+          const isAlreadyParticipant = expense.participants.some(
+            p => p.participantId === member.id
+          );
+          if (!isAlreadyParticipant) {
+            participantEntries.push({
+              participantId: member.id,
+              splitPercentage: 0,
+              isSelected: false
+            });
+          }
+        });
+        
+        setParticipants(participantEntries);
+        setLineItems([]);
+      }
     } else {
       // Creating new expense
       setDescription('');
@@ -156,7 +238,8 @@ export default function ExpenseModal({
         isSelected: true
       }));
       setParticipants(participantEntries);
-      setSplitMode('even');
+      setLineItems([]);
+      setSplitMode('participants');
     }
   }, [isOpen, expense, groupMembers.length]);
   
@@ -204,15 +287,69 @@ export default function ExpenseModal({
       
       return updated;
     });
+    
+    // Update custom split focus if needed
+    if (splitMode === 'itemized') {
+      setCustomSplitFocusIndex(prev => {
+        const newSelected = participants.map((p, i) => {
+          if (i === index) return !p.isSelected;
+          return p.isSelected;
+        });
+        
+        const selectedIndices = newSelected
+          .map((isSelected, i) => isSelected ? i : -1)
+          .filter(i => i !== -1);
+        
+        // If the currently focused participant was deselected, focus on first selected
+        if (prev !== null && prev === index && !newSelected[index]) {
+          return selectedIndices.length > 0 ? selectedIndices[0] : null;
+        }
+        
+        // If no focus set and we have selected participants, focus on first selected  
+        if (prev === null && selectedIndices.length > 0) {
+          return selectedIndices[0];
+        }
+        
+        return prev;
+      });
+    }
   };
   
   const handleSplitPercentageChange = (index: number, value: string) => {
     const percentage = parseFloat(value) || 0;
+    
     setParticipants(prev => {
       const updated = [...prev];
-      updated[index].splitPercentage = percentage;
+      const selectedParticipants = updated.filter(p => p.isSelected);
+      
+      if (selectedParticipants.length <= 1) {
+        // If only one participant, they get 100%
+        updated[index].splitPercentage = 100;
+        return updated;
+      }
+      
+      // Set the focus participant's percentage
+      updated[index].splitPercentage = Math.min(100, Math.max(0, percentage));
+      
+      // Calculate remaining percentage for other selected participants
+      const remainingPercentage = 100 - updated[index].splitPercentage;
+      const otherSelectedCount = selectedParticipants.length - 1;
+      const evenSplitForOthers = otherSelectedCount > 0 ? remainingPercentage / otherSelectedCount : 0;
+      
+      // Distribute remaining percentage evenly among other selected participants
+      updated.forEach((p, i) => {
+        if (i !== index && p.isSelected) {
+          p.splitPercentage = evenSplitForOthers;
+        }
+      });
+      
       return updated;
     });
+  };
+
+  // Function to set which participant has the editable percentage input
+  const handleSetCustomFocus = (index: number) => {
+    setCustomSplitFocusIndex(index);
   };
 
   // Fetch external participants for suggestions
@@ -238,28 +375,73 @@ export default function ExpenseModal({
   const handleAddExternal = () => {
     if (!externalName.trim()) return;
     
-    const selectedCount = participants.filter(p => p.isSelected).length;
-    const evenSplit = calculateEvenSplit(selectedCount + 1);
-    
-    setParticipants(prev => [
-      ...prev,
-      {
-        externalName: externalName.trim(),
-        splitPercentage: evenSplit,
-        isSelected: true
-      }
-    ]);
+    setParticipants(prev => {
+      // Add the new external participant
+      const updated = [
+        ...prev,
+        {
+          externalName: externalName.trim(),
+          splitPercentage: 0, // Will be recalculated below
+          isSelected: true
+        }
+      ];
+      
+      // Recalculate percentages for all selected participants (including the new one)
+      const selectedParticipants = updated.filter(p => p.isSelected);
+      const evenSplit = selectedParticipants.length > 0 ? 100 / selectedParticipants.length : 0;
+      
+      // Apply the even split to all selected participants
+      return updated.map(p => ({
+        ...p,
+        splitPercentage: p.isSelected ? evenSplit : 0
+      }));
+    });
     
     setExternalName('');
     setShowExternalForm(false);
     setShowExternalSuggestions(false);
+    
+    // If in custom mode and no focus is set, focus on the new participant
+    if (splitMode === 'itemized' && customSplitFocusIndex === null) {
+      setCustomSplitFocusIndex(participants.length); // Index of the newly added participant
+    }
     
     // Refresh external participants list to include the new one
     fetchExternalParticipants();
   };
   
   const handleRemoveParticipant = (index: number) => {
-    setParticipants(prev => prev.filter((_, i) => i !== index));
+    setParticipants(prev => {
+      // Remove the participant
+      const updated = prev.filter((_, i) => i !== index);
+      
+      // If in participant split mode, recalculate percentages for remaining selected participants
+      if (splitMode === 'participants') {
+        const selectedParticipants = updated.filter(p => p.isSelected);
+        const evenSplit = selectedParticipants.length > 0 ? 100 / selectedParticipants.length : 0;
+        
+        return updated.map(p => ({
+          ...p,
+          splitPercentage: p.isSelected ? evenSplit : 0
+        }));
+      }
+      
+      return updated;
+    });
+    
+    // Update custom split focus if the removed participant was focused
+    if (splitMode === 'itemized' && customSplitFocusIndex === index) {
+      setCustomSplitFocusIndex(prev => {
+        const remainingSelected = participants
+          .filter((_, i) => i !== index && participants[i].isSelected)
+          .map((_, originalIndex) => originalIndex < index ? originalIndex : originalIndex - 1);
+        
+        return remainingSelected.length > 0 ? remainingSelected[0] : null;
+      });
+    } else if (splitMode === 'itemized' && customSplitFocusIndex !== null && customSplitFocusIndex > index) {
+      // Adjust focus index if a participant before the focused one was removed
+      setCustomSplitFocusIndex(prev => prev! - 1);
+    }
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -360,7 +542,7 @@ export default function ExpenseModal({
                 type="number"
                 step="0.01"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => setAmount(formatToTwoDecimals(e.target.value))}
                 placeholder="0.00"
                 required
               />
@@ -437,9 +619,9 @@ export default function ExpenseModal({
               <div>
                 <Label>Split between</Label>
                 <p className="text-xs text-gray-500 mt-1">
-                  {splitMode === 'even' 
-                    ? 'Even split mode - percentages recalculated automatically when selections change' 
-                    : 'Custom split mode - percentages recalculated when selections change, then manually editable'
+                  {splitMode === 'participants' 
+                    ? 'Participant split mode - percentages divided equally among selected participants' 
+                    : 'Itemized split mode - create individual line items with their own participants.'
                   }
                 </p>
               </div>
@@ -447,9 +629,9 @@ export default function ExpenseModal({
                 <Button
                   type="button"
                   size="sm"
-                  variant={splitMode === 'even' ? 'default' : 'outline'}
+                  variant={splitMode === 'participants' ? 'default' : 'outline'}
                   onClick={() => {
-                    setSplitMode('even');
+                    setSplitMode('participants');
                     // Recalculate equal splits for all selected participants
                     const selectedCount = participants.filter(p => p.isSelected).length;
                     if (selectedCount > 0) {
@@ -461,15 +643,22 @@ export default function ExpenseModal({
                     }
                   }}
                 >
-                  Even Split
+                  Participant Split
                 </Button>
                 <Button
                   type="button"
                   size="sm"
-                  variant={splitMode === 'custom' ? 'default' : 'outline'}
-                  onClick={() => setSplitMode('custom')}
+                  variant={splitMode === 'itemized' ? 'default' : 'outline'}
+                  onClick={() => {
+                    setSplitMode('itemized');
+                    // Set the first selected participant as the focus for custom input
+                    const firstSelectedIndex = participants.findIndex(p => p.isSelected);
+                    if (firstSelectedIndex !== -1) {
+                      setCustomSplitFocusIndex(firstSelectedIndex);
+                    }
+                  }}
                 >
-                  Custom Split
+                  Itemized Split
                 </Button>
               </div>
             </div>
@@ -484,7 +673,11 @@ export default function ExpenseModal({
                 const participantKey = participant.participantId || participant.externalName || `external-${index}`;
                 
                 return (
-                  <div key={`participant-${index}-${participantKey}`} className="flex items-center gap-2 p-2 rounded">
+                  <div key={`participant-${index}-${participantKey}`} className={`flex items-center gap-2 p-2 rounded transition-colors ${
+                    splitMode === 'itemized' && customSplitFocusIndex === index && participant.isSelected 
+                      ? 'bg-blue-50 border border-blue-200' 
+                      : ''
+                  }`}>
                     <Checkbox
                       checked={participant.isSelected}
                       onCheckedChange={() => handleParticipantToggle(index)}
@@ -492,18 +685,32 @@ export default function ExpenseModal({
                     <span className="flex-1">{displayName}</span>
                     {participant.isSelected && (
                       <>
-                        {splitMode === 'custom' && (
+                        {splitMode === 'itemized' && customSplitFocusIndex === index ? (
+                          // Show input field for the focused participant
                           <Input
                             type="number"
                             step="0.01"
                             value={participant.splitPercentage}
-                            onChange={(e) => handleSplitPercentageChange(index, e.target.value)}
+                            onChange={(e) => handleSplitPercentageChange(index, formatToTwoDecimals(e.target.value))}
                             className="w-20"
+                            placeholder="0.00"
                           />
+                        ) : splitMode === 'itemized' ? (
+                          // Show clickable percentage for non-focused participants
+                          <button
+                            type="button"
+                            onClick={() => handleSetCustomFocus(index)}
+                            className="w-20 px-2 py-1 text-sm bg-gray-50 hover:bg-gray-100 border rounded text-center transition-colors"
+                            title="Click to edit this percentage"
+                          >
+                            {Number(participant.splitPercentage).toFixed(1)}%
+                          </button>
+                        ) : (
+                          // Show read-only percentage for even split mode
+                          <span className="text-sm text-gray-500 w-20 text-center">
+                            {Number(participant.splitPercentage).toFixed(1)}%
+                          </span>
                         )}
-                        <span className="text-sm text-gray-500 w-12">
-                          {Number(participant.splitPercentage).toFixed(1)}%
-                        </span>
                         {amountValue > 0 && (
                           <span className="text-sm font-medium w-20 text-right">
                             {formatCurrency(amountValue * Number(participant.splitPercentage) / 100)}

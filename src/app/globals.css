@@ -254,3 +254,56 @@ html {
   border-color: #004343;
   box-shadow: 0 0 0 4px rgba(0, 67, 67, 0.1);
 }
+
+/* Planet Hero Animations */
+@keyframes slow-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes drift {
+  0%, 100% {
+    transform: translateX(-20px);
+  }
+  50% {
+    transform: translateX(20px);
+  }
+}
+
+@keyframes drift-reverse {
+  0%, 100% {
+    transform: translateX(20px);
+  }
+  50% {
+    transform: translateX(-20px);
+  }
+}
+
+@keyframes orbit {
+  from {
+    transform: rotateX(75deg) rotateY(0deg);
+  }
+  to {
+    transform: rotateX(75deg) rotateY(360deg);
+  }
+}
+
+.animate-slow-spin {
+  animation: slow-spin 60s linear infinite;
+}
+
+.animate-drift {
+  animation: drift 8s ease-in-out infinite;
+}
+
+.animate-drift-reverse {
+  animation: drift-reverse 12s ease-in-out infinite;
+}
+
+.animate-orbit {
+  animation: orbit 20s linear infinite;
+}
