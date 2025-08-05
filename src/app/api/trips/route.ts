@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session';
 import { prisma } from '@/lib/prisma';
 import { createAbsoluteDate, createAbsoluteDateRange, normalizeDate } from '@/lib/dateTimeUtils';
+import { CACHE_TAGS, CACHE_DURATIONS, CacheManager } from '@/lib/cache';
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,6 +74,9 @@ export async function POST(request: NextRequest) {
         endDate: normalizeDate(trip.endDate)
       };
 
+      // Revalidate trips cache after creation
+      CacheManager.revalidateTrips(context.groupId);
+
       return NextResponse.json({ trip: normalizedTrip }, { status: 201 });
     });
   } catch (error) {
@@ -122,9 +126,17 @@ export async function GET(request: NextRequest) {
 
       const response = NextResponse.json({ trips: normalizedTrips });
       
-      // Add cache headers for trip data
-      response.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600'); // 5 min cache, 10 min stale
-      response.headers.set('ETag', `trips-${context.groupId}-${Date.now()}`);
+      // Add cache headers with tags for revalidation
+      const cacheHeaders = CacheManager.getCacheHeaders(
+        CACHE_DURATIONS.TRIPS,
+        [CACHE_TAGS.TRIPS(context.groupId)]
+      );
+      
+      Object.entries(cacheHeaders).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+      
+      response.headers.set('ETag', CacheManager.generateETag(`trips-${context.groupId}`));
       
       return response;
     });

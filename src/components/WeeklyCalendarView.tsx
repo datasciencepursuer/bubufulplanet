@@ -260,8 +260,11 @@ export default function WeeklyCalendarView({
         
         <div className="text-center">
           <h2 className="text-xl font-semibold text-white">
-            {format(currentWeekStart, 'MMM d')} - {format(currentWeekEnd, 'MMM d, yyyy')}
+            {format(startDate, 'MMM d')} - {format(endDate, 'MMM d, yyyy')}
           </h2>
+          <p className="text-sm text-white/80 mt-1">
+            Viewing week: {format(currentWeekStart, 'MMM d')} - {format(currentWeekEnd, 'MMM d')}
+          </p>
         </div>
         
         <div className="flex items-center space-x-2">

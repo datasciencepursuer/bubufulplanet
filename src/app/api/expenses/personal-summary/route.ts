@@ -62,25 +62,25 @@ export async function GET(request: NextRequest) {
         role: currentMember.role
       });
 
-      // Get all trips for the group
-      const trips = await prisma.trip.findMany({
-        where: { groupId: context.groupId },
-        orderBy: { startDate: 'desc' }
-      });
-
-      // Get all expenses with participants
-      const expenses = await prisma.expense.findMany({
-        where: { groupId: context.groupId },
-        include: {
-          owner: true,
-          participants: {
-            include: {
-              participant: true
-            }
-          },
-          trip: true
-        }
-      });
+      // Get trips and expenses in parallel to reduce database round trips
+      const [trips, expenses] = await Promise.all([
+        prisma.trip.findMany({
+          where: { groupId: context.groupId },
+          orderBy: { startDate: 'desc' }
+        }),
+        prisma.expense.findMany({
+          where: { groupId: context.groupId },
+          include: {
+            owner: true,
+            participants: {
+              include: {
+                participant: true
+              }
+            },
+            trip: true
+          }
+        })
+      ]);
 
       // Calculate per-trip summaries
       const tripBreakdowns: TripExpenseSummary[] = [];

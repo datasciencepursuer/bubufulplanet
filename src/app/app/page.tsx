@@ -122,13 +122,13 @@ export default function AppPage() {
       alert('You do not have permission to create trips. Please ask your group adventurer for permission.')
       return
     }
-    // Set default dates to tomorrow and day after for user to adjust
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const dayAfter = new Date()
-    dayAfter.setDate(dayAfter.getDate() + 2)
+    // Set default dates to a week from now for a 3-day trip (more reasonable default)
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() + 7) // One week from today
+    const endDate = new Date()
+    endDate.setDate(endDate.getDate() + 9) // 3-day trip (inclusive)
     
-    setSelectedDates({ start: tomorrow, end: dayAfter })
+    setSelectedDates({ start: startDate, end: endDate })
     setEditingTrip(null)
     setShowTripForm(true)
   }

@@ -9,11 +9,29 @@ export async function GET(
   try {
     const { id } = await params;
     return await withUnifiedSessionContext(async (context) => {
-      // Verify the trip belongs to the user's group
+      // Get trip and expenses in single query with verification
       const trip = await prisma.trip.findFirst({
         where: {
           id: id,
           groupId: context.groupId
+        },
+        include: {
+          expenses: {
+            include: {
+              owner: true,
+              participants: {
+                include: {
+                  participant: true
+                }
+              },
+              day: true,
+              event: true
+            },
+            orderBy: [
+              { day: { date: 'asc' } },
+              { createdAt: 'asc' }
+            ]
+          }
         }
       });
 
@@ -24,26 +42,7 @@ export async function GET(
         );
       }
 
-      // Get all expenses for the trip
-      const expenses = await prisma.expense.findMany({
-        where: {
-          tripId: id
-        },
-        include: {
-          owner: true,
-          participants: {
-            include: {
-              participant: true
-            }
-          },
-          day: true,
-          event: true
-        },
-        orderBy: [
-          { day: { date: 'asc' } },
-          { createdAt: 'asc' }
-        ]
-      });
+      const expenses = trip.expenses;
 
       // Group expenses by day
       const expensesByDay = expenses.reduce((acc, expense) => {

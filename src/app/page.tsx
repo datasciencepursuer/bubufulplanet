@@ -150,7 +150,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-900 via-cyan-900 to-teal-800">
       {/* Hero Section with Planet */}
-      <div className="relative min-h-screen flex items-center justify-center overflow-hidden px-4">
+      <div className="relative min-h-screen flex items-center justify-center overflow-hidden px-4 py-8 lg:py-0">
         {/* Background Stars */}
         <div className="absolute inset-0 opacity-60">
           <div className="absolute top-1/4 left-1/4 w-1 h-1 bg-teal-200 rounded-full animate-pulse"></div>
@@ -162,12 +162,12 @@ export default function Home() {
         </div>
         
         <div className="relative z-10 w-full max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left Side - Planet */}
-            <div className="flex flex-col items-center text-center lg:text-left">
-              <div className="relative mb-8">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            {/* Left Side - Planet */}  
+            <div className="flex flex-col items-center text-center lg:text-left order-1 lg:order-1">
+              <div className="relative mb-6 lg:mb-8">
                 {/* Planet with glow effect */}
-                <div className="relative w-64 h-64 lg:w-80 lg:h-80 mx-auto lg:mx-0">
+                <div className="relative w-48 h-48 sm:w-64 sm:h-64 lg:w-80 lg:h-80 mx-auto lg:mx-0">
                   {/* Outer glow */}
                   <div className="absolute inset-0 rounded-full bg-gradient-to-r from-teal-400/30 via-cyan-500/30 to-teal-500/30 blur-2xl animate-pulse"></div>
                   
@@ -189,19 +189,19 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* Brand and Tagline */}
-              <div className="space-y-4">
-                <h1 className="text-4xl lg:text-6xl font-bold bg-gradient-to-r from-teal-300 via-cyan-300 to-teal-200 bg-clip-text text-transparent leading-tight">
+              {/* Brand and Tagline - Improved mobile centering */}
+              <div className="space-y-3 lg:space-y-4 text-center lg:text-left w-full max-w-md lg:max-w-none mx-auto lg:mx-0">
+                <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold bg-gradient-to-r from-teal-300 via-cyan-300 to-teal-200 bg-clip-text text-transparent leading-tight">
                   Bubuful Planet
                 </h1>
-                <p className="text-lg lg:text-xl text-teal-100 font-light leading-relaxed">
+                <p className="text-base sm:text-lg lg:text-xl text-teal-100 font-light leading-relaxed">
                   Plan it beautifully
                 </p>
               </div>
             </div>
             
             {/* Right Side - Action Cards */}
-            <div className="space-y-6">
+            <div className="space-y-6 order-2 lg:order-2">
               {mode === 'select' && (
                 <div className="space-y-6">
                   {/* Auto-login section - only show if sessions are available */}

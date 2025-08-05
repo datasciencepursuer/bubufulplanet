@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session'
 import { prisma } from '@/lib/prisma'
 import { isValidTimeSlot, getNextTimeSlot } from '@/lib/timeSlotUtils'
+import { CACHE_TAGS, CACHE_DURATIONS, CacheManager } from '@/lib/cache'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,7 +30,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         }, { status: 404 })
       }
 
-      return NextResponse.json({ event })
+      const response = NextResponse.json({ event })
+      
+      // Add cache headers for individual event
+      const cacheHeaders = CacheManager.getCacheHeaders(
+        CACHE_DURATIONS.EVENTS,
+        [CACHE_TAGS.DAY_EVENTS(event.dayId)]
+      );
+      
+      Object.entries(cacheHeaders).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+      
+      response.headers.set('ETag', CacheManager.generateETag(`event-${id}`));
+      
+      return response
     })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
@@ -132,6 +147,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
       }
 
+      // Get trip info for cache revalidation
+      const tripDay = await prisma.tripDay.findFirst({
+        where: { id: existingEvent.dayId },
+        include: { trip: { select: { id: true, groupId: true } } }
+      });
+
+      if (tripDay?.trip?.groupId) {
+        // Revalidate event caches after update
+        CacheManager.revalidateEvents(tripDay.trip.id, tripDay.trip.groupId, existingEvent.dayId);
+        
+        // Also revalidate expenses if they were updated
+        if (expenses !== undefined) {
+          CacheManager.revalidateExpenses(tripDay.trip.id, tripDay.trip.groupId);
+        }
+      }
+
       return NextResponse.json({ event: updatedEvent })
     })
   } catch (error) {
@@ -155,13 +186,22 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       // Check modify permission
       requireUnifiedPermission(context, 'modify')
 
-      // Verify event exists and belongs to user's group
+      // Verify event exists and belongs to user's group - get trip info for cache revalidation
       const existingEvent = await prisma.event.findFirst({
         where: {
           id: id,
           day: {
             trip: {
               groupId: context.groupId
+            }
+          }
+        },
+        include: {
+          day: {
+            include: {
+              trip: {
+                select: { id: true, groupId: true }
+              }
             }
           }
         }
@@ -178,6 +218,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       await prisma.event.delete({
         where: { id: id }
       })
+
+      // Revalidate event caches after deletion
+      if (existingEvent.day.trip?.groupId) {
+        CacheManager.revalidateEvents(existingEvent.day.trip.id, existingEvent.day.trip.groupId, existingEvent.dayId);
+        // Also revalidate expenses since event expenses were deleted
+        CacheManager.revalidateExpenses(existingEvent.day.trip.id, existingEvent.day.trip.groupId);
+      }
 
       return NextResponse.json({ message: 'Event deleted successfully' })
     })

@@ -66,6 +66,7 @@ model Event {
 
   @@index([dayId], map: "idx_events_day_id")
   @@index([startSlot, endSlot], map: "idx_events_slots")
+  @@index([dayId, startSlot], map: "idx_events_day_start_slot")
   @@map("events")
 }
 
@@ -92,6 +93,8 @@ model Expense {
   @@index([tripId], map: "idx_expenses_trip_id")
   @@index([ownerId], map: "idx_expenses_owner_id")
   @@index([groupId], map: "idx_expenses_group_id")
+  @@index([groupId, tripId], map: "idx_expenses_group_trip")
+  @@index([groupId, ownerId], map: "idx_expenses_group_owner")
   @@map("expenses")
 }
 
@@ -183,6 +186,8 @@ model DeviceSession {
   @@index([isActive], map: "idx_device_sessions_active")
   @@index([expiresAt], map: "idx_device_sessions_expires")
   @@index([lastUsed], map: "idx_device_sessions_last_used")
+  @@index([deviceFingerprint, groupId, isActive], map: "idx_device_sessions_lookup")
+  @@index([isActive, expiresAt], map: "idx_device_sessions_cleanup")
   @@map("device_sessions")
 }
 

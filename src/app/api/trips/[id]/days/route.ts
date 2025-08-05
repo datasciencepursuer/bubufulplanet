@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withUnifiedSessionContext } from '@/lib/unified-session'
 import { prisma } from '@/lib/prisma'
+import { CACHE_TAGS, CACHE_DURATIONS, CacheManager } from '@/lib/cache'
 
 export async function GET(
   request: NextRequest,
@@ -10,11 +11,16 @@ export async function GET(
 
   try {
     return await withUnifiedSessionContext(async (context) => {
-      // Verify the trip belongs to the user's group
+      // Get trip with days in single query with verification
       const trip = await prisma.trip.findFirst({
         where: { 
           id: id,
           groupId: context.groupId 
+        },
+        include: {
+          tripDays: {
+            orderBy: { dayNumber: 'asc' }
+          }
         }
       })
 
@@ -22,13 +28,23 @@ export async function GET(
         return NextResponse.json({ error: 'Trip not found' }, { status: 404 })
       }
 
-      // Fetch trip days using Prisma
-      const tripDays = await prisma.tripDay.findMany({
-        where: { tripId: id },
-        orderBy: { dayNumber: 'asc' }
-      })
+      const tripDays = trip.tripDays
 
-      return NextResponse.json({ tripDays })
+      const response = NextResponse.json({ tripDays })
+      
+      // Add cache headers with tags for revalidation
+      const cacheHeaders = CacheManager.getCacheHeaders(
+        CACHE_DURATIONS.TRIPS,
+        [CACHE_TAGS.TRIP_DAYS(id), CACHE_TAGS.TRIP(id)]
+      );
+      
+      Object.entries(cacheHeaders).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+      
+      response.headers.set('ETag', CacheManager.generateETag(`trip-days-${id}`));
+      
+      return response
     })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {

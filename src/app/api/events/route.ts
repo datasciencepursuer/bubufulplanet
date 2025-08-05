@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session'
 import { prisma } from '@/lib/prisma'
 import { isValidTimeSlot, getNextTimeSlot } from '@/lib/timeSlotUtils'
+import { CACHE_TAGS, CACHE_DURATIONS, CacheManager } from '@/lib/cache'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -49,9 +50,26 @@ export async function GET(request: NextRequest) {
 
       const response = NextResponse.json({ events });
       
-      // Add cache headers for events data
-      response.headers.set('Cache-Control', 'private, max-age=180, stale-while-revalidate=300'); // 3 min cache, 5 min stale
-      response.headers.set('ETag', `events-${context.groupId}-${tripId || dayId || 'all'}-${Date.now()}`);
+      // Determine cache tags based on query parameters
+      const cacheTags = [CACHE_TAGS.EVENTS(context.groupId)];
+      if (tripId) {
+        cacheTags.push(CACHE_TAGS.TRIP_EVENTS(tripId));
+      }
+      if (dayId) {
+        cacheTags.push(CACHE_TAGS.DAY_EVENTS(dayId));
+      }
+      
+      // Add cache headers with tags for revalidation
+      const cacheHeaders = CacheManager.getCacheHeaders(
+        CACHE_DURATIONS.EVENTS,
+        cacheTags
+      );
+      
+      Object.entries(cacheHeaders).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+      
+      response.headers.set('ETag', CacheManager.generateETag(`events-${context.groupId}-${tripId || dayId || 'all'}`));
       
       return response;
     })
@@ -82,27 +100,8 @@ export async function POST(request: NextRequest) {
         traveler: context.travelerName
       })
 
-      // Verify trip day exists and belongs to user's group
+      // Verify trip day exists and belongs to user's group (optimization: combine with event creation)
       const dayId = event.dayId
-      const tripDay = await prisma.tripDay.findFirst({
-        where: {
-          id: dayId,
-          trip: {
-            groupId: context.groupId
-          }
-        }
-      })
-
-      if (!tripDay) {
-        console.error('Trip day verification failed:', {
-          dayId: dayId,
-          groupId: context.groupId
-        })
-        return NextResponse.json({ 
-          error: 'Trip day not found or access denied',
-          details: 'Trip day does not exist or you do not have access'
-        }, { status: 404 })
-      }
 
       // Validate required fields
       if (!event.title || !event.startSlot) {
@@ -139,28 +138,52 @@ export async function POST(request: NextRequest) {
         color: event.color || '#3B82F6'
       }
 
-      // Create the event
-      const newEvent = await prisma.event.create({
-        data: eventData
-      })
+      // Create event with verification and expenses in transaction to reduce database calls
+      const newEvent = await prisma.$transaction(async (tx) => {
+        // Verify trip day exists and belongs to user's group within transaction
+        const tripDay = await tx.tripDay.findFirst({
+          where: {
+            id: dayId,
+            trip: {
+              groupId: context.groupId
+            }
+          }
+        })
 
-      // Create associated expenses if provided
-      if (expenses && expenses.length > 0) {
-        try {
-          await prisma.expense.createMany({
+        if (!tripDay) {
+          throw new Error('Trip day not found or access denied')
+        }
+
+        // Create the event
+        const event = await tx.event.create({
+          data: eventData
+        })
+
+        // Create associated expenses if provided
+        if (expenses && expenses.length > 0) {
+          await tx.expense.createMany({
             data: expenses.map((expense: any) => ({
-              eventId: newEvent.id,
+              eventId: event.id,
               dayId: dayId,
               description: expense.description,
               amount: expense.amount,
               category: expense.category
             }))
           })
-        } catch (expenseError) {
-          console.error('Error creating expenses:', expenseError)
-          // Event was created successfully, but expenses failed
-          // Return success but log the error
         }
+
+        return event
+      })
+
+      // Get trip info for cache revalidation
+      const tripDay = await prisma.tripDay.findFirst({
+        where: { id: dayId },
+        include: { trip: { select: { id: true, groupId: true } } }
+      });
+
+      if (tripDay?.trip?.groupId) {
+        // Revalidate event caches after creation
+        CacheManager.revalidateEvents(tripDay.trip.id, tripDay.trip.groupId, dayId);
       }
 
       return NextResponse.json({ event: newEvent }, { status: 201 })
@@ -171,6 +194,12 @@ export async function POST(request: NextRequest) {
     }
     if (error instanceof Error && error.message.includes('Insufficient permissions')) {
       return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    if (error instanceof Error && error.message === 'Trip day not found or access denied') {
+      return NextResponse.json({ 
+        error: 'Trip day not found or access denied',
+        details: 'Trip day does not exist or you do not have access'
+      }, { status: 404 })
     }
     console.error('Unexpected error in POST /api/events:', error)
     return NextResponse.json({ 

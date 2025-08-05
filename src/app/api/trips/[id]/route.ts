@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { validateUnifiedSession } from '@/lib/unified-session'
 import { createAbsoluteDate, createAbsoluteDateRange, normalizeDate } from '@/lib/dateTimeUtils'
+import { CacheManager } from '@/lib/cache'
 
 export async function PUT(
   request: Request,
@@ -131,6 +132,14 @@ export async function PUT(
       }))
     } : null
 
+    // Revalidate caches after trip update
+    CacheManager.revalidateTrip(tripId, validation.context!.groupId);
+    
+    // If dates changed, also revalidate events since trip days were regenerated
+    if (datesChanged) {
+      CacheManager.revalidateEvents(tripId, validation.context!.groupId);
+    }
+
     return NextResponse.json({ 
       trip: normalizedTrip,
       datesChanged 
@@ -163,10 +172,19 @@ export async function DELETE(
   try {
     const { id: tripId } = await params
 
-    // Verify trip exists
-    const trip = await prisma.trip.findUnique({
-      where: { id: tripId },
-      select: { id: true }
+    // Validate session and get group info for cache revalidation
+    const validation = await validateUnifiedSession()
+    if (!validation.isValid) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Verify trip exists and belongs to group
+    const trip = await prisma.trip.findFirst({
+      where: { 
+        id: tripId,
+        groupId: validation.context!.groupId 
+      },
+      select: { id: true, groupId: true }
     })
 
     if (!trip) {
@@ -180,6 +198,11 @@ export async function DELETE(
     await prisma.trip.delete({
       where: { id: tripId }
     })
+
+    // Revalidate all related caches after deletion
+    CacheManager.revalidateTrip(tripId, validation.context!.groupId);
+    CacheManager.revalidateEvents(tripId, validation.context!.groupId);
+    CacheManager.revalidateExpenses(tripId, validation.context!.groupId);
 
     return NextResponse.json({ success: true })
   } catch (error) {
