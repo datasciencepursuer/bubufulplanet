@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withUnifiedSessionContext } from '@/lib/unified-session';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { CacheManager } from '@/lib/cache';
 
 // Validation schema for updating an expense
 const updateExpenseSchema = z.object({
@@ -384,6 +385,9 @@ export async function PUT(
         });
       });
 
+      // Revalidate expense caches after update
+      CacheManager.revalidateExpenses(expense.tripId, context.groupId);
+
       return NextResponse.json({ expense: updatedExpense });
     });
   } catch (error) {
@@ -424,6 +428,9 @@ export async function DELETE(
       await prisma.expense.delete({
         where: { id: id }
       });
+
+      // Revalidate expense caches after deletion
+      CacheManager.revalidateExpenses(expense.tripId, context.groupId);
 
       return NextResponse.json({ success: true });
     });

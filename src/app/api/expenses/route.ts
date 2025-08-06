@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withUnifiedSessionContext } from '@/lib/unified-session';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { CacheManager } from '@/lib/cache';
 
 // Validation schema for creating an expense
 const createExpenseSchema = z.object({
@@ -263,6 +264,9 @@ export async function POST(request: NextRequest) {
           event: true
         }
       });
+
+      // Revalidate expense caches after creation
+      CacheManager.revalidateExpenses(data.tripId, context.groupId);
 
       return NextResponse.json({ expense });
     });
