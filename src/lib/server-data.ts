@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
+import { createClient } from '@/utils/supabase/server'
 import { normalizeDate } from '@/lib/dateTimeUtils'
 import { CACHE_TAGS, CACHE_DURATIONS } from '@/lib/cache'
 import { unstable_cache } from 'next/cache'
@@ -9,15 +9,24 @@ import type { Expense } from '@/types/expense'
 // Server-side data fetching functions that work with Prisma directly
 
 export async function getServerSession() {
-  const cookieStore = await cookies()
-  const groupId = cookieStore.get('vacation-planner-group-id')?.value
-  const travelerName = cookieStore.get('vacation-planner-traveler-name')?.value
-
-  if (!groupId || !travelerName) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
     throw new Error('Unauthorized - No valid session found')
   }
 
-  return { groupId, travelerName }
+  // Get user's current group
+  const userGroup = await prisma.userGroup.findFirst({
+    where: { userId: user.id },
+    include: { group: true }
+  })
+
+  if (!userGroup) {
+    throw new Error('No group found')
+  }
+
+  return { groupId: userGroup.groupId, userId: user.id }
 }
 
 export async function fetchTripServerSide(tripId: string): Promise<Trip> {

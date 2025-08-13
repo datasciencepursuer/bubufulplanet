@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withUnifiedSessionContext } from '@/lib/unified-session'
+import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
-import { hasPermission } from '@/lib/permissions'
 
 // GET all points of interest for the current group
 export async function GET(request: NextRequest) {
@@ -9,29 +8,44 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const tripId = searchParams.get('tripId')
 
-    return await withUnifiedSessionContext(async (context) => {
-      const whereClause = {
-        groupId: context.groupId,
-        ...(tripId && { tripId })
-      }
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-      const pointsOfInterest = await prisma.pointOfInterest.findMany({
-        where: whereClause,
-        include: {
-          trip: {
-            select: {
-              id: true,
-              name: true
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      })
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-      return NextResponse.json({ pointsOfInterest })
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
     })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    const whereClause = {
+      groupId: userGroup.groupId,
+      ...(tripId && { tripId })
+    }
+
+    const pointsOfInterest = await prisma.pointOfInterest.findMany({
+      where: whereClause,
+      include: {
+        trip: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
+
+    return NextResponse.json({ pointsOfInterest })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -47,27 +61,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { destinationName, address, notes, link, tripId } = body
 
-    return await withUnifiedSessionContext(async (context) => {
-      // Check if user has create permission
-      const member = await prisma.groupMember.findFirst({
-        where: {
-          groupId: context.groupId,
-          travelerName: context.travelerName
-        }
-      })
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-      if (!member) {
-        return NextResponse.json({ error: 'Member not found' }, { status: 404 })
-      }
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-      const permissionContext = {
-        role: member.role,
-        permissions: member.permissions as { read: boolean; create: boolean; modify: boolean }
-      }
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
 
-      if (!hasPermission(permissionContext, 'create')) {
-        return NextResponse.json({ error: 'You do not have permission to create points of interest' }, { status: 403 })
-      }
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
 
       // Validate required fields
       if (!destinationName?.trim()) {
@@ -79,10 +88,10 @@ export async function POST(request: NextRequest) {
         const trip = await prisma.trip.findFirst({
           where: {
             id: tripId,
-            groupId: context.groupId
+            groupId: userGroup.groupId
           }
         })
-
+    
         if (!trip) {
           return NextResponse.json({ error: 'Invalid trip ID' }, { status: 400 })
         }
@@ -94,7 +103,7 @@ export async function POST(request: NextRequest) {
           address: address?.trim() || null,
           notes: notes?.trim() || null,
           link: link?.trim() || null,
-          groupId: context.groupId,
+          groupId: userGroup.groupId,
           tripId: tripId || null
         },
         include: {
@@ -106,9 +115,8 @@ export async function POST(request: NextRequest) {
           }
         }
       })
-
+  
       return NextResponse.json({ pointOfInterest })
-    })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -124,27 +132,22 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const { id, destinationName, address, notes, link, tripId } = body
 
-    return await withUnifiedSessionContext(async (context) => {
-      // Check if user has modify permission
-      const member = await prisma.groupMember.findFirst({
-        where: {
-          groupId: context.groupId,
-          travelerName: context.travelerName
-        }
-      })
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-      if (!member) {
-        return NextResponse.json({ error: 'Member not found' }, { status: 404 })
-      }
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-      const permissionContext = {
-        role: member.role,
-        permissions: member.permissions as { read: boolean; create: boolean; modify: boolean }
-      }
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
 
-      if (!hasPermission(permissionContext, 'modify')) {
-        return NextResponse.json({ error: 'You do not have permission to edit points of interest' }, { status: 403 })
-      }
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
 
       if (!id) {
         return NextResponse.json({ error: 'Point of interest ID is required' }, { status: 400 })
@@ -154,10 +157,10 @@ export async function PUT(request: NextRequest) {
       const existing = await prisma.pointOfInterest.findFirst({
         where: {
           id,
-          groupId: context.groupId
+          groupId: userGroup.groupId
         }
       })
-
+  
       if (!existing) {
         return NextResponse.json({ error: 'Point of interest not found' }, { status: 404 })
       }
@@ -167,10 +170,10 @@ export async function PUT(request: NextRequest) {
         const trip = await prisma.trip.findFirst({
           where: {
             id: tripId,
-            groupId: context.groupId
+            groupId: userGroup.groupId
           }
         })
-
+    
         if (!trip) {
           return NextResponse.json({ error: 'Invalid trip ID' }, { status: 400 })
         }
@@ -194,9 +197,8 @@ export async function PUT(request: NextRequest) {
           }
         }
       })
-
+  
       return NextResponse.json({ pointOfInterest })
-    })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -212,27 +214,22 @@ export async function DELETE(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
 
-    return await withUnifiedSessionContext(async (context) => {
-      // Check if user has modify permission
-      const member = await prisma.groupMember.findFirst({
-        where: {
-          groupId: context.groupId,
-          travelerName: context.travelerName
-        }
-      })
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-      if (!member) {
-        return NextResponse.json({ error: 'Member not found' }, { status: 404 })
-      }
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-      const permissionContext = {
-        role: member.role,
-        permissions: member.permissions as { read: boolean; create: boolean; modify: boolean }
-      }
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
 
-      if (!hasPermission(permissionContext, 'modify')) {
-        return NextResponse.json({ error: 'You do not have permission to delete points of interest' }, { status: 403 })
-      }
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
 
       if (!id) {
         return NextResponse.json({ error: 'Point of interest ID is required' }, { status: 400 })
@@ -242,10 +239,10 @@ export async function DELETE(request: NextRequest) {
       const existing = await prisma.pointOfInterest.findFirst({
         where: {
           id,
-          groupId: context.groupId
+          groupId: userGroup.groupId
         }
       })
-
+  
       if (!existing) {
         return NextResponse.json({ error: 'Point of interest not found' }, { status: 404 })
       }
@@ -253,9 +250,8 @@ export async function DELETE(request: NextRequest) {
       await prisma.pointOfInterest.delete({
         where: { id }
       })
-
+  
       return NextResponse.json({ success: true })
-    })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

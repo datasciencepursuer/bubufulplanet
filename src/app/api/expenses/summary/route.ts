@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withUnifiedSessionContext } from '@/lib/unified-session';
+import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/lib/prisma';
 
 interface BalanceSummary {
@@ -17,13 +17,28 @@ interface BalanceSummary {
 
 export async function GET(request: NextRequest) {
   try {
-    return await withUnifiedSessionContext(async (context) => {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
       const { searchParams } = new URL(request.url);
       const tripId = searchParams.get('tripId');
 
       // Build where clause
       const where: any = {
-        groupId: context.groupId
+        groupId: userGroup.groupId
       };
 
       if (tripId) {
@@ -45,7 +60,7 @@ export async function GET(request: NextRequest) {
 
       // Get all group members
       const groupMembers = await prisma.groupMember.findMany({
-        where: { groupId: context.groupId }
+        where: { groupId: userGroup.groupId }
       });
 
       // Calculate balances
@@ -57,7 +72,7 @@ export async function GET(request: NextRequest) {
         tripInfo = await prisma.trip.findFirst({
           where: {
             id: tripId,
-            groupId: context.groupId
+            groupId: userGroup.groupId
           },
           select: {
             id: true,
@@ -74,7 +89,6 @@ export async function GET(request: NextRequest) {
         trip: tripInfo,
         totalExpenses: expenses.reduce((sum, e) => sum + Number(e.amount), 0)
       });
-    });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

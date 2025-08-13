@@ -13,8 +13,9 @@ import { Button } from '@/components/ui/button'
 import { MapPin, Calendar as CalendarIcon, DollarSign, Settings, ArrowLeft, Plus, LogOut, Trash2, Clock, Users, Copy, Check } from 'lucide-react'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import BearGlobeLoader from '@/components/BearGlobeLoader'
-import { useDeviceSession } from '@/hooks/useDeviceSession'
 import { useNotify } from '@/hooks/useNotify'
+import { createClient } from '@/utils/supabase/client'
+import TravelerNameEditor from '@/components/TravelerNameEditor'
 
 export default function AppPage() {
   const { warning } = useNotify()
@@ -38,19 +39,57 @@ export default function AppPage() {
   const [accessCodeCopied, setAccessCodeCopied] = useState(false)
   const [editingTrip, setEditingTrip] = useState<any>(null)
   const router = useRouter()
-  const { logout } = useDeviceSession()
+  const supabase = createClient()
 
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true)
       try {
-        await Promise.all([loadTrips(), loadGroupInfo()])
+        // Check for Supabase auth
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          // Load user's group data and trips
+          await Promise.all([loadTrips(), loadSupabaseUserGroup(user.id)])
+        } else {
+          // Redirect to login if not authenticated
+          router.push('/login')
+          return
+        }
       } finally {
         setLoading(false)
       }
     }
     loadInitialData()
-  }, [])
+  }, [supabase.auth, router])
+
+  const loadSupabaseUserGroup = async (userId: string) => {
+    try {
+      const response = await fetch('/api/groups/current')
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Check if user needs to complete setup (has temporary name)
+        if (data.travelerName === 'New Traveler') {
+          router.push('/setup')
+          return
+        }
+        
+        setGroupInfo({
+          name: data.group.name,
+          accessCode: data.group.accessCode,
+          travelerName: data.travelerName || 'User',
+          role: 'adventurer',
+          permissions: {
+            read: true,
+            create: true,
+            modify: true
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Error loading user group:', error)
+    }
+  }
 
   const loadTrips = async () => {
     try {
@@ -64,27 +103,6 @@ export default function AppPage() {
     }
   }
 
-  const loadGroupInfo = async () => {
-    try {
-      const response = await fetch('/api/groups/current')
-      if (response.ok) {
-        const data = await response.json()
-        setGroupInfo({
-          name: data.group.name,
-          accessCode: data.group.accessCode,
-          travelerName: data.travelerName,
-          role: data.role,
-          permissions: data.currentMember?.permissions || {
-            read: true,
-            create: data.role === 'adventurer',
-            modify: data.role === 'adventurer'
-          }
-        })
-      }
-    } catch (error) {
-      console.error('Error loading group info:', error)
-    }
-  }
 
   const handleTripSelect = (start: Date, end: Date) => {
     // Check if user has create permission
@@ -145,13 +163,8 @@ export default function AppPage() {
 
   const handleLogout = async () => {
     try {
-      const success = await logout()
-      if (success) {
-        router.push('/')
-        router.refresh()
-      } else {
-        console.error('Logout failed')
-      }
+      await supabase.auth.signOut()
+      router.push('/login')
     } catch (error) {
       console.error('Error logging out:', error)
     }
@@ -242,6 +255,29 @@ export default function AppPage() {
     setTripToDelete({ id: editingTrip.id, name: editingTrip.name })
     setShowTripForm(false) // Close the edit modal
     setShowDeleteConfirm(true)
+  }
+
+  const handleUpdateTravelerName = async (newName: string) => {
+    try {
+      const response = await fetch('/api/groups/current', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ travelerName: newName }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Failed to update traveler name')
+      }
+
+      // Update local state
+      setGroupInfo(prev => prev ? { ...prev, travelerName: newName } : null)
+    } catch (error) {
+      console.error('Error updating traveler name:', error)
+      throw error
+    }
   }
 
   // Categorize trips as current, upcoming, or past
@@ -374,9 +410,16 @@ export default function AppPage() {
                   Your Trips
                 </h2>
                 {groupInfo && groupInfo.travelerName && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'} {groupInfo.travelerName}!
-                  </p>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-600 mb-2">
+                      Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'}:
+                    </p>
+                    <TravelerNameEditor
+                      currentName={groupInfo.travelerName}
+                      onNameUpdate={handleUpdateTravelerName}
+                      className="text-sm"
+                    />
+                  </div>
                 )}
               </div>
 
@@ -392,18 +435,20 @@ export default function AppPage() {
                 </div>
                 
                 {/* Welcome Card */}
-                {(() => {
-                  console.log('Welcome card render check:', { groupInfo, travelerName: groupInfo?.travelerName, role: groupInfo?.role })
-                  return groupInfo && groupInfo.travelerName && (
-                    <Card className="bg-teal-50 border-teal-200 max-w-sm flex-shrink-0">
-                      <CardContent className="pt-4">
-                        <p className="text-lg text-teal-700 font-medium">
-                          Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'} {groupInfo.travelerName}!
-                        </p>
-                      </CardContent>
-                    </Card>
-                  )
-                })()}
+                {groupInfo && groupInfo.travelerName && (
+                  <Card className="bg-teal-50 border-teal-200 max-w-sm flex-shrink-0">
+                    <CardContent className="pt-4">
+                      <p className="text-lg text-teal-700 font-medium mb-3">
+                        Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'}:
+                      </p>
+                      <TravelerNameEditor
+                        currentName={groupInfo.travelerName}
+                        onNameUpdate={handleUpdateTravelerName}
+                        className="text-base"
+                      />
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
             

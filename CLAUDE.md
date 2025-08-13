@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Next.js 15 vacation planning application with TypeScript, Tailwind CSS, and Prisma + PostgreSQL. Features include group-based trip planning with calendar views, day-by-day itineraries, expense tracking, and device session management for seamless authentication.
+A Next.js 15 vacation planning application with TypeScript, Tailwind CSS, and Prisma + PostgreSQL. Features include group-based trip planning with calendar views, day-by-day itineraries, expense tracking, and OAuth-based authentication via Supabase.
 
 ## Development Commands
 
@@ -23,9 +23,6 @@ pnpm run db:seed     # Run database seeding
 pnpm prisma migrate dev --name <name>  # Create new migration
 
 # Maintenance & testing scripts
-pnpm run cleanup:sessions         # Run device session cleanup manually
-pnpm run test:session-extension   # Test session extension functionality
-pnpm run test:logout             # Test logout functionality
 pnpm run test:final-day          # Test final day clickability fix
 ```
 
@@ -33,37 +30,36 @@ pnpm run test:final-day          # Test final day clickability fix
 
 ### Database Structure (Prisma + PostgreSQL)
 
-Hierarchical data model with group-based access control:
-- `travel_groups` → `group_members` + `trips` + `device_sessions`
+Hierarchical data model with OAuth and group-based access control:
+- `travel_groups` → `group_members` + `trips` + `user_groups`
 - `trips` → `trip_days` → `events` → `expenses`
-- `devices` → `device_sessions` (consolidates device fingerprints)
+- `user_groups` (links Supabase users to travel groups)
 - `packing_items` (linked to trips)
-- `cleanup_log` (tracks maintenance operations)
 
 **Key Database Features:**
 - Composite indexes for performance (e.g., `trip_days` on `[tripId, dayNumber]`)
-- Device session consolidation with lifespan management
-- Automatic cleanup of expired sessions via cron job
+- OAuth-based authentication via Supabase
+- Many-to-many user-group relationships via `user_groups` table
 
 ### Authentication & Session Management
 
-**Group-Based System:**
-- No traditional user accounts - authentication via travel groups
-- Users create/join groups using unique access codes
-- Travelers identified by name within groups
+**OAuth-Only Authentication:**
+- Supabase Auth with Google/GitHub OAuth providers
+- Users authenticate via OAuth and are linked to travel groups
+- Email-based invitations for group membership
+- Support for multiple groups per user
 
-**Device Session Features:**
-- Browser fingerprinting for automatic re-authentication
-- Session lifespans: 90 days (remember_device), extendable on login
-- One session per device per group (consolidation)
-- Automatic cleanup of expired/idle sessions
-- Optional local data clearing on logout
+**Authentication Flow:**
+- OAuth sign-in via Supabase (Google/GitHub)
+- Automatic linking of pending email invitations
+- Group membership via `user_groups` junction table
+- Session management handled by Supabase
 
 **Key Files:**
-- `src/lib/device-fingerprint.ts` - Device fingerprint generation
-- `src/hooks/useDeviceSession.ts` - React hook for device sessions
-- `src/lib/unified-session.ts` - Server-side session management
-- `src/lib/session-config.ts` - Session lifespan configuration
+- `src/utils/supabase/client.ts` - Browser-side Supabase client
+- `src/utils/supabase/server.ts` - Server-side Supabase client
+- `src/components/auth/OAuthSignIn.tsx` - OAuth sign-in component
+- `src/app/auth/callback/route.ts` - OAuth callback handler
 
 ### Date & Time Management
 
@@ -80,18 +76,30 @@ Hierarchical data model with group-based access control:
 ### API Pattern
 
 ```typescript
-// Standard API route pattern
-import { validateUnifiedSession } from '@/lib/unified-session'
+// Standard API route pattern with Supabase Auth
+import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
 
-const validation = await validateUnifiedSession()
-if (!validation.isValid) {
+const supabase = await createClient()
+const { data: { user } } = await supabase.auth.getUser()
+
+if (!user) {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+}
+
+// Get user's current group
+const userGroup = await prisma.userGroup.findFirst({
+  where: { userId: user.id },
+  include: { group: true }
+})
+
+if (!userGroup) {
+  return NextResponse.json({ error: 'No group found' }, { status: 404 })
 }
 
 // Operations automatically scoped to group
 const trips = await prisma.trip.findMany({
-  where: { groupId: validation.context!.groupId },
+  where: { groupId: userGroup.groupId },
   orderBy: { createdAt: 'desc' }
 })
 ```
@@ -115,34 +123,38 @@ const trips = await prisma.trip.findMany({
 
 ## Environment Variables
 
-Required in `.env.local`:
+Required in `.env`:
 ```
 DATABASE_URL=                    # PostgreSQL connection string
 DIRECT_DATABASE_URL=             # Direct database URL for migrations
-NEXT_PUBLIC_SUPABASE_URL=        # Supabase URL (legacy, being phased out)
-NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase anon key (legacy)
-SUPABASE_SERVICE_ROLE_KEY=       # Service role key (legacy)
+NEXT_PUBLIC_SUPABASE_URL=        # Supabase URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase anon key
+SUPABASE_SERVICE_ROLE_KEY=       # Service role key
 ```
 
 ## Production Deployment
 
-**Coolify Cron Setup:**
-- Configure cleanup script: `cd /app && npm run cleanup:sessions`
-- Recommended schedule: `0 2 * * *` (daily at 2 AM)
-- Uses same environment as webapp
+**Environment Variables Required:**
+```
+DATABASE_URL=                    # PostgreSQL connection string
+DIRECT_DATABASE_URL=             # Direct database URL for migrations
+NEXT_PUBLIC_SUPABASE_URL=        # Supabase URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase anon key
+SUPABASE_SERVICE_ROLE_KEY=       # Service role key
+```
 
 **Database Indexes:**
 - Composite index on `trip_days(tripId, dayNumber)` for fast lookups
 - Event index on `events(dayId, startSlot)` for calendar queries
-- Device session indexes for efficient cleanup operations
+- User-group indexes for efficient OAuth-based access control
 
 ## Recent Improvements
 
-1. **Device Session Optimization:**
-   - Consolidated device storage (60-70% reduction)
-   - Session lifespan extension on login
-   - Automatic cleanup via Coolify cron
-   - Remember device for 3 months (extendable)
+1. **OAuth Authentication System:**
+   - Migrated to Supabase Auth with Google/GitHub OAuth
+   - Email-based group invitations and user linking
+   - Support for multiple groups per user
+   - Eliminated legacy device session system
 
 2. **Date Handling Fixes:**
    - Final day of trips now clickable
@@ -154,10 +166,10 @@ SUPABASE_SERVICE_ROLE_KEY=       # Service role key (legacy)
    - Date confirmation during creation
    - Proper duration calculation (inclusive)
 
-4. **Session Features:**
-   - Complete logout removes all device sessions
-   - Optional local data clearing for privacy
-   - Session extension on each login
+4. **Database Cleanup:**
+   - Removed legacy device session tables
+   - Simplified authentication architecture
+   - Improved performance with OAuth-only flow
 
 ## Development Patterns
 
@@ -171,11 +183,7 @@ SUPABASE_SERVICE_ROLE_KEY=       # Service role key (legacy)
 ## Testing Utilities
 
 Located in `scripts/` directory:
-- `test-session-extension.js` - Verify session lifespan extension
-- `test-logout-functionality.js` - Ensure complete session removal
 - `test-final-day-clickability.js` - Confirm final day fix
-- `cleanup-device-sessions.js` - Manual cleanup execution
-- `check-cleanup-logs.js` - Monitor cleanup operations
 
 ## Missing Features (Schema Ready)
 

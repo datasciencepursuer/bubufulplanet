@@ -119,13 +119,16 @@ model TravelGroup {
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy        String?           @map("created_by") @db.Uuid
+  createdById      String?           @map("created_by_id") @db.VarChar(255) // Supabase user ID
   groupMembers        GroupMember[]
   pointsOfInterest    PointOfInterest[]
   externalParticipants ExternalParticipant[]
   createdByMember     GroupMember?      @relation("GroupCreator", fields: [createdBy], references: [id])
   trips               Trip[]
+  userGroups          UserGroup[]
 
   @@index([accessCode], map: "idx_travel_groups_access_code")
+  @@index([createdById], map: "idx_travel_groups_created_by_id")
   @@map("travel_groups")
 }
 
@@ -133,6 +136,8 @@ model GroupMember {
   id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   groupId       String        @map("group_id") @db.Uuid
   travelerName  String        @map("traveler_name") @db.VarChar(255)
+  email         String?       @db.VarChar(255) // Email for linking to Supabase user
+  userId        String?       @map("user_id") @db.VarChar(255) // Supabase user ID when linked
   role          String        @default("party member") @db.VarChar(50)
   permissions   Json          @default("{\"read\": true, \"create\": false, \"modify\": false}")
   joinedAt      DateTime      @default(now()) @map("joined_at") @db.Timestamptz(6)
@@ -144,64 +149,14 @@ model GroupMember {
   lineItemParticipations LineItemParticipant[]
 
   @@unique([groupId, travelerName], name: "unique_group_traveler")
+  @@unique([groupId, email], name: "unique_group_email")
   @@index([groupId], map: "idx_group_members_group_id")
   @@index([groupId, travelerName], map: "idx_group_members_group_traveler")
+  @@index([email], map: "idx_group_members_email")
+  @@index([userId], map: "idx_group_members_user_id")
   @@map("group_members")
 }
 
-model Device {
-  fingerprint    String          @id @db.VarChar(255)
-  userAgent      String?         @map("user_agent")
-  screen         String?         @db.VarChar(100)
-  timezone       String?         @db.VarChar(100)
-  language       String?         @db.VarChar(20)
-  platform       String?         @db.VarChar(100)
-  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deviceSessions DeviceSession[]
-
-  @@map("devices")
-}
-
-model DeviceSession {
-  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  deviceFingerprint   String   @map("device_fingerprint") @db.VarChar(255)
-  groupId             String   @map("group_id") @db.Uuid
-  sessionData         Json?    @map("session_data")
-  userAgent           String?  @map("user_agent")
-  ipAddress           String?  @map("ip_address") @db.VarChar(45)
-  isActive            Boolean  @default(true) @map("is_active")
-  lastUsed            DateTime @default(now()) @map("last_used") @db.Timestamptz(6)
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  currentTravelerName String   @map("current_traveler_name") @db.VarChar(255)
-  availableTravelers  Json?    @map("available_travelers")
-  sessionType         String?  @default("remember_device") @map("session_type") @db.VarChar(20)
-  expiresAt           DateTime @map("expires_at") @db.Timestamptz(6)
-  maxIdleTime         Int?     @default(1814400) @map("max_idle_time")
-  device              Device   @relation(fields: [deviceFingerprint], references: [fingerprint], onDelete: Cascade)
-
-  @@unique([deviceFingerprint, groupId], name: "unique_device_group_session", map: "unique_device_group_session")
-  @@index([deviceFingerprint], map: "idx_device_sessions_fingerprint")
-  @@index([groupId], map: "idx_device_sessions_group_id")
-  @@index([isActive], map: "idx_device_sessions_active")
-  @@index([expiresAt], map: "idx_device_sessions_expires")
-  @@index([lastUsed], map: "idx_device_sessions_last_used")
-  @@index([deviceFingerprint, groupId, isActive], map: "idx_device_sessions_lookup")
-  @@index([isActive, expiresAt], map: "idx_device_sessions_cleanup")
-  @@map("device_sessions")
-}
-
-model CleanupLog {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tableName    String   @map("table_name") @db.VarChar(100)
-  deletedCount Int      @map("deleted_count")
-  details      Json?
-  cleanedAt    DateTime @map("cleaned_at") @db.Timestamptz(6)
-
-  @@index([tableName], map: "idx_cleanup_log_table")
-  @@index([cleanedAt], map: "idx_cleanup_log_cleaned_at")
-  @@map("cleanup_log")
-}
 
 model PointOfInterest {
   id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -297,4 +252,19 @@ model LineItemParticipant {
   @@index([participantId], map: "idx_line_item_participants_participant_id")
   @@index([externalParticipantId], map: "idx_line_item_participants_external_participant_id")
   @@map("line_item_participants")
+}
+
+model UserGroup {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String       @map("user_id") @db.VarChar(255) // Supabase user ID
+  groupId     String       @map("group_id") @db.Uuid
+  role        String       @default("member") @db.VarChar(50) // "leader" or "member"
+  joinedAt    DateTime     @default(now()) @map("joined_at") @db.Timestamptz(6)
+  invitedBy   String?      @map("invited_by") @db.VarChar(255) // User ID who invited
+  group       TravelGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, groupId], name: "unique_user_group")
+  @@index([userId], map: "idx_user_groups_user_id")
+  @@index([groupId], map: "idx_user_groups_group_id")
+  @@map("user_groups")
 }

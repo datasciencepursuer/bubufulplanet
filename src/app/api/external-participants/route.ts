@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withUnifiedSessionContext } from '@/lib/unified-session';
+import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
@@ -10,10 +10,25 @@ const createExternalParticipantSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    return await withUnifiedSessionContext(async (context) => {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
       const externalParticipants = await prisma.externalParticipant.findMany({
         where: {
-          groupId: context.groupId
+          groupId: userGroup.groupId
         },
         orderBy: [
           { lastUsedAt: 'desc' },
@@ -22,7 +37,6 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.json({ externalParticipants });
-    });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -37,7 +51,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    return await withUnifiedSessionContext(async (context) => {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
       const body = await request.json();
       
       // Validate request body
@@ -54,7 +83,7 @@ export async function POST(request: NextRequest) {
       // Check if external participant already exists
       const existingParticipant = await prisma.externalParticipant.findFirst({
         where: {
-          groupId: context.groupId,
+          groupId: userGroup.groupId,
           name: data.name
         }
       });
@@ -72,13 +101,12 @@ export async function POST(request: NextRequest) {
       // Create new external participant
       const externalParticipant = await prisma.externalParticipant.create({
         data: {
-          groupId: context.groupId,
+          groupId: userGroup.groupId,
           name: data.name
         }
       });
 
       return NextResponse.json({ externalParticipant });
-    });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

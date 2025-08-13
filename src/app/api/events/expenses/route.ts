@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withUnifiedSessionContext } from '@/lib/unified-session'
+import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
@@ -11,12 +11,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Trip ID is required' }, { status: 400 })
     }
 
-    return await withUnifiedSessionContext(async (context) => {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
       // First verify the trip belongs to the user's group
       const trip = await prisma.trip.findFirst({
         where: {
           id: tripId,
-          groupId: context.groupId
+          groupId: userGroup.groupId
         }
       })
 
@@ -31,7 +46,7 @@ export async function GET(request: NextRequest) {
       const expenses = await prisma.expense.findMany({
         where: {
           tripId: tripId,
-          groupId: context.groupId
+          groupId: userGroup.groupId
         },
         include: {
           event: true,
@@ -52,10 +67,9 @@ export async function GET(request: NextRequest) {
       
       // Add cache headers for expenses data
       response.headers.set('Cache-Control', 'private, max-age=120, stale-while-revalidate=240'); // 2 min cache, 4 min stale
-      response.headers.set('ETag', `expenses-${context.groupId}-${tripId}-${Date.now()}`);
+      response.headers.set('ETag', `expenses-${userGroup.groupId}-${tripId}-${Date.now()}`);
       
       return response;
-    })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -1,38 +1,46 @@
-import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { createClient } from '@/utils/supabase/server'
 
 // Get current user's group information
 export async function GET() {
   try {
-    const cookieStore = await cookies()
-    const groupId = cookieStore.get('vacation-planner-group-id')?.value
-    const travelerName = cookieStore.get('vacation-planner-traveler-name')?.value
-
-    if (!groupId || !travelerName) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get group details using Prisma
-    const group = await prisma.travelGroup.findUnique({
-      where: { id: groupId },
-      select: {
-        id: true,
-        name: true,
-        accessCode: true,
-        createdAt: true
+    // Get user's current group via userGroup relationship
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { 
+        group: {
+          select: {
+            id: true,
+            name: true,
+            accessCode: true,
+            createdAt: true
+          }
+        }
       }
     })
 
-    if (!group) {
-      return NextResponse.json({ error: 'Group not found' }, { status: 404 })
+    if (!userGroup || !userGroup.group) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
     }
 
-    // Get current user's member info using Prisma
+    const groupId = userGroup.groupId
+    const travelerName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
+
+    const group = userGroup.group
+
+    // Get current user's member info linked by userId
     const member = await prisma.groupMember.findFirst({
       where: {
         groupId,
-        travelerName
+        userId: user.id
       },
       select: {
         id: true,
@@ -91,6 +99,70 @@ export async function GET() {
 
   } catch (error) {
     console.error('Error in current group GET:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// Update current user's traveler name
+export async function PUT(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { travelerName }: { travelerName: string } = await request.json()
+
+    if (!travelerName?.trim()) {
+      return NextResponse.json({ error: 'Traveler name is required' }, { status: 400 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    const groupId = userGroup.groupId
+
+    // Check if traveler name already exists in group
+    const existingMember = await prisma.groupMember.findFirst({
+      where: {
+        groupId,
+        travelerName: travelerName.trim(),
+        userId: { not: user.id } // Exclude current user
+      }
+    })
+
+    if (existingMember) {
+      return NextResponse.json({ error: 'Traveler name already exists in this group' }, { status: 400 })
+    }
+
+    // Update the member's traveler name
+    const updatedMember = await prisma.groupMember.updateMany({
+      where: {
+        groupId,
+        userId: user.id
+      },
+      data: {
+        travelerName: travelerName.trim()
+      }
+    })
+
+    if (updatedMember.count === 0) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, travelerName: travelerName.trim() })
+
+  } catch (error) {
+    console.error('Error updating traveler name:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

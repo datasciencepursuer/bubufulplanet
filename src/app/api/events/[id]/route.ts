@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session'
+import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { isValidTimeSlot, getNextTimeSlot } from '@/lib/timeSlotUtils'
 import { CACHE_TAGS, CACHE_DURATIONS, CacheManager } from '@/lib/cache'
@@ -7,16 +7,32 @@ import { CACHE_TAGS, CACHE_DURATIONS, CacheManager } from '@/lib/cache'
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    return await withUnifiedSessionContext(async (context) => {
-      const event = await prisma.event.findFirst({
-        where: {
-          id: id,
-          day: {
-            trip: {
-              groupId: context.groupId
-            }
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    const event = await prisma.event.findFirst({
+      where: {
+        id: id,
+        day: {
+          trip: {
+            groupId: userGroup.groupId
           }
-        },
+        }
+      },
         include: {
           day: true,
           expenses: true
@@ -45,7 +61,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       response.headers.set('ETag', CacheManager.generateETag(`event-${id}`));
       
       return response
-    })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -63,21 +78,34 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const body = await request.json()
     const { event, expenses } = body
 
-    return await withUnifiedSessionContext(async (context) => {
-      // Check modify permission
-      requireUnifiedPermission(context, 'modify')
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-      // Verify event exists and belongs to user's group
-      const existingEvent = await prisma.event.findFirst({
-        where: {
-          id: id,
-          day: {
-            trip: {
-              groupId: context.groupId
-            }
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    // Verify event exists and belongs to user's group
+    const existingEvent = await prisma.event.findFirst({
+      where: {
+        id: id,
+        day: {
+          trip: {
+            groupId: userGroup.groupId
           }
         }
-      })
+      }
+    })
 
       if (!existingEvent) {
         return NextResponse.json({ 
@@ -164,7 +192,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       return NextResponse.json({ event: updatedEvent })
-    })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -182,20 +209,33 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    return await withUnifiedSessionContext(async (context) => {
-      // Check modify permission
-      requireUnifiedPermission(context, 'modify')
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-      // Verify event exists and belongs to user's group - get trip info for cache revalidation
-      const existingEvent = await prisma.event.findFirst({
-        where: {
-          id: id,
-          day: {
-            trip: {
-              groupId: context.groupId
-            }
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    // Verify event exists and belongs to user's group - get trip info for cache revalidation
+    const existingEvent = await prisma.event.findFirst({
+      where: {
+        id: id,
+        day: {
+          trip: {
+            groupId: userGroup.groupId
           }
-        },
+        }
+      },
         include: {
           day: {
             include: {
@@ -227,7 +267,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       }
 
       return NextResponse.json({ message: 'Event deleted successfully' })
-    })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withUnifiedSessionContext } from '@/lib/unified-session';
+import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { CacheManager } from '@/lib/cache';
@@ -37,11 +37,26 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    return await withUnifiedSessionContext(async (context) => {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
       const expense = await prisma.expense.findFirst({
         where: {
           id: id,
-          groupId: context.groupId
+          groupId: userGroup.groupId
         },
         include: {
           owner: true,
@@ -75,7 +90,6 @@ export async function GET(
       }
 
       return NextResponse.json({ expense });
-    });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -94,7 +108,22 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    return await withUnifiedSessionContext(async (context) => {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
       const body = await request.json();
       
       // Validate request body
@@ -112,7 +141,7 @@ export async function PUT(
       const expense = await prisma.expense.findFirst({
         where: {
           id: id,
-          groupId: context.groupId
+          groupId: userGroup.groupId
         },
         include: {
           trip: true
@@ -131,7 +160,7 @@ export async function PUT(
         const owner = await prisma.groupMember.findFirst({
           where: {
             id: data.ownerId,
-            groupId: context.groupId
+            groupId: userGroup.groupId
           }
         });
 
@@ -154,7 +183,7 @@ export async function PUT(
           const validParticipants = await prisma.groupMember.findMany({
             where: {
               id: { in: participantIds },
-              groupId: context.groupId
+              groupId: userGroup.groupId
             }
           });
 
@@ -188,7 +217,7 @@ export async function PUT(
             const validParticipants = await prisma.groupMember.findMany({
               where: {
                 id: { in: participantIds },
-                groupId: context.groupId
+                groupId: userGroup.groupId
               }
             });
 
@@ -249,7 +278,7 @@ export async function PUT(
         const handleExternalParticipant = async (name: string) => {
           let externalParticipant = await tx.externalParticipant.findFirst({
             where: {
-              groupId: context.groupId,
+              groupId: userGroup.groupId,
               name: name
             }
           });
@@ -257,7 +286,7 @@ export async function PUT(
           if (!externalParticipant) {
             externalParticipant = await tx.externalParticipant.create({
               data: {
-                groupId: context.groupId,
+                groupId: userGroup.groupId,
                 name: name
               }
             });
@@ -386,10 +415,9 @@ export async function PUT(
       });
 
       // Revalidate expense caches after update
-      CacheManager.revalidateExpenses(expense.tripId, context.groupId);
+      CacheManager.revalidateExpenses(expense.tripId, userGroup.groupId);
 
       return NextResponse.json({ expense: updatedExpense });
-    });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -408,12 +436,27 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    return await withUnifiedSessionContext(async (context) => {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
       // Find the expense
       const expense = await prisma.expense.findFirst({
         where: {
           id: id,
-          groupId: context.groupId
+          groupId: userGroup.groupId
         }
       });
 
@@ -430,10 +473,9 @@ export async function DELETE(
       });
 
       // Revalidate expense caches after deletion
-      CacheManager.revalidateExpenses(expense.tripId, context.groupId);
+      CacheManager.revalidateExpenses(expense.tripId, userGroup.groupId);
 
       return NextResponse.json({ success: true });
-    });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session'
+import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { isValidTimeSlot, getNextTimeSlot } from '@/lib/timeSlotUtils'
 import { CACHE_TAGS, CACHE_DURATIONS, CacheManager } from '@/lib/cache'
@@ -10,26 +10,42 @@ export async function GET(request: NextRequest) {
   const tripId = searchParams.get('tripId')
 
   try {
-    return await withUnifiedSessionContext(async (context) => {
-      let whereClause: any = {}
-      
-      if (dayId) {
-        whereClause.dayId = dayId
-      } else if (tripId) {
-        whereClause.day = {
-          trip: {
-            id: tripId,
-            groupId: context.groupId
-          }
-        }
-      } else {
-        // Default to all events for the user's group
-        whereClause.day = {
-          trip: {
-            groupId: context.groupId
-          }
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group (we'll use the first one for now)
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    let whereClause: any = {}
+    
+    if (dayId) {
+      whereClause.dayId = dayId
+    } else if (tripId) {
+      whereClause.day = {
+        trip: {
+          id: tripId,
+          groupId: userGroup.groupId
         }
       }
+    } else {
+      // Default to all events for the user's group
+      whereClause.day = {
+        trip: {
+          groupId: userGroup.groupId
+        }
+      }
+    }
 
       const events = await prisma.event.findMany({
         where: whereClause,
@@ -48,31 +64,30 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      const response = NextResponse.json({ events });
-      
-      // Determine cache tags based on query parameters
-      const cacheTags = [CACHE_TAGS.EVENTS(context.groupId)];
-      if (tripId) {
-        cacheTags.push(CACHE_TAGS.TRIP_EVENTS(tripId));
-      }
-      if (dayId) {
-        cacheTags.push(CACHE_TAGS.DAY_EVENTS(dayId));
-      }
-      
-      // Add cache headers with tags for revalidation
-      const cacheHeaders = CacheManager.getCacheHeaders(
-        CACHE_DURATIONS.EVENTS,
-        cacheTags
-      );
-      
-      Object.entries(cacheHeaders).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-      
-      response.headers.set('ETag', CacheManager.generateETag(`events-${context.groupId}-${tripId || dayId || 'all'}`));
-      
-      return response;
-    })
+    const response = NextResponse.json({ events });
+    
+    // Determine cache tags based on query parameters
+    const cacheTags = [CACHE_TAGS.EVENTS(userGroup.groupId)];
+    if (tripId) {
+      cacheTags.push(CACHE_TAGS.TRIP_EVENTS(tripId));
+    }
+    if (dayId) {
+      cacheTags.push(CACHE_TAGS.DAY_EVENTS(dayId));
+    }
+    
+    // Add cache headers with tags for revalidation
+    const cacheHeaders = CacheManager.getCacheHeaders(
+      CACHE_DURATIONS.EVENTS,
+      cacheTags
+    );
+    
+    Object.entries(cacheHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+    
+    response.headers.set('ETag', CacheManager.generateETag(`events-${userGroup.groupId}-${tripId || dayId || 'all'}`));
+    
+    return response;
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -90,43 +105,56 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { event, expenses } = body
 
-    return await withUnifiedSessionContext(async (context) => {
-      // Check create permission
-      requireUnifiedPermission(context, 'create')
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-      console.log('Creating event with simplified data:', {
-        event,
-        expenses,
-        traveler: context.travelerName
-      })
+    // Get user's current group (we'll use the first one for now)
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
 
-      // Verify trip day exists and belongs to user's group (optimization: combine with event creation)
-      const dayId = event.dayId
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
 
-      // Validate required fields
-      if (!event.title || !event.startSlot) {
+    console.log('Creating event with simplified data:', {
+      event,
+      expenses,
+      user: user.email
+    })
+
+    // Verify trip day exists and belongs to user's group (optimization: combine with event creation)
+    const dayId = event.dayId
+
+    // Validate required fields
+    if (!event.title || !event.startSlot) {
         return NextResponse.json({ 
           error: 'Missing required fields',
           details: 'title and startSlot are required'
         }, { status: 400 })
       }
 
-      // Validate time slots
-      if (!isValidTimeSlot(event.startSlot)) {
+    // Validate time slots
+    if (!isValidTimeSlot(event.startSlot)) {
         return NextResponse.json({ 
           error: 'Invalid start time slot',
           details: 'startSlot must be a valid time slot (e.g., "09:00")'
         }, { status: 400 })
       }
 
-      if (event.endSlot && !isValidTimeSlot(event.endSlot)) {
+    if (event.endSlot && !isValidTimeSlot(event.endSlot)) {
         return NextResponse.json({ 
           error: 'Invalid end time slot',
           details: 'endSlot must be a valid time slot (e.g., "10:00")'
         }, { status: 400 })
       }
 
-      const eventData = {
+    const eventData = {
         dayId: dayId,
         title: event.title,
         startSlot: event.startSlot,
@@ -138,14 +166,14 @@ export async function POST(request: NextRequest) {
         color: event.color || '#3B82F6'
       }
 
-      // Create event with verification and expenses in transaction to reduce database calls
-      const newEvent = await prisma.$transaction(async (tx) => {
+    // Create event with verification and expenses in transaction to reduce database calls
+    const newEvent = await prisma.$transaction(async (tx) => {
         // Verify trip day exists and belongs to user's group within transaction
         const tripDay = await tx.tripDay.findFirst({
           where: {
             id: dayId,
             trip: {
-              groupId: context.groupId
+              groupId: userGroup.groupId
             }
           }
         })
@@ -175,19 +203,18 @@ export async function POST(request: NextRequest) {
         return event
       })
 
-      // Get trip info for cache revalidation
-      const tripDay = await prisma.tripDay.findFirst({
-        where: { id: dayId },
-        include: { trip: { select: { id: true, groupId: true } } }
-      });
+    // Get trip info for cache revalidation
+    const tripDay = await prisma.tripDay.findFirst({
+      where: { id: dayId },
+      include: { trip: { select: { id: true, groupId: true } } }
+    });
 
-      if (tripDay?.trip?.groupId) {
-        // Revalidate event caches after creation
-        CacheManager.revalidateEvents(tripDay.trip.id, tripDay.trip.groupId, dayId);
-      }
+    if (tripDay?.trip?.groupId) {
+      // Revalidate event caches after creation
+      CacheManager.revalidateEvents(tripDay.trip.id, tripDay.trip.groupId, dayId);
+    }
 
-      return NextResponse.json({ event: newEvent }, { status: 201 })
-    })
+    return NextResponse.json({ event: newEvent }, { status: 201 })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

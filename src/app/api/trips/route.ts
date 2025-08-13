@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withUnifiedSessionContext, requireUnifiedPermission } from '@/lib/unified-session';
+import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { createAbsoluteDate, createAbsoluteDateRange, normalizeDate } from '@/lib/dateTimeUtils';
 import { CACHE_TAGS, CACHE_DURATIONS, CacheManager } from '@/lib/cache';
@@ -16,25 +16,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return await withUnifiedSessionContext(async (context) => {
-      // Check create permission
-      requireUnifiedPermission(context, 'create');
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-      // Parse dates as absolute calendar dates (timezone-agnostic)
-      const start = createAbsoluteDate(startDate);
-      const end = createAbsoluteDate(endDate);
+    // Get user's current group (we'll use the first one for now)
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    });
 
-      // Create trip using Prisma
-      const trip = await prisma.trip.create({
-        data: {
-          name,
-          startDate: start,
-          endDate: end,
-          destination,
-          groupId: context.groupId,
-          userId: '' // Legacy field, set to empty string
-        }
-      });
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 });
+    }
+
+    // Parse dates as absolute calendar dates (timezone-agnostic)
+    const start = createAbsoluteDate(startDate);
+    const end = createAbsoluteDate(endDate);
+
+    // Create trip using Prisma
+    const trip = await prisma.trip.create({
+      data: {
+        name,
+        startDate: start,
+        endDate: end,
+        destination,
+        groupId: userGroup.groupId,
+        userId: '' // Legacy field, set to empty string
+      }
+    });
 
       // Create trip_days for each day in the range using timezone-agnostic method
       const dateRange = createAbsoluteDateRange(start, end);
@@ -74,11 +87,10 @@ export async function POST(request: NextRequest) {
         endDate: normalizeDate(trip.endDate)
       };
 
-      // Revalidate trips cache after creation
-      CacheManager.revalidateTrips(context.groupId);
+    // Revalidate trips cache after creation
+    CacheManager.revalidateTrips(userGroup.groupId);
 
-      return NextResponse.json({ trip: normalizedTrip }, { status: 201 });
-    });
+    return NextResponse.json({ trip: normalizedTrip }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -99,47 +111,62 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const tripId = searchParams.get('id');
 
-    return await withUnifiedSessionContext(async (context) => {
-      let whereClause: any = {
-        groupId: context.groupId
-      };
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-      // If specific trip ID requested, add it to the filter
-      if (tripId) {
-        whereClause.id = tripId;
-      }
-
-      // Fetch trips filtered by group using Prisma
-      const trips = await prisma.trip.findMany({
-        where: whereClause,
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
-
-      // Normalize date formats to ensure consistency using timezone-agnostic method
-      const normalizedTrips = trips.map(trip => ({
-        ...trip,
-        startDate: normalizeDate(trip.startDate),
-        endDate: normalizeDate(trip.endDate)
-      }));
-
-      const response = NextResponse.json({ trips: normalizedTrips });
-      
-      // Add cache headers with tags for revalidation
-      const cacheHeaders = CacheManager.getCacheHeaders(
-        CACHE_DURATIONS.TRIPS,
-        [CACHE_TAGS.TRIPS(context.groupId)]
-      );
-      
-      Object.entries(cacheHeaders).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-      
-      response.headers.set('ETag', CacheManager.generateETag(`trips-${context.groupId}`));
-      
-      return response;
+    // Get user's current group (we'll use the first one for now)
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
     });
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 });
+    }
+
+    let whereClause: any = {
+      groupId: userGroup.groupId
+    };
+
+    // If specific trip ID requested, add it to the filter
+    if (tripId) {
+      whereClause.id = tripId;
+    }
+
+    // Fetch trips filtered by group using Prisma
+    const trips = await prisma.trip.findMany({
+      where: whereClause,
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Normalize date formats to ensure consistency using timezone-agnostic method
+    const normalizedTrips = trips.map(trip => ({
+      ...trip,
+      startDate: normalizeDate(trip.startDate),
+      endDate: normalizeDate(trip.endDate)
+    }));
+
+    const response = NextResponse.json({ trips: normalizedTrips });
+    
+    // Add cache headers with tags for revalidation
+    const cacheHeaders = CacheManager.getCacheHeaders(
+      CACHE_DURATIONS.TRIPS,
+      [CACHE_TAGS.TRIPS(userGroup.groupId)]
+    );
+    
+    Object.entries(cacheHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+    
+    response.headers.set('ETag', CacheManager.generateETag(`trips-${userGroup.groupId}`));
+    
+    return response;
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

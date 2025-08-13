@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withUnifiedSessionContext } from '@/lib/unified-session';
+import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { CacheManager } from '@/lib/cache';
@@ -33,7 +33,22 @@ const createExpenseSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    return await withUnifiedSessionContext(async (context) => {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
       const body = await request.json();
       
       // Validate request body
@@ -51,7 +66,7 @@ export async function POST(request: NextRequest) {
       const trip = await prisma.trip.findFirst({
         where: {
           id: data.tripId,
-          groupId: context.groupId
+          groupId: userGroup.groupId
         }
       });
 
@@ -66,7 +81,7 @@ export async function POST(request: NextRequest) {
       const owner = await prisma.groupMember.findFirst({
         where: {
           id: data.ownerId,
-          groupId: context.groupId
+          groupId: userGroup.groupId
         }
       });
 
@@ -88,7 +103,7 @@ export async function POST(request: NextRequest) {
         const validParticipants = await prisma.groupMember.findMany({
           where: {
             id: { in: participantIds },
-            groupId: context.groupId
+            groupId: userGroup.groupId
           }
         });
 
@@ -145,7 +160,7 @@ export async function POST(request: NextRequest) {
       const handleExternalParticipant = async (name: string) => {
         let externalParticipant = await prisma.externalParticipant.findFirst({
           where: {
-            groupId: context.groupId,
+            groupId: userGroup.groupId,
             name: name
           }
         });
@@ -153,7 +168,7 @@ export async function POST(request: NextRequest) {
         if (!externalParticipant) {
           externalParticipant = await prisma.externalParticipant.create({
             data: {
-              groupId: context.groupId,
+              groupId: userGroup.groupId,
               name: name
             }
           });
@@ -202,7 +217,7 @@ export async function POST(request: NextRequest) {
           tripId: data.tripId,
           dayId: data.dayId,
           eventId: data.eventId,
-          groupId: context.groupId,
+          groupId: userGroup.groupId,
           participants: data.participants && !data.lineItems ? {
             create: participantsToCreate
           } : undefined,
@@ -266,10 +281,9 @@ export async function POST(request: NextRequest) {
       });
 
       // Revalidate expense caches after creation
-      CacheManager.revalidateExpenses(data.tripId, context.groupId);
+      CacheManager.revalidateExpenses(data.tripId, userGroup.groupId);
 
       return NextResponse.json({ expense });
-    });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -284,13 +298,28 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    return await withUnifiedSessionContext(async (context) => {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
       const { searchParams } = new URL(request.url);
       const tripId = searchParams.get('tripId');
 
       // Build where clause
       const where: any = {
-        groupId: context.groupId
+        groupId: userGroup.groupId
       };
 
       if (tripId) {
@@ -328,7 +357,6 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.json({ expenses });
-    });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

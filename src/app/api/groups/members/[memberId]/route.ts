@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
 
 export async function DELETE(
@@ -8,19 +8,30 @@ export async function DELETE(
 ) {
   try {
     const { memberId } = await params
-    const cookieStore = await cookies()
-    const groupId = cookieStore.get('vacation-planner-group-id')?.value
-    const travelerName = cookieStore.get('vacation-planner-traveler-name')?.value
-
-    if (!groupId || !travelerName) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    const groupId = userGroup.groupId
 
     // Check if current user is an adventurer
     const currentMember = await prisma.groupMember.findFirst({
       where: {
         groupId,
-        travelerName
+        userId: user.id
       },
       select: {
         role: true

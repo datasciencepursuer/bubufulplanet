@@ -1,17 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
 
 // Get group members
 export async function GET() {
   try {
-    const cookieStore = await cookies()
-    const groupId = cookieStore.get('vacation-planner-group-id')?.value
-    const travelerName = cookieStore.get('vacation-planner-traveler-name')?.value
-
-    if (!groupId || !travelerName) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    const groupId = userGroup.groupId
 
     // Get group members using Prisma
     const members = await prisma.groupMember.findMany({
@@ -23,7 +34,8 @@ export async function GET() {
         travelerName: true,
         role: true,
         permissions: true,
-        joinedAt: true
+        joinedAt: true,
+        userId: true
       },
       orderBy: {
         joinedAt: 'asc'
@@ -37,7 +49,7 @@ export async function GET() {
       role: member.role,
       permissions: member.permissions,
       joinedAt: member.joinedAt.toISOString(),
-      isCurrentUser: member.travelerName === travelerName
+      isCurrentUser: member.userId === user.id
     }))
 
     const response = NextResponse.json({ members: transformedMembers });
@@ -59,19 +71,30 @@ export async function PUT(request: NextRequest) {
   try {
     const { memberId, permissions }: { memberId: string; permissions: { read: boolean; create: boolean; modify: boolean } } = await request.json()
 
-    const cookieStore = await cookies()
-    const groupId = cookieStore.get('vacation-planner-group-id')?.value
-    const travelerName = cookieStore.get('vacation-planner-traveler-name')?.value
-
-    if (!groupId || !travelerName) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    const groupId = userGroup.groupId
 
     // Check if current user is an adventurer using Prisma
     const currentMember = await prisma.groupMember.findFirst({
       where: {
         groupId,
-        travelerName
+        userId: user.id
       },
       select: {
         role: true
@@ -106,13 +129,24 @@ export async function POST(request: NextRequest) {
   try {
     const { travelerName, role = 'party member' }: { travelerName: string; role?: 'adventurer' | 'party member' } = await request.json()
 
-    const cookieStore = await cookies()
-    const groupId = cookieStore.get('vacation-planner-group-id')?.value
-    const currentTravelerName = cookieStore.get('vacation-planner-traveler-name')?.value
-
-    if (!groupId || !currentTravelerName) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    const groupId = userGroup.groupId
 
     if (!travelerName?.trim()) {
       return NextResponse.json({ error: 'Traveler name is required' }, { status: 400 })
@@ -122,7 +156,7 @@ export async function POST(request: NextRequest) {
     const currentMember = await prisma.groupMember.findFirst({
       where: {
         groupId,
-        travelerName: currentTravelerName
+        userId: user.id
       },
       select: {
         role: true

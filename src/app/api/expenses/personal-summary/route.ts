@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withUnifiedSessionContext } from '@/lib/unified-session';
+import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/lib/prisma';
 
 interface TripExpenseSummary {
@@ -36,25 +36,41 @@ interface PersonalExpenseSummary {
 
 export async function GET(request: NextRequest) {
   try {
-    return await withUnifiedSessionContext(async (context) => {
-      // Get current member using traveler name from session
-      const currentMember = await prisma.groupMember.findFirst({
-        where: {
-          groupId: context.groupId,
-          travelerName: context.travelerName
-        }
-      });
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-      if (!currentMember) {
-        console.error('Member not found for context:', {
-          groupId: context.groupId,
-          travelerName: context.travelerName
-        });
-        return NextResponse.json({ 
-          error: 'Member not found',
-          details: `No member found with traveler name: ${context.travelerName}`
-        }, { status: 404 });
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
+
+    // Get current member using user ID from Supabase
+    const currentMember = await prisma.groupMember.findFirst({
+      where: {
+        groupId: userGroup.groupId,
+        userId: user.id
       }
+    });
+
+    if (!currentMember) {
+      console.error('Member not found for user:', {
+        groupId: userGroup.groupId,
+        userId: user.id
+      });
+      return NextResponse.json({ 
+        error: 'Member not found',
+        details: `No member found for user: ${user.id}`
+      }, { status: 404 });
+    }
       
       console.log('Found current member:', {
         id: currentMember.id,
@@ -64,7 +80,7 @@ export async function GET(request: NextRequest) {
 
       // Get expenses with all related data in a single query
       const expenses = await prisma.expense.findMany({
-        where: { groupId: context.groupId },
+        where: { groupId: userGroup.groupId },
         include: {
           owner: true,
           participants: {
@@ -86,7 +102,7 @@ export async function GET(request: NextRequest) {
             )
             .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
         : await prisma.trip.findMany({
-            where: { groupId: context.groupId },
+            where: { groupId: userGroup.groupId },
             orderBy: { startDate: 'desc' }
           });
 
@@ -262,7 +278,6 @@ export async function GET(request: NextRequest) {
       };
 
       return NextResponse.json(summary);
-    });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

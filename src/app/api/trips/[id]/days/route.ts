@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withUnifiedSessionContext } from '@/lib/unified-session'
+import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { CACHE_TAGS, CACHE_DURATIONS, CacheManager } from '@/lib/cache'
 
@@ -10,12 +10,27 @@ export async function GET(
   const { id } = await params
 
   try {
-    return await withUnifiedSessionContext(async (context) => {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's current group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    }
       // Get trip with days in single query with verification
       const trip = await prisma.trip.findFirst({
         where: { 
           id: id,
-          groupId: context.groupId 
+          groupId: userGroup.groupId 
         },
         include: {
           tripDays: {
@@ -45,7 +60,6 @@ export async function GET(
       response.headers.set('ETag', CacheManager.generateETag(`trip-days-${id}`));
       
       return response
-    })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
