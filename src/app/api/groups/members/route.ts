@@ -32,6 +32,7 @@ export async function GET() {
       select: {
         id: true,
         travelerName: true,
+        email: true,
         role: true,
         permissions: true,
         joinedAt: true,
@@ -42,14 +43,16 @@ export async function GET() {
       }
     })
 
-    // Transform to match expected format with current user flag
+    // Transform to match expected format with current user flag and linked status
     const transformedMembers = members.map(member => ({
       id: member.id,
       travelerName: member.travelerName,
+      email: member.email,
       role: member.role,
       permissions: member.permissions,
       joinedAt: member.joinedAt.toISOString(),
-      isCurrentUser: member.userId === user.id
+      isCurrentUser: member.userId === user.id,
+      isLinked: !!member.userId // Whether this member has linked their account
     }))
 
     const response = NextResponse.json({ members: transformedMembers });
@@ -124,10 +127,20 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// Add new member to group (adventurers only)
+// Invite new member to group (adventurers only)
 export async function POST(request: NextRequest) {
   try {
-    const { travelerName, role = 'party member' }: { travelerName: string; role?: 'adventurer' | 'party member' } = await request.json()
+    const { 
+      travelerName, 
+      email, 
+      permissions = { read: true, create: true, modify: false },
+      role = 'party member' 
+    }: { 
+      travelerName: string; 
+      email: string;
+      permissions?: { read: boolean; create: boolean; modify: boolean };
+      role?: 'adventurer' | 'party member';
+    } = await request.json()
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -152,6 +165,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Traveler name is required' }, { status: 400 })
     }
 
+    if (!email?.trim()) {
+      return NextResponse.json({ error: 'Email address is required' }, { status: 400 })
+    }
+
     // Check if current user is an adventurer using Prisma
     const currentMember = await prisma.groupMember.findFirst({
       where: {
@@ -164,11 +181,28 @@ export async function POST(request: NextRequest) {
     })
 
     if (!currentMember || currentMember.role !== 'adventurer') {
-      return NextResponse.json({ error: 'Only group adventurers can add members' }, { status: 403 })
+      return NextResponse.json({ error: 'Only group adventurers can invite members' }, { status: 403 })
+    }
+
+    const normalizedEmail = email.trim().toLowerCase()
+
+    // Check if email is already in group using Prisma
+    const existingEmailMember = await prisma.groupMember.findFirst({
+      where: {
+        groupId,
+        email: normalizedEmail
+      },
+      select: {
+        id: true
+      }
+    })
+
+    if (existingEmailMember) {
+      return NextResponse.json({ error: 'This email is already invited to the group' }, { status: 400 })
     }
 
     // Check if traveler name already exists in group using Prisma
-    const existingMember = await prisma.groupMember.findFirst({
+    const existingNameMember = await prisma.groupMember.findFirst({
       where: {
         groupId,
         travelerName: travelerName.trim()
@@ -178,23 +212,71 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    if (existingMember) {
+    if (existingNameMember) {
       return NextResponse.json({ error: 'Traveler name already exists in this group' }, { status: 400 })
     }
 
-    // Add new member using Prisma
-    await prisma.groupMember.create({
+    // Create member with invitation
+    const member = await prisma.groupMember.create({
       data: {
         groupId,
         travelerName: travelerName.trim(),
+        email: normalizedEmail,
         role,
         permissions: role === 'adventurer' 
           ? { read: true, create: true, modify: true }
-          : { read: true, create: false, modify: false }
+          : permissions
       }
     })
 
-    return NextResponse.json({ success: true })
+    // Check if this email has a Supabase account and link immediately
+    try {
+      const { data: userData } = await supabase.auth.admin.getUserByEmail(normalizedEmail)
+      
+      if (userData?.user) {
+        // User exists, link them immediately
+        await prisma.groupMember.update({
+          where: { id: member.id },
+          data: { userId: userData.user.id }
+        })
+
+        // Create UserGroup entry
+        await prisma.userGroup.upsert({
+          where: {
+            unique_user_group: {
+              userId: userData.user.id,
+              groupId
+            }
+          },
+          update: {},
+          create: {
+            userId: userData.user.id,
+            groupId,
+            role: role === 'adventurer' ? 'leader' : 'member',
+            invitedBy: user.id
+          }
+        })
+
+        return NextResponse.json({ 
+          success: true,
+          status: 'added_existing_user',
+          message: 'User added to group immediately'
+        })
+      } else {
+        return NextResponse.json({ 
+          success: true,
+          status: 'invited_new_user',
+          message: 'Invitation created. User will be added when they sign up.'
+        })
+      }
+    } catch (adminError) {
+      // If admin call fails, still create the invitation
+      return NextResponse.json({ 
+        success: true,
+        status: 'invited_pending',
+        message: 'Invitation created. User will be added when they sign up.'
+      })
+    }
 
   } catch (error) {
     console.error('Error in members POST:', error)

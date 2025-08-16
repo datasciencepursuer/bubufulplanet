@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateUnifiedSession } from '@/lib/unified-session'
+import { createClient } from '@/utils/supabase/server'
 import { createAbsoluteDate, createAbsoluteDateRange, normalizeDate } from '@/lib/dateTimeUtils'
 import { CacheManager } from '@/lib/cache'
 
@@ -12,8 +12,10 @@ export async function PUT(
     const { id: tripId } = await params
     
     // Validate session
-    const validation = await validateUnifiedSession()
-    if (!validation.isValid) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -26,6 +28,16 @@ export async function PUT(
         { error: 'Trip name, start date, and end date are required' },
         { status: 400 }
       )
+    }
+
+    // Get user's group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
     }
 
     // Parse dates as absolute calendar dates (timezone-agnostic)
@@ -44,7 +56,7 @@ export async function PUT(
     const existingTrip = await prisma.trip.findUnique({
       where: { 
         id: tripId,
-        groupId: validation.context!.groupId 
+        groupId: userGroup.groupId 
       },
       include: {
         tripDays: {
@@ -133,11 +145,11 @@ export async function PUT(
     } : null
 
     // Revalidate caches after trip update
-    CacheManager.revalidateTrip(tripId, validation.context!.groupId);
+    CacheManager.revalidateTrip(tripId, userGroup.groupId);
     
     // If dates changed, also revalidate events since trip days were regenerated
     if (datesChanged) {
-      CacheManager.revalidateEvents(tripId, validation.context!.groupId);
+      CacheManager.revalidateEvents(tripId, userGroup.groupId);
     }
 
     return NextResponse.json({ 
@@ -173,16 +185,28 @@ export async function DELETE(
     const { id: tripId } = await params
 
     // Validate session and get group info for cache revalidation
-    const validation = await validateUnifiedSession()
-    if (!validation.isValid) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      return NextResponse.json({ error: 'No group found' }, { status: 404 })
     }
 
     // Verify trip exists and belongs to group
     const trip = await prisma.trip.findFirst({
       where: { 
         id: tripId,
-        groupId: validation.context!.groupId 
+        groupId: userGroup.groupId 
       },
       select: { id: true, groupId: true }
     })
@@ -200,9 +224,9 @@ export async function DELETE(
     })
 
     // Revalidate all related caches after deletion
-    CacheManager.revalidateTrip(tripId, validation.context!.groupId);
-    CacheManager.revalidateEvents(tripId, validation.context!.groupId);
-    CacheManager.revalidateExpenses(tripId, validation.context!.groupId);
+    CacheManager.revalidateTrip(tripId, userGroup.groupId);
+    CacheManager.revalidateEvents(tripId, userGroup.groupId);
+    CacheManager.revalidateExpenses(tripId, userGroup.groupId);
 
     return NextResponse.json({ success: true })
   } catch (error) {

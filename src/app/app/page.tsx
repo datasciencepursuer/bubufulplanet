@@ -16,83 +16,64 @@ import BearGlobeLoader from '@/components/BearGlobeLoader'
 import { useNotify } from '@/hooks/useNotify'
 import { createClient } from '@/utils/supabase/client'
 import TravelerNameEditor from '@/components/TravelerNameEditor'
+import GroupSelector from '@/components/GroupSelector'
+import GroupNameEditor from '@/components/GroupNameEditor'
+import { useGroup } from '@/contexts/GroupContext'
 
 export default function AppPage() {
   const { warning } = useNotify()
+  const { 
+    selectedGroup, 
+    selectedGroupMember, 
+    loading: groupLoading, 
+    canCreate, 
+    canModify, 
+    isAdventurer,
+    updateSelectedGroupName,
+    selectGroup,
+    availableGroups
+  } = useGroup()
   const [showTripForm, setShowTripForm] = useState(false)
   const [selectedDates, setSelectedDates] = useState<{ start: Date; end: Date } | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [tripsLoading, setTripsLoading] = useState(true)
   const [trips, setTrips] = useState<any[]>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
-  const [groupInfo, setGroupInfo] = useState<{
-    name: string, 
-    accessCode: string, 
-    travelerName?: string, 
-    role?: string,
-    permissions?: {
-      read: boolean
-      create: boolean
-      modify: boolean
-    }
-  } | null>(null)
   const [accessCodeCopied, setAccessCodeCopied] = useState(false)
   const [editingTrip, setEditingTrip] = useState<any>(null)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    const loadInitialData = async () => {
-      setLoading(true)
+    const checkAuth = async () => {
       try {
         // Check for Supabase auth
         const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          // Load user's group data and trips
-          await Promise.all([loadTrips(), loadSupabaseUserGroup(user.id)])
-        } else {
+        if (!user) {
           // Redirect to login if not authenticated
           router.push('/login')
           return
         }
-      } finally {
-        setLoading(false)
+      } catch (error) {
+        console.error('Auth check failed:', error)
+        router.push('/login')
       }
     }
-    loadInitialData()
+    checkAuth()
   }, [supabase.auth, router])
 
-  const loadSupabaseUserGroup = async (userId: string) => {
-    try {
-      const response = await fetch('/api/groups/current')
-      if (response.ok) {
-        const data = await response.json()
-        
-        // Check if user needs to complete setup (has temporary name)
-        if (data.travelerName === 'New Traveler') {
-          router.push('/setup')
-          return
-        }
-        
-        setGroupInfo({
-          name: data.group.name,
-          accessCode: data.group.accessCode,
-          travelerName: data.travelerName || 'User',
-          role: 'adventurer',
-          permissions: {
-            read: true,
-            create: true,
-            modify: true
-          }
-        })
-      }
-    } catch (error) {
-      console.error('Error loading user group:', error)
+  // Load trips when selected group changes
+  useEffect(() => {
+    if (selectedGroup) {
+      loadTrips()
     }
-  }
+  }, [selectedGroup])
 
   const loadTrips = async () => {
+    if (!selectedGroup) return
+    
     try {
+      setTripsLoading(true)
       const response = await fetch('/api/trips')
       if (response.ok) {
         const data = await response.json()
@@ -100,13 +81,15 @@ export default function AppPage() {
       }
     } catch (error) {
       console.error('Error loading trips:', error)
+    } finally {
+      setTripsLoading(false)
     }
   }
 
 
   const handleTripSelect = (start: Date, end: Date) => {
     // Check if user has create permission
-    if (!groupInfo?.permissions?.create) {
+    if (!canCreate) {
       warning('Permission Denied', 'You do not have permission to create trips. Please ask your group adventurer for permission.')
       return
     }
@@ -115,16 +98,16 @@ export default function AppPage() {
   }
 
   const handleCopyAccessCode = async () => {
-    if (!groupInfo?.accessCode) return
+    if (!selectedGroup?.accessCode) return
 
     try {
-      await navigator.clipboard.writeText(groupInfo.accessCode)
+      await navigator.clipboard.writeText(selectedGroup.accessCode)
       setAccessCodeCopied(true)
       setTimeout(() => setAccessCodeCopied(false), 2000)
     } catch (err) {
       // Fallback for browsers that don't support clipboard API
       const textArea = document.createElement('textarea')
-      textArea.value = groupInfo.accessCode
+      textArea.value = selectedGroup.accessCode
       document.body.appendChild(textArea)
       textArea.select()
       document.execCommand('copy')
@@ -136,7 +119,7 @@ export default function AppPage() {
 
   const handleCreateTrip = () => {
     // Check if user has create permission
-    if (!groupInfo?.permissions?.create) {
+    if (!canCreate) {
       alert('You do not have permission to create trips. Please ask your group adventurer for permission.')
       return
     }
@@ -153,7 +136,7 @@ export default function AppPage() {
 
   const handleEditTrip = (trip: any) => {
     // Check if user has modify permission
-    if (!groupInfo?.permissions?.modify) {
+    if (!canModify) {
       alert('You do not have permission to edit trips. Please ask your group adventurer for permission.')
       return
     }
@@ -214,7 +197,7 @@ export default function AppPage() {
   const handleDeleteTripClick = (tripId: string, tripName: string, event: React.MouseEvent) => {
     event.stopPropagation()
     // Check if user has modify permission
-    if (!groupInfo?.permissions?.modify) {
+    if (!canModify) {
       alert('You do not have permission to delete trips. Please ask your group adventurer for permission.')
       return
     }
@@ -246,7 +229,7 @@ export default function AppPage() {
     if (!editingTrip) return
     
     // Check if user has modify permission
-    if (!groupInfo?.permissions?.modify) {
+    if (!canModify) {
       alert('You do not have permission to delete trips. Please ask your group adventurer for permission.')
       return
     }
@@ -272,8 +255,7 @@ export default function AppPage() {
         throw new Error(errorData.error || 'Failed to update traveler name')
       }
 
-      // Update local state
-      setGroupInfo(prev => prev ? { ...prev, travelerName: newName } : null)
+      // The context will update automatically on next data fetch
     } catch (error) {
       console.error('Error updating traveler name:', error)
       throw error
@@ -312,7 +294,7 @@ export default function AppPage() {
     return { currentTrip: current || null, upcomingTrips: upcoming, pastTrips: past }
   }, [trips])
 
-  if (loading) {
+  if (groupLoading || tripsLoading) {
     return <BearGlobeLoader />
   }
 
@@ -334,13 +316,23 @@ export default function AppPage() {
                 <span className="hidden sm:inline">Back</span>
               </Button>
               <div className="min-w-0">
-                <h1 className="text-base lg:text-lg font-semibold truncate">
-                  {groupInfo ? groupInfo.name : 'My Trips'}
-                </h1>
-                {groupInfo && (
+                {selectedGroup ? (
+                  <GroupNameEditor
+                    groupId={selectedGroup.id}
+                    currentName={selectedGroup.name}
+                    canEdit={isAdventurer}
+                    onNameUpdate={updateSelectedGroupName}
+                    className="text-base lg:text-lg"
+                  />
+                ) : (
+                  <h1 className="text-base lg:text-lg font-semibold truncate">
+                    Select a Group
+                  </h1>
+                )}
+                {selectedGroup && (
                   <div className="flex items-center gap-2 text-xs lg:text-sm text-gray-500">
                     <span className="hidden sm:inline">Access Code:</span>
-                    <span className="font-mono font-medium">{groupInfo.accessCode}</span>
+                    <span className="font-mono font-medium">{selectedGroup.accessCode}</span>
                     <button
                       onClick={handleCopyAccessCode}
                       className="relative inline-flex items-center justify-center w-5 h-5 text-gray-400 hover:text-teal-600 transition-colors duration-200 rounded-sm hover:bg-teal-50"
@@ -373,7 +365,12 @@ export default function AppPage() {
             </div>
             
             {/* Right Section */}
-            <div className="flex items-center gap-1 lg:gap-4 justify-end">
+            <div className="flex items-center gap-1 lg:gap-3 justify-end">
+              <GroupSelector
+                currentGroupId={selectedGroup?.id || null}
+                onGroupChange={selectGroup}
+                onManageGroup={(groupId) => router.push('/group-settings')}
+              />
               <Button 
                 variant="outline" 
                 size="sm"
@@ -381,7 +378,7 @@ export default function AppPage() {
                 className="gap-1 lg:gap-2"
               >
                 <Users className="w-4 h-4" /> 
-                <span className="hidden sm:inline">Group Settings</span>
+                <span className="hidden sm:inline">Settings</span>
               </Button>
               <Button 
                 variant="outline" 
@@ -409,13 +406,13 @@ export default function AppPage() {
                 <h2 className="text-xl font-bold text-gray-900">
                   Your Trips
                 </h2>
-                {groupInfo && groupInfo.travelerName && (
+                {selectedGroupMember && (
                   <div className="mt-2">
                     <p className="text-sm text-gray-600 mb-2">
-                      Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'}:
+                      Welcome {isAdventurer ? 'Adventurer' : 'Party Member'}:
                     </p>
                     <TravelerNameEditor
-                      currentName={groupInfo.travelerName}
+                      currentName={selectedGroupMember.travelerName}
                       onNameUpdate={handleUpdateTravelerName}
                       className="text-sm"
                     />
@@ -427,7 +424,7 @@ export default function AppPage() {
               <div className="hidden lg:flex lg:justify-between lg:items-start space-y-4 lg:space-y-0">
                 <div>
                   <h2 className="text-3xl font-bold mb-2">
-                    {groupInfo ? `${groupInfo.name} - Plan Your Trips` : 'Plan Your Trips'}
+                    {selectedGroup ? `${selectedGroup.name} - Plan Your Trips` : 'Plan Your Trips'}
                   </h2>
                   <p className="text-gray-600">
                     Drag and select dates on the calendar to create a new trip
@@ -435,14 +432,14 @@ export default function AppPage() {
                 </div>
                 
                 {/* Welcome Card */}
-                {groupInfo && groupInfo.travelerName && (
+                {selectedGroupMember && (
                   <Card className="bg-teal-50 border-teal-200 max-w-sm flex-shrink-0">
                     <CardContent className="pt-4">
                       <p className="text-lg text-teal-700 font-medium mb-3">
-                        Welcome {groupInfo.role === 'adventurer' ? 'Adventurer' : 'Party Member'}:
+                        Welcome {isAdventurer ? 'Adventurer' : 'Party Member'}:
                       </p>
                       <TravelerNameEditor
-                        currentName={groupInfo.travelerName}
+                        currentName={selectedGroupMember.travelerName}
                         onNameUpdate={handleUpdateTravelerName}
                         className="text-base"
                       />
@@ -481,7 +478,7 @@ export default function AppPage() {
                 onCreateTrip={handleCreateTrip}
                 onEditTrip={handleEditTrip}
                 onDeleteTrip={handleDeleteTripClick}
-                permissions={groupInfo?.permissions}
+                permissions={selectedGroupMember?.permissions}
               />
               
               {/* Mobile Utility Sections */}

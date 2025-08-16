@@ -12,6 +12,7 @@ import { useNotify } from '@/hooks/useNotify'
 interface GroupMember {
   id: string
   travelerName: string
+  email?: string
   role: string
   permissions: {
     read: boolean
@@ -20,6 +21,7 @@ interface GroupMember {
   }
   joinedAt: string
   isCurrentUser?: boolean
+  isLinked?: boolean // Whether the user has signed up and linked their account
 }
 
 export default function GroupMembersManagement() {
@@ -28,6 +30,12 @@ export default function GroupMembersManagement() {
   const [loading, setLoading] = useState(true)
   const [showAddMember, setShowAddMember] = useState(false)
   const [newMemberName, setNewMemberName] = useState('')
+  const [newMemberEmail, setNewMemberEmail] = useState('')
+  const [defaultPermissions, setDefaultPermissions] = useState({
+    read: true,
+    create: true,
+    modify: false
+  })
   const [editingMember, setEditingMember] = useState<string | null>(null)
   const [showConfirmDelete, setShowConfirmDelete] = useState<string | null>(null)
   const { isAdventurer } = usePermissions()
@@ -52,7 +60,7 @@ export default function GroupMembersManagement() {
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMemberName.trim()) return
+    if (!newMemberName.trim() || !newMemberEmail.trim()) return
 
     try {
       const response = await fetch('/api/groups/members', {
@@ -60,12 +68,15 @@ export default function GroupMembersManagement() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           travelerName: newMemberName.trim(),
+          email: newMemberEmail.trim().toLowerCase(),
+          permissions: defaultPermissions,
           role: 'party member'
         })
       })
 
       if (response.ok) {
         setNewMemberName('')
+        setNewMemberEmail('')
         setShowAddMember(false)
         loadMembers()
       } else {
@@ -170,9 +181,17 @@ export default function GroupMembersManagement() {
                     {member.role === 'adventurer' && (
                       <Shield className="w-4 h-4 text-amber-600" />
                     )}
+                    {!member.isLinked && (
+                      <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">
+                        Pending
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm text-gray-600 mt-1">
                     {getRoleDisplay(member.role)}
+                    {member.email && (
+                      <span className="text-gray-400"> • {member.email}</span>
+                    )}
                   </p>
                   
                   {editingMember === member.id ? (
@@ -276,31 +295,95 @@ export default function GroupMembersManagement() {
         {/* Add Member Form */}
         {showAddMember && (
           <div className="border-t p-4 bg-gray-50">
-            <form onSubmit={handleAddMember} className="flex gap-2">
-              <input
-                type="text"
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                placeholder="Enter traveler name"
-                className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoFocus
-              />
-              <Button type="submit" disabled={!newMemberName.trim()}>
-                Add
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowAddMember(false)
-                  setNewMemberName('')
-                }}
-              >
-                Cancel
-              </Button>
+            <form onSubmit={handleAddMember} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Traveler Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="Enter traveler name"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={newMemberEmail}
+                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                    placeholder="Enter email address"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Default Permissions
+                </label>
+                <div className="space-y-2 bg-white p-3 rounded border">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={defaultPermissions.create}
+                      onChange={(e) => setDefaultPermissions(prev => ({ 
+                        ...prev, 
+                        create: e.target.checked 
+                      }))}
+                      className="rounded"
+                    />
+                    <Plus className="w-3 h-3" />
+                    Can create trips & events
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={defaultPermissions.modify}
+                      onChange={(e) => setDefaultPermissions(prev => ({ 
+                        ...prev, 
+                        modify: e.target.checked 
+                      }))}
+                      className="rounded"
+                    />
+                    <Edit className="w-3 h-3" />
+                    Can edit & delete items
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  type="submit" 
+                  disabled={!newMemberName.trim() || !newMemberEmail.trim()}
+                  className="flex-1"
+                >
+                  Send Invitation
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowAddMember(false)
+                    setNewMemberName('')
+                    setNewMemberEmail('')
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
             </form>
             <p className="text-xs text-gray-500 mt-2">
-              New members will need the group access code to join
+              Members will be linked automatically when they sign up with the provided email address.
+              If they already have an account with this email, they'll be added immediately.
             </p>
           </div>
         )}

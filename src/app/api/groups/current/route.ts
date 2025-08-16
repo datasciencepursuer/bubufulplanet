@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/utils/supabase/server'
 
-// Get current user's group information
-export async function GET() {
+// Get user's group information (specific group or default first group)
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -12,20 +12,45 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group via userGroup relationship
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { 
-        group: {
-          select: {
-            id: true,
-            name: true,
-            accessCode: true,
-            createdAt: true
+    // Check if a specific group ID is requested
+    const { searchParams } = new URL(request.url)
+    const requestedGroupId = searchParams.get('groupId')
+
+    let userGroup
+    if (requestedGroupId) {
+      // Get specific group if user is a member
+      userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        },
+        include: { 
+          group: {
+            select: {
+              id: true,
+              name: true,
+              accessCode: true,
+              createdAt: true
+            }
           }
         }
-      }
-    })
+      })
+    } else {
+      // Get user's first group (default behavior)
+      userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { 
+          group: {
+            select: {
+              id: true,
+              name: true,
+              accessCode: true,
+              createdAt: true
+            }
+          }
+        }
+      })
+    }
 
     if (!userGroup || !userGroup.group) {
       return NextResponse.json({ error: 'No group found' }, { status: 404 })
