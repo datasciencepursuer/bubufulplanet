@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { createClient } from '@/utils/supabase/server'
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     groupId: string
-  }
+  }>
 }
 
 // Update group details (name, etc.) - only for adventurers/leaders
@@ -18,7 +18,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { groupId } = params
+    const { groupId } = await params
     const { name }: { name: string } = await request.json()
 
     if (!name?.trim()) {
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { groupId } = params
+    const { groupId } = await params
 
     // Check if user is a member of this group
     const userGroup = await prisma.userGroup.findFirst({
