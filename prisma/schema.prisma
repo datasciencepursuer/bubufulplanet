@@ -80,6 +80,7 @@ model Expense {
   category    String?  @db.VarChar(100)
   ownerId     String   @map("owner_id") @db.Uuid
   groupId     String   @map("group_id") @db.Uuid
+  splitType   String   @default("equal") @map("split_type") @db.VarChar(20) // "equal", "manual", "itemized"
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   day         TripDay? @relation(fields: [dayId], references: [id], onDelete: Cascade)
   event       Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -87,6 +88,7 @@ model Expense {
   owner       GroupMember @relation("ExpenseOwner", fields: [ownerId], references: [id])
   participants ExpenseParticipant[]
   lineItems   ExpenseLineItem[]
+  participantItemizedLists ParticipantItemizedList[]
 
   @@index([dayId], map: "idx_expenses_day_id")
   @@index([eventId], map: "idx_expenses_event_id")
@@ -95,6 +97,7 @@ model Expense {
   @@index([groupId], map: "idx_expenses_group_id")
   @@index([groupId, tripId], map: "idx_expenses_group_trip")
   @@index([groupId, ownerId], map: "idx_expenses_group_owner")
+  @@index([splitType], map: "idx_expenses_split_type")
   @@map("expenses")
 }
 
@@ -147,6 +150,7 @@ model GroupMember {
   ownedExpenses Expense[]     @relation("ExpenseOwner")
   expenseParticipations ExpenseParticipant[]
   lineItemParticipations LineItemParticipant[]
+  participantItemizedLists ParticipantItemizedList[] @relation("ParticipantItemizedLists")
 
   @@unique([groupId, travelerName], name: "unique_group_traveler")
   @@unique([groupId, email], name: "unique_group_email")
@@ -208,6 +212,7 @@ model ExternalParticipant {
   group         TravelGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   expenseParticipations ExpenseParticipant[]
   lineItemParticipations LineItemParticipant[]
+  participantItemizedLists ParticipantItemizedList[] @relation("ExternalParticipantItemizedLists")
 
   @@unique([groupId, name])
   @@index([groupId], map: "idx_external_participants_group_id")
@@ -252,6 +257,45 @@ model LineItemParticipant {
   @@index([participantId], map: "idx_line_item_participants_participant_id")
   @@index([externalParticipantId], map: "idx_line_item_participants_external_participant_id")
   @@map("line_item_participants")
+}
+
+// New models for itemized split feature
+model ParticipantItemizedList {
+  id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expenseId              String               @map("expense_id") @db.Uuid
+  participantId          String?              @map("participant_id") @db.Uuid
+  externalParticipantId  String?              @map("external_participant_id") @db.Uuid
+  externalName           String?              @map("external_name") @db.VarChar(255)
+  totalAmount            Decimal              @map("total_amount") @db.Decimal(10, 2) @default(0)
+  splitPercentage        Decimal              @map("split_percentage") @db.Decimal(5, 2) @default(0)
+  createdAt              DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  expense             Expense               @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  participant         GroupMember?          @relation("ParticipantItemizedLists", fields: [participantId], references: [id])
+  externalParticipant ExternalParticipant?  @relation("ExternalParticipantItemizedLists", fields: [externalParticipantId], references: [id], onDelete: SetNull)
+  items               ParticipantItem[]
+  
+  @@unique([expenseId, participantId])
+  @@unique([expenseId, externalName])
+  @@index([expenseId], map: "idx_participant_itemized_lists_expense_id")
+  @@index([participantId], map: "idx_participant_itemized_lists_participant_id")
+  @@index([externalParticipantId], map: "idx_participant_itemized_lists_external_participant_id")
+  @@map("participant_itemized_lists")
+}
+
+model ParticipantItem {
+  id                     String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  participantListId      String                    @map("participant_list_id") @db.Uuid
+  description            String                    @db.VarChar(255)
+  amount                 Decimal                   @db.Decimal(10, 2)
+  quantity               Int                       @default(1)
+  category               String?                   @db.VarChar(100)
+  createdAt              DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  participantList        ParticipantItemizedList   @relation(fields: [participantListId], references: [id], onDelete: Cascade)
+  
+  @@index([participantListId], map: "idx_participant_items_list_id")
+  @@map("participant_items")
 }
 
 model UserGroup {

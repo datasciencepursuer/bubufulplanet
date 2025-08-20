@@ -143,7 +143,9 @@ export async function GET(request: NextRequest) {
       orderBy: {
         createdAt: 'desc'
       }
-    });
+    })
+
+    console.log(`GET trips: Found ${trips.length} trips for group ${userGroup.groupId}:`, trips.map(t => ({ id: t.id, name: t.name, groupId: t.groupId })));
 
     // Normalize date formats to ensure consistency using timezone-agnostic method
     const normalizedTrips = trips.map(trip => ({

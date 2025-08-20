@@ -13,6 +13,7 @@ const createExpenseSchema = z.object({
   tripId: z.string().uuid(),
   dayId: z.string().uuid().optional(),
   eventId: z.string().uuid().optional(),
+  splitType: z.enum(['equal', 'manual', 'itemized']).default('equal'),
   participants: z.array(z.object({
     participantId: z.string().uuid().optional(),
     externalName: z.string().max(255).optional(),
@@ -27,6 +28,16 @@ const createExpenseSchema = z.object({
       participantId: z.string().uuid().optional(),
       externalName: z.string().max(255).optional(),
       splitPercentage: z.number().min(0).max(100)
+    })).min(1)
+  })).optional(),
+  participantItemizedLists: z.array(z.object({
+    participantId: z.string().uuid().optional(),
+    externalName: z.string().max(255).optional(),
+    items: z.array(z.object({
+      description: z.string().min(1).max(255),
+      amount: z.number().positive(),
+      quantity: z.number().int().positive().default(1),
+      category: z.string().max(100).optional()
     })).min(1)
   })).optional()
 });
@@ -139,6 +150,23 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Calculate total amount for itemized split and validate
+      let calculatedTotal = 0;
+      if (data.splitType === 'itemized' && data.participantItemizedLists) {
+        for (const participantList of data.participantItemizedLists) {
+          const participantTotal = participantList.items.reduce((sum, item) => sum + (item.amount * (item.quantity || 1)), 0);
+          calculatedTotal += participantTotal;
+        }
+        
+        // For itemized split, the amount should match the calculated total
+        if (Math.abs(calculatedTotal - data.amount) > 0.01) {
+          return NextResponse.json(
+            { error: `Total amount (${data.amount}) must match sum of all participant items (${calculatedTotal})` },
+            { status: 400 }
+          );
+        }
+      }
+
       // Verify dayId if provided
       if (data.dayId) {
         const day = await prisma.tripDay.findFirst({
@@ -207,7 +235,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Create the expense with participants or line items
+      // Create the expense with participants, line items, or itemized lists
       const expense = await prisma.expense.create({
         data: {
           description: data.description,
@@ -218,7 +246,8 @@ export async function POST(request: NextRequest) {
           dayId: data.dayId,
           eventId: data.eventId,
           groupId: userGroup.groupId,
-          participants: data.participants && !data.lineItems ? {
+          splitType: data.splitType,
+          participants: data.participants && !data.lineItems && data.splitType !== 'itemized' ? {
             create: participantsToCreate
           } : undefined,
           lineItems: data.lineItems ? {
@@ -254,6 +283,34 @@ export async function POST(request: NextRequest) {
                 }
               };
             }))
+          } : undefined,
+          participantItemizedLists: data.splitType === 'itemized' && data.participantItemizedLists ? {
+            create: await Promise.all(data.participantItemizedLists.map(async (participantList) => {
+              const participantTotal = participantList.items.reduce((sum, item) => sum + (item.amount * (item.quantity || 1)), 0);
+              const splitPercentage = calculatedTotal > 0 ? (participantTotal / calculatedTotal) * 100 : 0;
+              
+              let externalParticipantId = null;
+              if (participantList.externalName && !participantList.participantId) {
+                const externalParticipant = await handleExternalParticipant(participantList.externalName);
+                externalParticipantId = externalParticipant.id;
+              }
+              
+              return {
+                participantId: participantList.participantId,
+                externalParticipantId,
+                externalName: participantList.externalName,
+                totalAmount: participantTotal,
+                splitPercentage,
+                items: {
+                  create: participantList.items.map(item => ({
+                    description: item.description,
+                    amount: item.amount,
+                    quantity: item.quantity || 1,
+                    category: item.category
+                  }))
+                }
+              };
+            }))
           } : undefined
         },
         include: {
@@ -272,6 +329,13 @@ export async function POST(request: NextRequest) {
                   externalParticipant: true
                 }
               }
+            }
+          },
+          participantItemizedLists: {
+            include: {
+              participant: true,
+              externalParticipant: true,
+              items: true
             }
           },
           trip: true,
@@ -344,6 +408,13 @@ export async function GET(request: NextRequest) {
                   externalParticipant: true
                 }
               }
+            }
+          },
+          participantItemizedLists: {
+            include: {
+              participant: true,
+              externalParticipant: true,
+              items: true
             }
           },
           trip: true,

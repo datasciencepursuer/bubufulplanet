@@ -22,10 +22,11 @@ interface AllTripsViewProps {
   trips: Trip[]
   onTripsChange: () => void
   onEditTrip?: (trip: Trip) => void
+  onDeleteTrip?: (tripId: string, tripName: string, event: React.MouseEvent) => void
   className?: string
 }
 
-export default function AllTripsView({ trips, onTripsChange, onEditTrip, className }: AllTripsViewProps) {
+export default function AllTripsView({ trips, onTripsChange, onEditTrip, onDeleteTrip, className }: AllTripsViewProps) {
   const { error } = useNotify()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
@@ -69,8 +70,14 @@ export default function AllTripsView({ trips, onTripsChange, onEditTrip, classNa
 
   const handleDeleteTripClick = (tripId: string, tripName: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    setTripToDelete({ id: tripId, name: tripName })
-    setShowDeleteConfirm(true)
+    // If parent provides delete handler, use it (for optimistic updates)
+    if (onDeleteTrip) {
+      onDeleteTrip(tripId, tripName, event)
+    } else {
+      // Fallback to local deletion logic
+      setTripToDelete({ id: tripId, name: tripName })
+      setShowDeleteConfirm(true)
+    }
   }
 
   const handleDeleteTripConfirm = async () => {
@@ -82,14 +89,16 @@ export default function AllTripsView({ trips, onTripsChange, onEditTrip, classNa
       })
 
       if (!response.ok) {
-        throw new Error('Failed to delete trip')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       onTripsChange()
       setTripToDelete(null)
     } catch (err) {
       console.error('Error deleting trip:', err)
-      error('Delete Failed', 'Failed to delete trip. Please try again.')
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
+      error('Delete Failed', `Failed to delete trip: ${errorMessage}`)
     }
   }
 

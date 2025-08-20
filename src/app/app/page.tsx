@@ -69,18 +69,35 @@ export default function AppPage() {
     }
   }, [selectedGroup])
 
+  // Force refresh trips data (clears any stale data)
+  const forceRefreshTrips = async () => {
+    setTrips([]) // Clear current trips immediately
+    await loadTrips()
+  }
+
   const loadTrips = async () => {
     if (!selectedGroup) return
     
     try {
       setTripsLoading(true)
-      const response = await fetch('/api/trips')
+      // Add cache-busting parameter to ensure fresh data
+      const response = await fetch(`/api/trips?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        }
+      })
       if (response.ok) {
         const data = await response.json()
+        console.log('Loaded trips from API:', data.trips?.length || 0, 'trips')
         setTrips(data.trips || [])
+      } else {
+        console.error('Failed to load trips:', response.status, response.statusText)
+        setTrips([]) // Clear trips if API fails
       }
     } catch (error) {
       console.error('Error loading trips:', error)
+      setTrips([]) // Clear trips on error
     } finally {
       setTripsLoading(false)
     }
@@ -177,8 +194,8 @@ export default function AppPage() {
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      // Reload trips after creating/updating
-      await loadTrips()
+      // Force refresh trips after creating/updating
+      await forceRefreshTrips()
       setEditingTrip(null)
       setShowTripForm(false)
       
@@ -208,20 +225,33 @@ export default function AppPage() {
   const handleDeleteTripConfirm = async () => {
     if (!tripToDelete) return
 
+    // Store reference to trip being deleted
+    const tripBeingDeleted = tripToDelete
+    
+    // Optimistic update: immediately remove trip from UI
+    const originalTrips = [...trips]
+    setTrips(trips.filter(trip => trip.id !== tripBeingDeleted.id))
+    setTripToDelete(null)
+
     try {
-      const response = await fetch(`/api/trips/${tripToDelete.id}`, {
+      const response = await fetch(`/api/trips/${tripBeingDeleted.id}`, {
         method: 'DELETE',
       })
 
       if (!response.ok) {
-        throw new Error('Failed to delete trip')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Delete API error:', errorData)
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      await loadTrips()
-      setTripToDelete(null)
+      // Success: force refresh to ensure no stale data
+      await forceRefreshTrips()
     } catch (error) {
       console.error('Error deleting trip:', error)
-      alert('Failed to delete trip. Please try again.')
+      // Rollback: restore original trips state
+      setTrips(originalTrips)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      alert(`Failed to delete trip: ${errorMessage}`)
     }
   }
 
@@ -454,8 +484,9 @@ export default function AppPage() {
               {/* Next Trip Card - Moved from utility cards */}
               <AllTripsView 
                 trips={trips} 
-                onTripsChange={loadTrips}
+                onTripsChange={forceRefreshTrips}
                 onEditTrip={handleEditTrip}
+                onDeleteTrip={handleDeleteTripClick}
               />
               
               <AppMonthlyCalendar 

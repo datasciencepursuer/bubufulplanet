@@ -83,8 +83,19 @@ export default function TripForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    const submitStartDate = isEdit ? editStartDate : (startDate ? normalizeDate(startDate) : editStartDate)
-    const submitEndDate = isEdit ? editEndDate : (endDate ? normalizeDate(endDate) : editEndDate)
+    const submitStartDate = (isEdit || allowDateEdit) ? editStartDate : (startDate ? normalizeDate(startDate) : editStartDate)
+    const submitEndDate = (isEdit || allowDateEdit) ? editEndDate : (endDate ? normalizeDate(endDate) : editEndDate)
+    
+    // Validate that start date is before or equal to end date
+    if (submitStartDate && submitEndDate) {
+      const startDateObj = new Date(submitStartDate)
+      const endDateObj = new Date(submitEndDate)
+      
+      if (startDateObj > endDateObj) {
+        alert('Start date must be before or equal to end date.')
+        return
+      }
+    }
     
     const tripData = {
       name,
@@ -110,8 +121,8 @@ export default function TripForm({
   }
 
   // Calculate duration based on current dates (timezone-agnostic inclusive range)
-  const currentStartDate = isEdit && editStartDate ? createAbsoluteDate(editStartDate) : startDate
-  const currentEndDate = isEdit && editEndDate ? createAbsoluteDate(editEndDate) : endDate
+  const currentStartDate = (isEdit || allowDateEdit) && editStartDate ? createAbsoluteDate(editStartDate) : startDate
+  const currentEndDate = (isEdit || allowDateEdit) && editEndDate ? createAbsoluteDate(editEndDate) : endDate
   
   const tripDuration = currentStartDate && currentEndDate 
     ? (() => {
@@ -196,7 +207,6 @@ export default function TripForm({
                         onChange={(e) => setEditEndDate(e.target.value)}
                         className="w-full px-3 py-2 text-sm rounded-lg border border-teal-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-200 focus:outline-none"
                         required
-                        min={editStartDate}
                       />
                     </div>
                   </div>

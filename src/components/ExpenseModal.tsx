@@ -44,6 +44,21 @@ interface LineItemEntry {
   participants: ParticipantEntry[];
 }
 
+interface ParticipantItem {
+  id: string;
+  description: string;
+  amount: number;
+  quantity: number;
+  category?: string;
+}
+
+interface ParticipantItemizedList {
+  participantId?: string;
+  externalName?: string;
+  items: ParticipantItem[];
+  totalAmount: number;
+}
+
 const EXPENSE_CATEGORIES = [
   'Food & Dining',
   'Transportation',
@@ -83,6 +98,7 @@ export default function ExpenseModal({
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [participants, setParticipants] = useState<ParticipantEntry[]>([]);
   const [lineItems, setLineItems] = useState<LineItemEntry[]>([]);
+  const [participantItemizedLists, setParticipantItemizedLists] = useState<ParticipantItemizedList[]>([]);
   const [externalName, setExternalName] = useState('');
   const [externalParticipants, setExternalParticipants] = useState<{id: string, name: string}[]>([]);
   const [showExternalSuggestions, setShowExternalSuggestions] = useState(false);
@@ -444,55 +460,189 @@ export default function ExpenseModal({
     }
   };
   
+  // Itemized list helper functions
+  const addParticipantToItemizedList = () => {
+    if (groupMembers.length === 0) return;
+    
+    const firstAvailableMember = groupMembers.find(
+      member => !participantItemizedLists.some(list => list.participantId === member.id)
+    );
+    
+    if (!firstAvailableMember) return;
+
+    setParticipantItemizedLists([...participantItemizedLists, {
+      participantId: firstAvailableMember.id,
+      items: [],
+      totalAmount: 0
+    }]);
+  };
+
+  const removeParticipantFromItemizedList = (index: number) => {
+    setParticipantItemizedLists(participantItemizedLists.filter((_, i) => i !== index));
+    // Update amount if total calculation is automatic
+    if (splitMode === 'itemized') {
+      updateAmountFromItemizedLists(participantItemizedLists.filter((_, i) => i !== index));
+    }
+  };
+
+  const addItemToParticipant = (participantIndex: number) => {
+    const updated = [...participantItemizedLists];
+    updated[participantIndex].items.push({
+      id: Date.now().toString(),
+      description: '',
+      amount: 0,
+      quantity: 1
+    });
+    setParticipantItemizedLists(updated);
+  };
+
+  const removeItemFromParticipant = (participantIndex: number, itemIndex: number) => {
+    const updated = [...participantItemizedLists];
+    updated[participantIndex].items.splice(itemIndex, 1);
+    updateParticipantTotal(updated, participantIndex);
+    updateAmountFromItemizedLists(updated);
+    setParticipantItemizedLists(updated);
+  };
+
+  const updateParticipantItem = (participantIndex: number, itemIndex: number, field: string, value: any) => {
+    const updated = [...participantItemizedLists];
+    updated[participantIndex].items[itemIndex] = {
+      ...updated[participantIndex].items[itemIndex],
+      [field]: value
+    };
+    updateParticipantTotal(updated, participantIndex);
+    updateAmountFromItemizedLists(updated);
+    setParticipantItemizedLists(updated);
+  };
+
+  const updateParticipantTotal = (lists: ParticipantItemizedList[], participantIndex: number) => {
+    const total = lists[participantIndex].items.reduce((sum, item) => 
+      sum + (item.amount * item.quantity), 0
+    );
+    lists[participantIndex].totalAmount = total;
+  };
+
+  const updateAmountFromItemizedLists = (lists: ParticipantItemizedList[]) => {
+    const total = lists.reduce((sum, list) => sum + list.totalAmount, 0);
+    setAmount(total.toFixed(2));
+  };
+
+  const getTotalExpenseAmountFromItemized = () => {
+    return participantItemizedLists.reduce((sum, list) => sum + list.totalAmount, 0);
+  };
+
+  const getParticipantNameFromList = (participantId?: string, externalName?: string) => {
+    if (externalName) return externalName;
+    const member = groupMembers.find(m => m.id === participantId);
+    return member?.travelerName || 'Unknown';
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const selectedParticipants = participants.filter(p => p.isSelected);
-    
-    if (selectedParticipants.length === 0) {
-      error('Validation Error', 'Please select at least one participant');
-      return;
-    }
-    
-    if (!validateSplitPercentages(selectedParticipants)) {
-      error('Validation Error', 'Split percentages must sum to 100%');
-      return;
+    // Different validation for itemized vs participant split modes
+    if (splitMode === 'itemized') {
+      // Validate itemized split
+      if (participantItemizedLists.length === 0) {
+        error('Validation Error', 'Please add at least one participant with items');
+        return;
+      }
+      
+      const hasItemsWithAmount = participantItemizedLists.some(list => 
+        list.items.some(item => item.amount > 0)
+      );
+      
+      if (!hasItemsWithAmount) {
+        error('Validation Error', 'Please add items with amounts for participants');
+        return;
+      }
+    } else {
+      // Validate participant split
+      const selectedParticipants = participants.filter(p => p.isSelected);
+      
+      if (selectedParticipants.length === 0) {
+        error('Validation Error', 'Please select at least one participant');
+        return;
+      }
+      
+      if (!validateSplitPercentages(selectedParticipants)) {
+        error('Validation Error', 'Split percentages must sum to 100%');
+        return;
+      }
     }
     
     setIsSubmitting(true);
     
     try {
-      const participantData = selectedParticipants.map(p => ({
-        participantId: p.participantId && p.participantId !== '' ? p.participantId : undefined,
-        externalName: p.externalName && p.externalName !== '' ? p.externalName : undefined,
-        splitPercentage: Number(p.splitPercentage)
-      }));
-      
       let expenseData: any;
       
-      if (expense) {
-        // Update expense - only send changed fields
+      if (splitMode === 'itemized') {
+        // Itemized split mode
+        const totalAmount = getTotalExpenseAmountFromItemized();
+        
         expenseData = {
           description,
-          amount: parseFloat(amount),
-          category: category || null,
-          ownerId,
-          dayId: selectedEventId ? null : (dayId && dayId !== '' ? dayId : null),
-          eventId: selectedEventId && selectedEventId !== '' ? selectedEventId : null,
-          participants: participantData
-        };
-      } else {
-        // Create expense - send all required fields
-        expenseData = {
-          description,
-          amount: parseFloat(amount),
+          amount: totalAmount,
           category: category || undefined,
           ownerId,
-          tripId,
-          dayId: selectedEventId ? undefined : dayId,
-          eventId: selectedEventId || eventId,
-          participants: participantData
+          splitType: 'itemized',
+          participantItemizedLists: participantItemizedLists.map(list => ({
+            participantId: list.participantId,
+            externalName: list.externalName,
+            items: list.items.map(item => ({
+              description: item.description,
+              amount: item.amount,
+              quantity: item.quantity,
+              category: item.category
+            }))
+          }))
         };
+        
+        if (expense) {
+          // Update itemized expense
+          expenseData.dayId = selectedEventId ? null : (dayId && dayId !== '' ? dayId : null);
+          expenseData.eventId = selectedEventId && selectedEventId !== '' ? selectedEventId : null;
+        } else {
+          // Create itemized expense
+          expenseData.tripId = tripId;
+          expenseData.dayId = selectedEventId ? undefined : dayId;
+          expenseData.eventId = selectedEventId || eventId;
+        }
+      } else {
+        // Participant split mode (existing logic)
+        const selectedParticipants = participants.filter(p => p.isSelected);
+        const participantData = selectedParticipants.map(p => ({
+          participantId: p.participantId && p.participantId !== '' ? p.participantId : undefined,
+          externalName: p.externalName && p.externalName !== '' ? p.externalName : undefined,
+          splitPercentage: Number(p.splitPercentage)
+        }));
+        
+        if (expense) {
+          // Update expense - only send changed fields
+          expenseData = {
+            description,
+            amount: parseFloat(amount),
+            category: category || null,
+            ownerId,
+            dayId: selectedEventId ? null : (dayId && dayId !== '' ? dayId : null),
+            eventId: selectedEventId && selectedEventId !== '' ? selectedEventId : null,
+            splitType: 'manual',
+            participants: participantData
+          };
+        } else {
+          // Create expense - send all required fields
+          expenseData = {
+            description,
+            amount: parseFloat(amount),
+            category: category || undefined,
+            ownerId,
+            tripId,
+            dayId: selectedEventId ? undefined : dayId,
+            eventId: selectedEventId || eventId,
+            splitType: 'manual',
+            participants: participantData
+          };
+        }
       }
       
       await onSave(expenseData);
@@ -505,9 +655,9 @@ export default function ExpenseModal({
     }
   };
   
-  const totalPercentage = participants
-    .filter(p => p.isSelected)
-    .reduce((sum, p) => sum + Number(p.splitPercentage), 0);
+  const totalPercentage = splitMode === 'participants' 
+    ? participants.filter(p => p.isSelected).reduce((sum, p) => sum + Number(p.splitPercentage), 0)
+    : 100; // Always valid for itemized mode
   
   const amountValue = parseFloat(amount) || 0;
   
@@ -536,7 +686,9 @@ export default function ExpenseModal({
             </div>
             
             <div>
-              <Label htmlFor="amount">Amount</Label>
+              <Label htmlFor="amount">
+                Amount {splitMode === 'itemized' && <span className="text-xs text-gray-500">(auto-calculated)</span>}
+              </Label>
               <Input
                 id="amount"
                 type="number"
@@ -545,6 +697,8 @@ export default function ExpenseModal({
                 onChange={(e) => setAmount(formatToTwoDecimals(e.target.value))}
                 placeholder="0.00"
                 required
+                readOnly={splitMode === 'itemized'}
+                className={splitMode === 'itemized' ? 'bg-gray-100 cursor-not-allowed' : ''}
               />
             </div>
           </div>
@@ -621,7 +775,7 @@ export default function ExpenseModal({
                 <p className="text-xs text-gray-500 mt-1">
                   {splitMode === 'participants' 
                     ? 'Participant split mode - percentages divided equally among selected participants' 
-                    : 'Itemized split mode - create individual line items with their own participants.'
+                    : 'Itemized split mode - each participant adds their own items with individual prices.'
                   }
                 </p>
               </div>
@@ -632,6 +786,8 @@ export default function ExpenseModal({
                   variant={splitMode === 'participants' ? 'default' : 'outline'}
                   onClick={() => {
                     setSplitMode('participants');
+                    // Clear itemized lists
+                    setParticipantItemizedLists([]);
                     // Recalculate equal splits for all selected participants
                     const selectedCount = participants.filter(p => p.isSelected).length;
                     if (selectedCount > 0) {
@@ -651,11 +807,14 @@ export default function ExpenseModal({
                   variant={splitMode === 'itemized' ? 'default' : 'outline'}
                   onClick={() => {
                     setSplitMode('itemized');
-                    // Set the first selected participant as the focus for custom input
-                    const firstSelectedIndex = participants.findIndex(p => p.isSelected);
-                    if (firstSelectedIndex !== -1) {
-                      setCustomSplitFocusIndex(firstSelectedIndex);
-                    }
+                    // Clear participant selections and reset amount
+                    setParticipants(prev => prev.map(p => ({
+                      ...p,
+                      isSelected: false,
+                      splitPercentage: 0
+                    })));
+                    setAmount('0.00');
+                    setCustomSplitFocusIndex(null);
                   }}
                 >
                   Itemized Split
@@ -663,174 +822,262 @@ export default function ExpenseModal({
               </div>
             </div>
             
-            <div className="space-y-2 border rounded-lg p-3">
-              {participants.map((participant, index) => {
-                const isExternal = !participant.participantId;
-                const displayName = participant.participantId 
-                  ? groupMembers.find(m => m.id === participant.participantId)?.travelerName
-                  : participant.externalName;
-                
-                const participantKey = participant.participantId || participant.externalName || `external-${index}`;
-                
-                return (
-                  <div key={`participant-${index}-${participantKey}`} className={`flex items-center gap-2 p-2 rounded transition-colors ${
-                    splitMode === 'itemized' && customSplitFocusIndex === index && participant.isSelected 
-                      ? 'bg-blue-50 border border-blue-200' 
-                      : ''
-                  }`}>
-                    <Checkbox
-                      checked={participant.isSelected}
-                      onCheckedChange={() => handleParticipantToggle(index)}
-                    />
-                    <span className="flex-1">{displayName}</span>
-                    {participant.isSelected && (
-                      <>
-                        {splitMode === 'itemized' && customSplitFocusIndex === index ? (
-                          // Show input field for the focused participant
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={participant.splitPercentage}
-                            onChange={(e) => handleSplitPercentageChange(index, formatToTwoDecimals(e.target.value))}
-                            className="w-20"
-                            placeholder="0.00"
-                          />
-                        ) : splitMode === 'itemized' ? (
-                          // Show clickable percentage for non-focused participants
-                          <button
-                            type="button"
-                            onClick={() => handleSetCustomFocus(index)}
-                            className="w-20 px-2 py-1 text-sm bg-gray-50 hover:bg-gray-100 border rounded text-center transition-colors"
-                            title="Click to edit this percentage"
-                          >
-                            {Number(participant.splitPercentage).toFixed(1)}%
-                          </button>
-                        ) : (
-                          // Show read-only percentage for even split mode
+            {splitMode === 'participants' ? (
+              // Participant Split Mode UI
+              <div className="space-y-2 border rounded-lg p-3">
+                {participants.map((participant, index) => {
+                  const isExternal = !participant.participantId;
+                  const displayName = participant.participantId 
+                    ? groupMembers.find(m => m.id === participant.participantId)?.travelerName
+                    : participant.externalName;
+                  
+                  const participantKey = participant.participantId || participant.externalName || `external-${index}`;
+                  
+                  return (
+                    <div key={`participant-${index}-${participantKey}`} className="flex items-center gap-2 p-2 rounded">
+                      <Checkbox
+                        checked={participant.isSelected}
+                        onCheckedChange={() => handleParticipantToggle(index)}
+                      />
+                      <span className="flex-1">{displayName}</span>
+                      {participant.isSelected && (
+                        <>
                           <span className="text-sm text-gray-500 w-20 text-center">
                             {Number(participant.splitPercentage).toFixed(1)}%
                           </span>
-                        )}
-                        {amountValue > 0 && (
-                          <span className="text-sm font-medium w-20 text-right">
-                            {formatCurrency(amountValue * Number(participant.splitPercentage) / 100)}
-                          </span>
-                        )}
-                      </>
-                    )}
-                    {isExternal && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleRemoveParticipant(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-              
-              {!showExternalForm && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowExternalForm(true)}
-                  className="w-full"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Add External Participant
-                </Button>
-              )}
-              
-              {showExternalForm && (
-                <div className="pt-2 border-t space-y-2">
-                  {/* External participant suggestions */}
-                  {externalParticipants.length > 0 && (
-                    <div>
-                      <Label className="text-sm text-gray-600">Recent external participants:</Label>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {externalParticipants.slice(0, 5).map((participant) => (
-                          <Button
-                            key={participant.id}
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="text-xs h-7"
-                            onClick={() => {
-                              setExternalName(participant.name);
-                              setShowExternalSuggestions(false);
-                            }}
-                          >
-                            {participant.name}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-2">
-                    <div className="flex-1 relative">
-                      <Input
-                        value={externalName}
-                        onChange={(e) => {
-                          setExternalName(e.target.value);
-                          setShowExternalSuggestions(e.target.value.length > 0);
-                        }}
-                        placeholder="External participant name"
-                        className="w-full"
-                      />
-                      
-                      {/* Filtered suggestions dropdown */}
-                      {showExternalSuggestions && externalName.trim() && (
-                        <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-32 overflow-y-auto">
-                          {externalParticipants
-                            .filter(p => p.name.toLowerCase().includes(externalName.toLowerCase()))
-                            .slice(0, 5)
-                            .map((participant) => (
-                              <button
-                                key={participant.id}
-                                type="button"
-                                className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
-                                onClick={() => {
-                                  setExternalName(participant.name);
-                                  setShowExternalSuggestions(false);
-                                }}
-                              >
-                                {participant.name}
-                              </button>
-                            ))}
-                        </div>
+                          {amountValue > 0 && (
+                            <span className="text-sm font-medium w-20 text-right">
+                              {formatCurrency(amountValue * Number(participant.splitPercentage) / 100)}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {isExternal && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRemoveParticipant(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       )}
                     </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleAddExternal}
-                    disabled={!externalName.trim()}
-                  >
-                    Add
-                  </Button>
+                  );
+                })}
+                
+                {!showExternalForm && (
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      setShowExternalForm(false);
-                      setExternalName('');
-                      setShowExternalSuggestions(false);
-                    }}
+                    onClick={() => setShowExternalForm(true)}
+                    className="w-full"
                   >
-                    Cancel
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add External Participant
                   </Button>
-                </div>
-                </div>
-              )}
-            </div>
-            
-            {Math.abs(totalPercentage - 100) > 0.01 && (
+                )}
+                
+                {showExternalForm && (
+                  <div className="pt-2 border-t space-y-2">
+                    {/* External participant suggestions */}
+                    {externalParticipants.length > 0 && (
+                      <div>
+                        <Label className="text-sm text-gray-600">Recent external participants:</Label>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {externalParticipants.slice(0, 5).map((participant) => (
+                            <Button
+                              key={participant.id}
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7"
+                              onClick={() => {
+                                setExternalName(participant.name);
+                                setShowExternalSuggestions(false);
+                              }}
+                            >
+                              {participant.name}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="external-name">Add new external participant</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="external-name"
+                          value={externalName}
+                          onChange={(e) => setExternalName(e.target.value)}
+                          placeholder="Enter name"
+                          className="flex-1"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (externalName.trim()) {
+                                const newParticipant = {
+                                  externalName: externalName.trim(),
+                                  splitPercentage: 0,
+                                  isSelected: true
+                                };
+                                setParticipants(prev => [...prev, newParticipant]);
+                                setExternalName('');
+                                setShowExternalForm(false);
+                                setShowExternalSuggestions(false);
+                              }
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (externalName.trim()) {
+                              const newParticipant = {
+                                externalName: externalName.trim(),
+                                splitPercentage: 0,
+                                isSelected: true
+                              };
+                              setParticipants(prev => [...prev, newParticipant]);
+                              setExternalName('');
+                              setShowExternalForm(false);
+                              setShowExternalSuggestions(false);
+                            }
+                          }}
+                        >
+                          Add
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setExternalName('');
+                            setShowExternalForm(false);
+                            setShowExternalSuggestions(false);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Itemized Split Mode UI
+              <div className="space-y-4 border rounded-lg p-3">
+                {participantItemizedLists.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500">
+                    <p>No participants added yet.</p>
+                    <p className="text-sm">Click "Add Participant" to start adding itemized expenses.</p>
+                  </div>
+                ) : (
+                  participantItemizedLists.map((participantList, participantIndex) => (
+                    <div key={participantIndex} className="border rounded-lg p-3 bg-gray-50">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium">
+                          {getParticipantNameFromList(participantList.participantId, participantList.externalName)}
+                        </h4>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600">
+                            Total: ${participantList.totalAmount.toFixed(2)}
+                          </span>
+                          <Button 
+                            type="button"
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => removeParticipantFromItemizedList(participantIndex)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {participantList.items.map((item, itemIndex) => (
+                          <div key={item.id} className="flex items-center gap-2 p-2 bg-white rounded border">
+                            <Input
+                              placeholder="Item description"
+                              value={item.description}
+                              onChange={(e) => updateParticipantItem(participantIndex, itemIndex, 'description', e.target.value)}
+                              className="flex-1"
+                            />
+                            <Input
+                              type="number"
+                              placeholder="Amount"
+                              value={item.amount || ''}
+                              onChange={(e) => updateParticipantItem(participantIndex, itemIndex, 'amount', parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                              step="0.01"
+                              min="0"
+                            />
+                            <Input
+                              type="number"
+                              placeholder="Qty"
+                              value={item.quantity}
+                              onChange={(e) => updateParticipantItem(participantIndex, itemIndex, 'quantity', parseInt(e.target.value) || 1)}
+                              className="w-16"
+                              min="1"
+                            />
+                            <Button 
+                              type="button"
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => removeItemFromParticipant(participantIndex, itemIndex)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        
+                        <Button 
+                          type="button"
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => addItemToParticipant(participantIndex)}
+                          className="w-full"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Item
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+                
+                <Button 
+                  type="button"
+                  onClick={addParticipantToItemizedList} 
+                  disabled={participantItemizedLists.length >= groupMembers.length}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Participant
+                </Button>
+                
+                {participantItemizedLists.length > 0 && (
+                  <div className="border-t pt-3">
+                    <div className="space-y-2">
+                      <h5 className="font-medium text-sm">Split Breakdown:</h5>
+                      {participantItemizedLists.map((list, index) => {
+                        const total = getTotalExpenseAmountFromItemized();
+                        const percentage = total > 0 ? (list.totalAmount / total) * 100 : 0;
+                        return (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span>{getParticipantNameFromList(list.participantId, list.externalName)}</span>
+                            <span>${list.totalAmount.toFixed(2)} ({percentage.toFixed(1)}%)</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {splitMode === 'participants' && Math.abs(totalPercentage - 100) > 0.01 && (
               <p className="text-sm text-red-500 mt-1">
                 Total: {totalPercentage.toFixed(1)}% (must equal 100%)
               </p>
@@ -867,7 +1114,7 @@ export default function ExpenseModal({
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={isSubmitting || Math.abs(totalPercentage - 100) > 0.01}
+                  disabled={isSubmitting || (splitMode === 'participants' && Math.abs(totalPercentage - 100) > 0.01)}
                   className="px-6"
                 >
                   {isSubmitting ? 'Saving...' : (expense ? 'Update' : 'Create')}

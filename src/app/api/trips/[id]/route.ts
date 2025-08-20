@@ -202,18 +202,25 @@ export async function DELETE(
       return NextResponse.json({ error: 'No group found' }, { status: 404 })
     }
 
-    // Verify trip exists and belongs to group
-    const trip = await prisma.trip.findFirst({
-      where: { 
-        id: tripId,
-        groupId: userGroup.groupId 
-      },
+    // First check if trip exists at all
+    const tripExists = await prisma.trip.findUnique({
+      where: { id: tripId },
       select: { id: true, groupId: true }
     })
 
-    if (!trip) {
+    if (!tripExists) {
+      console.error(`DELETE: Trip ${tripId} does not exist in database`)
       return NextResponse.json(
-        { error: 'Trip not found' },
+        { error: 'Trip not found in database' },
+        { status: 404 }
+      )
+    }
+
+    // Then verify trip belongs to user's group
+    if (tripExists.groupId !== userGroup.groupId) {
+      console.error(`DELETE: Trip ${tripId} belongs to group ${tripExists.groupId} but user is in group ${userGroup.groupId}`)
+      return NextResponse.json(
+        { error: 'Trip not found in your group' },
         { status: 404 }
       )
     }
