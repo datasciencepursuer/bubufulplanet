@@ -128,8 +128,8 @@ Required in `.env`:
 DATABASE_URL=                    # PostgreSQL connection string
 DIRECT_DATABASE_URL=             # Direct database URL for migrations
 NEXT_PUBLIC_SUPABASE_URL=        # Supabase URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase anon key
-SUPABASE_SERVICE_ROLE_KEY=       # Service role key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase publishable key (sb_publishable_...)
+SUPABASE_SERVICE_ROLE_KEY=       # Supabase secret key (placeholder: YOUR_SECRET_KEY_HERE)
 ```
 
 ## Production Deployment
@@ -139,8 +139,8 @@ SUPABASE_SERVICE_ROLE_KEY=       # Service role key
 DATABASE_URL=                    # PostgreSQL connection string
 DIRECT_DATABASE_URL=             # Direct database URL for migrations
 NEXT_PUBLIC_SUPABASE_URL=        # Supabase URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase anon key
-SUPABASE_SERVICE_ROLE_KEY=       # Service role key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase publishable key (sb_publishable_...)
+SUPABASE_SERVICE_ROLE_KEY=       # Supabase secret key (placeholder: YOUR_SECRET_KEY_HERE)
 ```
 
 **Database Indexes:**
