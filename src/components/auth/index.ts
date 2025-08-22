@@ -5,4 +5,3 @@
 
 export { OAuthSignIn } from './OAuthSignIn'
 export { OAuthButtons } from './OAuthButtons'
-export { AuthProvider, useAuth } from './AuthProvider'
