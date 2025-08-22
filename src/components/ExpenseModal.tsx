@@ -461,20 +461,22 @@ export default function ExpenseModal({
   };
   
   // Itemized list helper functions
-  const addParticipantToItemizedList = () => {
-    if (groupMembers.length === 0) return;
-    
-    const firstAvailableMember = groupMembers.find(
-      member => !participantItemizedLists.some(list => list.participantId === member.id)
-    );
-    
-    if (!firstAvailableMember) return;
 
+  const addExternalParticipantToItemizedList = () => {
+    if (!externalName.trim()) return;
+    
     setParticipantItemizedLists([...participantItemizedLists, {
-      participantId: firstAvailableMember.id,
+      externalName: externalName.trim(),
       items: [],
       totalAmount: 0
     }]);
+    
+    setExternalName('');
+    setShowExternalForm(false);
+    setShowExternalSuggestions(false);
+    
+    // Refresh external participants list to include the new one
+    fetchExternalParticipants();
   };
 
   const removeParticipantFromItemizedList = (index: number) => {
@@ -815,6 +817,15 @@ export default function ExpenseModal({
                     })));
                     setAmount('0.00');
                     setCustomSplitFocusIndex(null);
+                    
+                    // Auto-include all group members in itemized lists if empty
+                    if (participantItemizedLists.length === 0) {
+                      setParticipantItemizedLists(groupMembers.map(member => ({
+                        participantId: member.id,
+                        items: [],
+                        totalAmount: 0
+                      })));
+                    }
                   }}
                 >
                   Itemized Split
@@ -1047,16 +1058,82 @@ export default function ExpenseModal({
                   ))
                 )}
                 
-                <Button 
-                  type="button"
-                  onClick={addParticipantToItemizedList} 
-                  disabled={participantItemizedLists.length >= groupMembers.length}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Participant
-                </Button>
+                {!showExternalForm && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowExternalForm(true)}
+                    className="w-full"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add External Participant
+                  </Button>
+                )}
+                
+                {showExternalForm && (
+                  <div className="pt-2 border-t space-y-2">
+                    {/* External participant suggestions */}
+                    {externalParticipants.length > 0 && (
+                      <div>
+                        <Label className="text-sm text-gray-600">Recent external participants:</Label>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {externalParticipants.slice(0, 5).map((participant) => (
+                            <Button
+                              key={participant.id}
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7"
+                              onClick={() => {
+                                setExternalName(participant.name);
+                                setShowExternalSuggestions(false);
+                              }}
+                            >
+                              {participant.name}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="external-name-itemized">Add new external participant</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="external-name-itemized"
+                          value={externalName}
+                          onChange={(e) => setExternalName(e.target.value)}
+                          placeholder="Enter name"
+                          className="flex-1"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addExternalParticipantToItemizedList();
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          onClick={addExternalParticipantToItemizedList}
+                        >
+                          Add
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setExternalName('');
+                            setShowExternalForm(false);
+                            setShowExternalSuggestions(false);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 {participantItemizedLists.length > 0 && (
                   <div className="border-t pt-3">
