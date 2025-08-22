@@ -64,14 +64,6 @@ export async function DELETE(
       where: { id: memberId }
     })
 
-    // Also delete any device sessions for this member
-    await prisma.deviceSession.deleteMany({
-      where: {
-        groupId,
-        currentTravelerName: targetMember.travelerName
-      }
-    })
-
     return NextResponse.json({ success: true })
 
   } catch (error) {

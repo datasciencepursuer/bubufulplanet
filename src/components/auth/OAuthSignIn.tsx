@@ -28,7 +28,7 @@ export function OAuthSignIn({ onError, redirectTo }: OAuthSignInProps) {
       }
 
       // Add provider-specific options
-      if (provider === 'google' && providerConfig.queryParams) {
+      if (provider === 'google' && 'queryParams' in providerConfig && providerConfig.queryParams) {
         options.options.queryParams = providerConfig.queryParams
       }
 

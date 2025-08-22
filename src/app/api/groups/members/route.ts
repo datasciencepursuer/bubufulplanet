@@ -231,26 +231,27 @@ export async function POST(request: NextRequest) {
 
     // Check if this email has a Supabase account and link immediately
     try {
-      const { data: userData } = await supabase.auth.admin.getUserByEmail(normalizedEmail)
+      const { data: userData } = await supabase.auth.admin.listUsers()
+      const existingUser = userData?.users?.find(user => user.email === normalizedEmail)
       
-      if (userData?.user) {
+      if (existingUser) {
         // User exists, link them immediately
         await prisma.groupMember.update({
           where: { id: member.id },
-          data: { userId: userData.user.id }
+          data: { userId: existingUser.id }
         })
 
         // Create UserGroup entry
         await prisma.userGroup.upsert({
           where: {
             unique_user_group: {
-              userId: userData.user.id,
+              userId: existingUser.id,
               groupId
             }
           },
           update: {},
           create: {
-            userId: userData.user.id,
+            userId: existingUser.id,
             groupId,
             role: role === 'adventurer' ? 'leader' : 'member',
             invitedBy: user.id

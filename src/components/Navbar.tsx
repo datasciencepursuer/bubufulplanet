@@ -3,20 +3,19 @@
 import { Button } from '@/components/ui/button'
 import { LogOut } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useDeviceSession } from '@/hooks/useDeviceSession'
+import { createClient } from '@/utils/supabase/client'
 
 export default function Navbar() {
   const router = useRouter()
-  const { logout } = useDeviceSession()
-
   const handleLogout = async () => {
     try {
-      const success = await logout()
-      if (success) {
-        router.push('/')
+      const supabase = createClient()
+      const { error } = await supabase.auth.signOut()
+      if (!error) {
+        router.push('/login')
         router.refresh()
       } else {
-        console.error('Logout failed')
+        console.error('Logout failed:', error.message)
       }
     } catch (error) {
       console.error('Error logging out:', error)

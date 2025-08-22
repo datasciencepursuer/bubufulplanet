@@ -82,14 +82,15 @@ export async function POST(
         })
 
         // Check if this email has a Supabase account
-        const { data: userData } = await supabase.auth.admin.getUserByEmail(email)
+        const { data: userData } = await supabase.auth.admin.listUsers()
+        const existingUser = userData?.users?.find(user => user.email === email)
         
-        if (userData?.user) {
+        if (existingUser) {
           // User exists, create UserGroup entry
           const existingUserGroup = await prisma.userGroup.findUnique({
             where: {
               unique_user_group: {
-                userId: userData.user.id,
+                userId: existingUser.id,
                 groupId
               }
             }
@@ -98,7 +99,7 @@ export async function POST(
           if (!existingUserGroup) {
             await prisma.userGroup.create({
               data: {
-                userId: userData.user.id,
+                userId: existingUser.id,
                 groupId,
                 role: 'member',
                 invitedBy: user.id
@@ -108,7 +109,7 @@ export async function POST(
             // Update GroupMember with userId
             await prisma.groupMember.update({
               where: { id: member.id },
-              data: { userId: userData.user.id }
+              data: { userId: existingUser.id }
             })
           }
 

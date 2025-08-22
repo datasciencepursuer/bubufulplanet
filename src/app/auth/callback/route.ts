@@ -30,7 +30,7 @@ export async function GET(request: Request) {
           // Link all pending invitations to this user
           for (const invitation of pendingInvitations) {
             // Update GroupMember with userId but keep the invited name if it exists
-            const updatedTravelerName = invitation.travelerName !== invitation.email.split('@')[0] 
+            const updatedTravelerName = invitation.travelerName !== invitation.email?.split('@')[0] 
               ? invitation.travelerName  // Keep custom name if it was provided
               : userName // Use OAuth name if only default email-based name was used
 
