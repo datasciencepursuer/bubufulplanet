@@ -55,7 +55,7 @@ export default function AppPage() {
   const groupedFetch = createGroupedFetch()
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuthAndGroup = async () => {
       try {
         // Check for Supabase auth
         const { data: { user } } = await supabase.auth.getUser()
@@ -64,12 +64,55 @@ export default function AppPage() {
           router.push('/login')
           return
         }
+
+        // Check if user has group access by making a groups API call
+        // This will determine if user needs to be redirected to group selection
+        try {
+          const response = await fetch('/api/user/groups', {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            const userGroups = data.groups || []
+            
+            // If user has no groups, redirect to setup
+            if (userGroups.length === 0) {
+              router.push('/setup')
+              return
+            }
+            
+            // If user has multiple groups, redirect to group selection
+            if (userGroups.length > 1) {
+              router.push('/groups')
+              return
+            }
+            
+            // User has exactly one group - continue loading
+            console.log('App: User has single group, continuing to load app')
+          } else if (response.status === 404) {
+            // No groups found, redirect to setup
+            router.push('/setup')
+            return
+          } else {
+            console.error('Failed to check user groups:', response.status)
+            // Let the existing group loading logic handle this
+          }
+        } catch (groupCheckError) {
+          console.error('Error checking user groups:', groupCheckError)
+          // Let the existing group loading logic handle this
+        }
       } catch (error) {
         console.error('Auth check failed:', error)
         router.push('/login')
       }
     }
-    checkAuth()
+    checkAuthAndGroup()
   }, [supabase.auth, router])
 
   // Handle group data and redirect logic
@@ -83,10 +126,39 @@ export default function AppPage() {
         return
       }
       
-      // If no group data after loading is complete, redirect immediately
+      // If no group data after loading is complete, check for groups and redirect
       if (!selectedGroup) {
-        console.log('App: No optimized group data found after loading, redirecting to group selection')
-        router.push('/groups')
+        console.log('App: No optimized group data found after loading')
+        
+        try {
+          // Make a final check for user groups before redirecting
+          const response = await fetch('/api/user/groups', {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            const userGroups = data.groups || []
+            
+            if (userGroups.length === 0) {
+              console.log('App: No groups found, redirecting to setup')
+              router.push('/setup')
+            } else if (userGroups.length > 1) {
+              console.log('App: Multiple groups found, redirecting to group selection')
+              router.push('/groups')
+            } else {
+              console.log('App: Single group found but no optimized data, redirecting to groups for selection')
+              router.push('/groups')
+            }
+          } else {
+            console.log('App: Failed to fetch groups, redirecting to group selection')
+            router.push('/groups')
+          }
+        } catch (error) {
+          console.error('App: Error checking groups, redirecting to group selection:', error)
+          router.push('/groups')
+        }
         return
       }
       

@@ -105,11 +105,21 @@ export default function GroupSelectionPage() {
           console.log('Groups page: Loaded fresh groups:', data.groups?.length || 0)
           setGroups(data.groups || [])
           
-          // If user only has one group, redirect to app
+          // If user has no groups, redirect to setup
+          if (data.groups?.length === 0) {
+            router.push('/setup')
+            return
+          }
+          
+          // If user only has one group, automatically select it and redirect to app
           if (data.groups?.length === 1) {
+            console.log('Groups page: Single group found, automatically selecting it')
             await selectGroup(data.groups[0].id)
             return
           }
+          
+          // User has multiple groups - show selection interface
+          console.log('Groups page: Multiple groups found, showing selection interface')
         } else {
           console.error('Failed to fetch groups')
           router.push('/app')
