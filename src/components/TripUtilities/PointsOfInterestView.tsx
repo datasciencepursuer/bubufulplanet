@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MapPin, Plus, Edit2, Trash2, X, Link, ExternalLink, StickyNote, Map, Calendar } from 'lucide-react'
-import { usePermissions } from '@/hooks/usePermissions'
+import { useOptimizedGroup } from '@/lib/groupUtils'
 import ConfirmDialog from '../ConfirmDialog'
 
 interface PointOfInterest {
@@ -42,7 +42,7 @@ export default function PointsOfInterestView({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [poiToDelete, setPoiToDelete] = useState<{ id: string; name: string } | null>(null)
-  const { canCreate, canModify } = usePermissions()
+  const { canCreate, canModify } = useOptimizedGroup()
   
   // Form state
   const [formData, setFormData] = useState({
@@ -234,7 +234,7 @@ export default function PointsOfInterestView({
               {pointsOfInterest.length} destination{pointsOfInterest.length !== 1 ? 's' : ''} saved
             </CardDescription>
           </div>
-          {(canCreate() || canModify()) && (
+          {(canCreate || canModify) && (
             <Button
               onClick={() => {
                 setIsEditing(!isEditing)
@@ -338,7 +338,7 @@ export default function PointsOfInterestView({
           <div className="text-center py-6">
             <MapPin className="w-8 h-8 mx-auto text-gray-400 mb-2" />
             <p className="text-sm text-gray-600 mb-3">No destinations saved yet</p>
-            {!isEditing && canCreate() && (
+            {!isEditing && canCreate && (
               <Button onClick={() => setIsEditing(true)} size="sm" variant="outline">
                 Add First Destination
               </Button>
@@ -387,7 +387,7 @@ export default function PointsOfInterestView({
                     )}
                   </div>
                   
-                  {canModify() && (
+                  {canModify && (
                     <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
