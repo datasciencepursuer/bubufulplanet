@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Next.js 15 vacation planning application with TypeScript, Tailwind CSS, and Prisma + PostgreSQL. Features include group-based trip planning with calendar views, day-by-day itineraries, expense tracking, and OAuth-based authentication via Supabase.
+A Next.js 15 vacation planning application with TypeScript, Tailwind CSS, and Prisma + PostgreSQL. Features include group-based trip planning with calendar views, day-by-day itineraries, expense tracking, and OAuth-based authentication via Supabase. Uses React 19 and FullCalendar for interactive calendar components.
 
 ## Development Commands
 
@@ -22,8 +22,11 @@ pnpm run db:reset    # Reset database with fresh migrations
 pnpm run db:seed     # Run database seeding
 pnpm prisma migrate dev --name <name>  # Create new migration
 
-# Maintenance & testing scripts
-pnpm run test:final-day          # Test final day clickability fix
+# Legacy cleanup & testing scripts
+pnpm run cleanup:sessions       # Clean up old device sessions
+pnpm run test:session-extension # Test session extension functionality
+pnpm run test:logout           # Test logout functionality
+pnpm run test:final-day        # Test final day clickability fix
 ```
 
 ## Architecture
@@ -180,9 +183,12 @@ SUPABASE_SERVICE_ROLE_KEY=       # Supabase secret key (placeholder: YOUR_SECRET
 - **Expense Integration**: Tightly coupled with events
 - **Permission System**: Role-based (adventurer vs party member)
 
-## Testing Utilities
+## Testing & Cleanup Scripts
 
 Located in `scripts/` directory:
+- `cleanup-device-sessions.js` - Clean up legacy device sessions
+- `test-session-extension.js` - Test session extension functionality  
+- `test-logout-functionality.js` - Test logout functionality
 - `test-final-day-clickability.js` - Confirm final day fix
 
 ## Missing Features (Schema Ready)

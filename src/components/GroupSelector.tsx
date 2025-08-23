@@ -17,13 +17,15 @@ interface GroupSelectorProps {
   onGroupChange: (groupId: string) => void
   onManageGroup?: (groupId: string) => void
   onCreateGroup?: () => void
+  switching?: boolean
 }
 
 export default function GroupSelector({ 
   currentGroupId, 
   onGroupChange, 
   onManageGroup,
-  onCreateGroup 
+  onCreateGroup,
+  switching = false
 }: GroupSelectorProps) {
   const [groups, setGroups] = useState<Group[]>([])
   const [isOpen, setIsOpen] = useState(false)
@@ -59,16 +61,16 @@ export default function GroupSelector({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg border border-white/20 text-white transition-all duration-200"
-        disabled={loading}
+        disabled={loading || switching}
       >
         <Users className="w-4 h-4" />
         <span className="font-medium">
-          {loading ? 'Loading...' : (currentGroup?.name || 'Select Group')}
+          {loading ? 'Loading...' : switching ? 'Switching...' : (currentGroup?.name || 'Select Group')}
         </span>
         <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {isOpen && !loading && (
+      {isOpen && !loading && !switching && (
         <div className="absolute top-full mt-2 left-0 right-0 min-w-[280px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
           <div className="max-h-96 overflow-y-auto">
             {groups.map(group => (

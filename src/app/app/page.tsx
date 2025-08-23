@@ -26,7 +26,8 @@ export default function AppPage() {
   const { 
     selectedGroup, 
     selectedGroupMember, 
-    loading: groupLoading, 
+    loading: groupLoading,
+    switching: groupSwitching, 
     canCreate, 
     canModify, 
     isAdventurer,
@@ -66,11 +67,28 @@ export default function AppPage() {
 
   // Load trips when selected group changes
   useEffect(() => {
-    if (selectedGroup) {
+    if (selectedGroup && !groupSwitching) {
       // Force cache busting when group changes to ensure fresh data
       loadTripsWithCacheBust()
     }
-  }, [selectedGroup])
+  }, [selectedGroup, groupSwitching])
+  
+  // Listen for group switch events to immediately refresh data
+  useEffect(() => {
+    const handleGroupSwitch = (event: CustomEvent) => {
+      console.log('App: Received group switch event, refreshing trips')
+      // Clear trips immediately and reload
+      setTrips([])
+      setTripsLoading(true)
+      // Small delay to ensure API caches are cleared
+      setTimeout(() => {
+        loadTripsWithCacheBust()
+      }, 50)
+    }
+
+    window.addEventListener('groupSwitched', handleGroupSwitch as EventListener)
+    return () => window.removeEventListener('groupSwitched', handleGroupSwitch as EventListener)
+  }, [])
 
   // Load trips with cache busting for group switches
   const loadTripsWithCacheBust = async () => {
@@ -357,7 +375,7 @@ export default function AppPage() {
     return { currentTrip: current || null, upcomingTrips: upcoming, pastTrips: past }
   }, [trips])
 
-  if (groupLoading || tripsLoading) {
+  if (groupLoading || (tripsLoading && !trips.length) || groupSwitching) {
     return <BearGlobeLoader />
   }
 
@@ -444,6 +462,7 @@ export default function AppPage() {
                 currentGroupId={selectedGroup?.id || null}
                 onGroupChange={selectGroup}
                 onManageGroup={(groupId) => router.push('/group-settings')}
+                switching={groupSwitching}
               />
               <Button 
                 variant="outline" 

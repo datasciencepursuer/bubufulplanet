@@ -42,9 +42,11 @@ export function useGroupedFetch() {
     throw new Error('useGroupedFetch must be used within a GroupProvider')
   }
 
-  const { selectedGroup } = context
+  const { selectedGroup, switching } = context
 
   return (url: string, options: RequestInit = {}, bustCache: boolean = false) => {
-    return groupedFetch(url, selectedGroup?.id || null, options, bustCache)
+    // Force cache busting if we're currently switching groups
+    const shouldBustCache = bustCache || switching
+    return groupedFetch(url, selectedGroup?.id || null, options, shouldBustCache)
   }
 }

@@ -34,6 +34,7 @@ interface GroupContextType {
   
   // Loading states
   loading: boolean
+  switching: boolean
   
   // Actions
   selectGroup: (groupId: string) => Promise<void>
@@ -61,6 +62,7 @@ export function GroupProvider({ children }: GroupProviderProps) {
   const [selectedGroupMember, setSelectedGroupMember] = useState<GroupMember | null>(null)
   const [availableGroups, setAvailableGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
+  const [switching, setSwitching] = useState(false)
   const queryClient = useQueryClient()
 
   // Load available groups on mount
@@ -112,13 +114,22 @@ export function GroupProvider({ children }: GroupProviderProps) {
     console.log('GroupContext: Clearing all caches for group switch to:', newGroupId)
     
     // Clear React Query cache (group members, etc.)
-    queryClient.clear()
+    await queryClient.clear()
     
     // Force browser to bypass cache for next requests
     if (typeof window !== 'undefined') {
       // Clear any stored cache timestamps
       const cacheKeys = Object.keys(localStorage).filter(key => key.startsWith('cache_'))
       cacheKeys.forEach(key => localStorage.removeItem(key))
+      
+      // Clear session storage that might contain cached data
+      const sessionCacheKeys = Object.keys(sessionStorage).filter(key => key.startsWith('cache_'))
+      sessionCacheKeys.forEach(key => sessionStorage.removeItem(key))
+      
+      // Dispatch custom event to notify other components to refresh
+      window.dispatchEvent(new CustomEvent('groupSwitched', { 
+        detail: { newGroupId, timestamp: Date.now() } 
+      }))
     }
   }
 
@@ -131,8 +142,16 @@ export function GroupProvider({ children }: GroupProviderProps) {
         return
       }
 
+      const isGroupSwitch = selectedGroup && selectedGroup.id !== groupId
+
+      // Set switching state immediately when switching groups
+      if (isGroupSwitch) {
+        setSwitching(true)
+        console.log('GroupContext: Starting group switch from', selectedGroup.id, 'to', groupId)
+      }
+
       // Clear all caches when switching groups (but not on initial load)
-      if (selectedGroup && selectedGroup.id !== groupId) {
+      if (isGroupSwitch) {
         await clearAllCaches(groupId)
       }
 
@@ -143,9 +162,12 @@ export function GroupProvider({ children }: GroupProviderProps) {
         cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         }
       })
+      
       if (response.ok) {
         const data = await response.json()
         
@@ -171,6 +193,11 @@ export function GroupProvider({ children }: GroupProviderProps) {
         localStorage.setItem('selectedGroupId', groupId)
         
         console.log('GroupContext: Successfully selected group:', groupId, group.name)
+        
+        // Add a small delay to ensure all cache clearing is complete
+        if (isGroupSwitch) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Failed to select group:')
@@ -186,6 +213,9 @@ export function GroupProvider({ children }: GroupProviderProps) {
       }
     } catch (error) {
       console.error('Error selecting group:', error)
+    } finally {
+      // Always clear switching state
+      setSwitching(false)
     }
   }
 
@@ -221,6 +251,7 @@ export function GroupProvider({ children }: GroupProviderProps) {
     selectedGroupMember,
     availableGroups,
     loading,
+    switching,
     selectGroup,
     refreshGroups,
     updateSelectedGroupName,
