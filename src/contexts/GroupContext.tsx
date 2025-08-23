@@ -116,8 +116,8 @@ export function GroupProvider({ children }: GroupProviderProps) {
                 name: parsedValidationData.group.name,
                 accessCode: parsedValidationData.group.accessCode,
                 role: parsedValidationData.role,
-                memberCount: groups.find(g => g.id === parsedValidationData.group.id)?.memberCount || 0,
-                tripCount: groups.find(g => g.id === parsedValidationData.group.id)?.tripCount || 0
+                memberCount: groups.find((g: Group) => g.id === parsedValidationData.group.id)?.memberCount || 0,
+                tripCount: groups.find((g: Group) => g.id === parsedValidationData.group.id)?.tripCount || 0
               })
 
               if (parsedValidationData.currentMember) {
