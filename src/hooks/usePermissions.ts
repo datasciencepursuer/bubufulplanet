@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useContext } from 'react'
 import { 
   PermissionContext, 
   hasPermission, 
@@ -8,42 +8,29 @@ import {
   canModify, 
   isAdventurer 
 } from '@/lib/permissions'
+import { GroupContext } from '@/contexts/GroupContext'
 
 export function usePermissions() {
-  const [permissionContext, setPermissionContext] = useState<PermissionContext | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    fetchPermissions()
-  }, [])
-
-  const fetchPermissions = async () => {
-    try {
-      const response = await fetch('/api/groups/current')
-      if (response.ok) {
-        const data = await response.json()
-        if (data.currentMember) {
-          setPermissionContext({
-            role: data.currentMember.role,
-            permissions: data.currentMember.permissions
-          })
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching permissions:', error)
-    } finally {
-      setIsLoading(false)
-    }
+  const context = useContext(GroupContext)
+  
+  if (!context) {
+    throw new Error('usePermissions must be used within a GroupProvider')
   }
 
+  const { selectedGroupMember, loading } = context
+
+  const permissionContext: PermissionContext | null = selectedGroupMember ? {
+    role: selectedGroupMember.role,
+    permissions: selectedGroupMember.permissions
+  } : null
+
   return {
-    isLoading,
+    isLoading: loading,
     permissionContext,
     canCreate: () => canCreate(permissionContext),
     canModify: () => canModify(permissionContext),
     isAdventurer: () => isAdventurer(permissionContext),
     hasPermission: (permission: keyof PermissionContext['permissions']) => 
-      hasPermission(permissionContext, permission),
-    refresh: fetchPermissions
+      hasPermission(permissionContext, permission)
   }
 }

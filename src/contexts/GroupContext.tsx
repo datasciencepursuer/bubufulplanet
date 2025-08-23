@@ -46,7 +46,7 @@ interface GroupContextType {
   isAdventurer: boolean
 }
 
-const GroupContext = createContext<GroupContextType | undefined>(undefined)
+export const GroupContext = createContext<GroupContextType | undefined>(undefined)
 
 interface GroupProviderProps {
   children: ReactNode
@@ -125,12 +125,16 @@ export function GroupProvider({ children }: GroupProviderProps) {
         localStorage.setItem('selectedGroupId', groupId)
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        console.error('Failed to select group:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData,
-          groupId
-        })
+        console.error('Failed to select group:')
+        console.error('Status:', response.status)
+        console.error('Status Text:', response.statusText)
+        console.error('Error Data:', errorData)
+        console.error('Group ID:', groupId)
+        
+        // Also log the debug info if available
+        if (errorData.debug) {
+          console.error('Debug Info:', errorData.debug)
+        }
       }
     } catch (error) {
       console.error('Error selecting group:', error)
