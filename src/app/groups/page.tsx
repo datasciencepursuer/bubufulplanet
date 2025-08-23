@@ -29,52 +29,9 @@ export default function GroupSelectionPage() {
   const [validationData, setValidationData] = useState<any>(null)
 
   useEffect(() => {
-    const clearAllCacheAndLoadGroups = async () => {
+    const loadGroups = async () => {
       try {
-        console.log('Groups page: Clearing ALL cache (like logout)')
-        
-        // COMPLETE CACHE CLEARING - as if user logged out
-        
-        // 1. Clear React Query cache
-        await queryClient.clear()
-        
-        // 2. Clear localStorage data except auth (but preserve any fresh group selection)
-        const authKeys = ['supabase.auth.token', 'sb-', 'auth-token']
-        const allKeys = Object.keys(localStorage)
-        allKeys.forEach(key => {
-          const shouldKeepAuth = authKeys.some(authKey => key.includes(authKey))
-          // Don't clear fresh optimized group data that might exist from a recent selection
-          const isOptimizedGroupData = key === 'optimizedGroupData' || key === 'selectedGroupId'
-          const isFreshOptimizedData = isOptimizedGroupData && localStorage.getItem('optimizedSwitchComplete') === 'true'
-          
-          if (!shouldKeepAuth && !isFreshOptimizedData) {
-            localStorage.removeItem(key)
-          }
-        })
-        
-        // If we don't have fresh optimized data, clear all group-related data for a clean start
-        if (localStorage.getItem('optimizedSwitchComplete') !== 'true') {
-          localStorage.removeItem('selectedGroupId')
-          localStorage.removeItem('optimizedGroupData')
-          localStorage.removeItem('groupSelectionInProgress')
-          localStorage.removeItem('groupValidationData')
-          console.log('Groups page: Cleared all group data for fresh start')
-        } else {
-          console.log('Groups page: Preserved fresh optimized group data')
-        }
-        
-        // 3. Clear ALL sessionStorage
-        sessionStorage.clear()
-        
-        // 4. Force browser cache invalidation for API calls
-        const cacheBuster = Date.now()
-        
-        // 5. Dispatch cache clear event
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('completeCache Clear', { 
-            detail: { timestamp: cacheBuster } 
-          }))
-        }
+        console.log('Groups page: Loading groups for selection')
 
         const { data: { user } } = await supabase.auth.getUser()
         
@@ -90,7 +47,8 @@ export default function GroupSelectionPage() {
                     'Adventurer'
         setUserName(name)
 
-        // Fetch user's groups with strong cache busting
+        // Fetch user's groups with cache busting
+        const cacheBuster = Date.now()
         const response = await fetch(`/api/user/groups?t=${cacheBuster}`, {
           cache: 'no-store',
           headers: {
@@ -132,7 +90,7 @@ export default function GroupSelectionPage() {
       }
     }
 
-    clearAllCacheAndLoadGroups()
+    loadGroups()
   }, [router, supabase.auth, queryClient])
 
   const selectGroup = async (groupId: string) => {

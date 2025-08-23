@@ -117,8 +117,11 @@ export default function AppPage() {
               console.log('App: Multiple groups found, redirecting to group selection')
               router.push('/groups')
             } else {
-              console.log('App: Single group found but no optimized data, redirecting to groups for selection')
-              router.push('/groups')
+              console.log('App: Single group found but no optimized data, will use normal loading when group data becomes available')
+              // For single group without optimized data, let the normal flow handle it
+              // The useOptimizedGroup hook will eventually provide the group data
+              setGroupSelectionComplete(true)
+              setAppInitialized(true)
             }
           } else {
             console.log('App: Failed to fetch groups, redirecting to group selection')
