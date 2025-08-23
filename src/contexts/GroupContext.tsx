@@ -89,148 +89,96 @@ export function GroupProvider({ children }: GroupProviderProps) {
   const refreshGroups = async () => {
     try {
       setLoading(true)
+      
+      // Check if we have optimized data first - if so, skip the API call entirely
+      const optimizedData = getCachedGroupData()
+      const isOptimizedSwitch = localStorage.getItem('optimizedSwitchComplete') === 'true'
+      
+      if (isOptimizedSwitch && optimizedData) {
+        console.log('GroupContext: ⚡ FAST PATH: Using optimized data, skipping API call')
+        
+        // Create a minimal availableGroups array with just the selected group
+        const groups = [{
+          id: optimizedData.group.id,
+          name: optimizedData.group.name,
+          accessCode: optimizedData.group.accessCode,
+          role: optimizedData.currentMember.role,
+          memberCount: optimizedData.allMembers?.length || 0,
+          tripCount: optimizedData.trips?.length || 0,
+          recentTrips: optimizedData.trips || []
+        }]
+        setAvailableGroups(groups)
+        
+        // Set the selected group immediately
+        setSelectedGroup({
+          id: optimizedData.group.id,
+          name: optimizedData.group.name,
+          accessCode: optimizedData.group.accessCode,
+          role: optimizedData.currentMember.role,
+          memberCount: optimizedData.allMembers?.length || 0,
+          tripCount: optimizedData.trips?.length || 0
+        })
+
+        if (optimizedData.currentMember) {
+          setSelectedGroupMember({
+            id: optimizedData.currentMember.id,
+            travelerName: optimizedData.currentMember.name,
+            role: optimizedData.currentMember.role,
+            permissions: optimizedData.currentMember.permissions
+          })
+        }
+
+        // Store selection and clear flags
+        localStorage.setItem('selectedGroupId', optimizedData.group.id)
+        localStorage.removeItem('groupSelectionInProgress')
+        localStorage.removeItem('groupValidationData')
+        
+        console.log('GroupContext: ⚡ FAST PATH: Optimized group loaded directly:', optimizedData.group.id, optimizedData.group.name)
+        setLoading(false)
+        return
+      }
+      
+      // Normal path: fetch from API
       const response = await fetch('/api/user/groups')
       if (response.ok) {
         const data = await response.json()
         const groups = data.groups || []
         setAvailableGroups(groups)
         
-        // Check for stored group selection first, then auto-select first group
-        const storedGroupId = localStorage.getItem('selectedGroupId')
-        const isFromGroupSelection = localStorage.getItem('groupSelectionInProgress') === 'true'
-        const validationData = localStorage.getItem('groupValidationData')
-        const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
-        
-        console.log('GroupContext: Current state:', {
-          selectedGroup: selectedGroup?.id || 'none',
-          storedGroupId,
-          isFromGroupSelection,
-          optimizedSwitchComplete,
-          availableGroups: groups.map((g: Group) => ({ id: g.id, name: g.name }))
-        })
-        
+        // Normal path: select group from available groups
         if (!selectedGroup && groups.length > 0) {
-          // Check for optimized group data FIRST - it takes absolute priority
-          const optimizedData = getCachedGroupData()
-          const isOptimizedSwitch = localStorage.getItem('optimizedSwitchComplete') === 'true'
+          const storedGroupId = localStorage.getItem('selectedGroupId')
           
-          console.log('GroupContext: Priority check:', {
-            optimizedData: optimizedData ? {
-              groupId: optimizedData.group?.id,
-              groupName: optimizedData.group?.name
-            } : 'null',
-            isOptimizedSwitch,
+          console.log('GroupContext: Normal path - selecting group:', {
+            selectedGroup: selectedGroup?.id || 'none',
             storedGroupId,
             availableGroups: groups.map((g: Group) => ({ id: g.id, name: g.name }))
           })
           
-          if ((isOptimizedSwitch || optimizedSwitchComplete) && optimizedData) {
-            console.log('GroupContext: ✅ PRIORITY: Using optimized group data:', optimizedData.group.name, optimizedData.group.id)
-            
-            // Set the group data directly from optimized response
-            setSelectedGroup({
-              id: optimizedData.group.id,
-              name: optimizedData.group.name,
-              accessCode: optimizedData.group.accessCode,
-              role: optimizedData.currentMember.role,
-              memberCount: optimizedData.allMembers?.length || 0,
-              tripCount: optimizedData.trips?.length || 0
+          let targetGroupId = groups[0].id // Default to first group
+          
+          // If we have a stored selection and it's valid, use that instead
+          if (storedGroupId) {
+            const storedGroupExists = groups.find((g: Group) => g.id === storedGroupId)
+            console.log('GroupContext: Checking stored group:', {
+              storedGroupId,
+              availableGroupIds: groups.map((g: Group) => g.id),
+              storedGroupExists: !!storedGroupExists
             })
-
-            if (optimizedData.currentMember) {
-              setSelectedGroupMember({
-                id: optimizedData.currentMember.id,
-                travelerName: optimizedData.currentMember.name,
-                role: optimizedData.currentMember.role,
-                permissions: optimizedData.currentMember.permissions
-              })
+            
+            if (storedGroupExists) {
+              targetGroupId = storedGroupId
+              console.log('GroupContext: ✅ Using stored group selection:', storedGroupId)
+            } else {
+              localStorage.removeItem('selectedGroupId')
+              console.log('GroupContext: ❌ Cleared invalid stored group:', storedGroupId)
             }
-
-            // Store selection in localStorage for persistence
-            localStorage.setItem('selectedGroupId', optimizedData.group.id)
-            
-            // Clear the flags
-            localStorage.removeItem('groupSelectionInProgress')
-            localStorage.removeItem('groupValidationData')
-            
-            console.log('GroupContext: ✅ Optimized group loaded successfully:', optimizedData.group.id, optimizedData.group.name)
-            
-            // IMPORTANT: Return early here to prevent any fallback logic from running
-            return
-            
           } else {
-            // Fallback to normal group selection logic
-            let targetGroupId = groups[0].id // Default to first group
-            
-            // If we have a stored selection and it's valid, use that instead
-            if (storedGroupId) {
-              const storedGroupExists = groups.find((g: Group) => g.id === storedGroupId)
-              console.log('GroupContext: Checking stored group:', {
-                storedGroupId,
-                availableGroupIds: groups.map((g: Group) => g.id),
-                storedGroupExists: !!storedGroupExists
-              })
-              
-              if (storedGroupExists) {
-                targetGroupId = storedGroupId
-                console.log('GroupContext: ✅ Using stored group selection:', storedGroupId)
-              } else {
-                localStorage.removeItem('selectedGroupId')
-                localStorage.removeItem('groupSelectionInProgress')
-                localStorage.removeItem('groupValidationData')
-                console.log('GroupContext: ❌ Cleared invalid stored group:', storedGroupId)
-              }
-            } else {
-              console.log('GroupContext: No stored group, using first available group:', targetGroupId)
-            }
-            
-            // Handle legacy validation data
-            if (isFromGroupSelection && validationData) {
-              try {
-                const parsedValidationData = JSON.parse(validationData)
-                console.log('GroupContext: Using pre-validated group data:', parsedValidationData.group.name)
-                
-                // Set the group data directly from validation
-                setSelectedGroup({
-                  id: parsedValidationData.group.id,
-                  name: parsedValidationData.group.name,
-                  accessCode: parsedValidationData.group.accessCode,
-                  role: parsedValidationData.role,
-                  memberCount: groups.find((g: Group) => g.id === parsedValidationData.group.id)?.memberCount || 0,
-                  tripCount: groups.find((g: Group) => g.id === parsedValidationData.group.id)?.tripCount || 0
-                })
-
-                if (parsedValidationData.currentMember) {
-                  setSelectedGroupMember({
-                    id: parsedValidationData.currentMember.id,
-                    travelerName: parsedValidationData.currentMember.name,
-                    role: parsedValidationData.currentMember.role,
-                    permissions: parsedValidationData.currentMember.permissions
-                  })
-                }
-
-                // Store selection in localStorage for persistence
-                localStorage.setItem('selectedGroupId', parsedValidationData.group.id)
-                
-                // Clear the validation flags
-                localStorage.removeItem('groupSelectionInProgress')
-                localStorage.removeItem('groupValidationData')
-                
-                console.log('GroupContext: Pre-validated group loaded successfully')
-              } catch (error) {
-                console.error('GroupContext: Failed to parse validation data, falling back to API call')
-                await selectGroupDirect(targetGroupId, groups)
-              }
-            } else {
-              // Clear the group selection flag
-              if (isFromGroupSelection) {
-                localStorage.removeItem('groupSelectionInProgress')
-                localStorage.removeItem('groupValidationData')
-              }
-              
-              await selectGroupDirect(targetGroupId, groups)
-            }
+            console.log('GroupContext: No stored group, using first available group:', targetGroupId)
           }
+          
+          // Use the determined target group
+          await selectGroupDirect(targetGroupId, groups)
         }
       }
     } catch (error) {
