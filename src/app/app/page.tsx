@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import AppMonthlyCalendar from '@/components/AppMonthlyCalendar'
 import MobileTripsList from '@/components/MobileTripsList'
 import TripForm from '@/components/TripForm'
@@ -54,6 +54,8 @@ export default function AppPage() {
   const router = useRouter()
   const supabase = createClient()
   const groupedFetch = createGroupedFetch()
+  const initializationInProgress = useRef(false)
+  const dataLoadingInProgress = useRef(false)
 
   useEffect(() => {
     if (appInitialized) return // Skip if already initialized
@@ -78,16 +80,18 @@ export default function AppPage() {
   // Handle group data and redirect logic
   useEffect(() => {
     const handleGroupData = async () => {
-      // Skip if already initialized
-      if (appInitialized) {
+      // Skip if already initialized or initialization is in progress
+      if (appInitialized || initializationInProgress.current) {
         return
       }
 
       console.log('App: Starting initialization with optimized group data')
+      initializationInProgress.current = true
       
       // If still loading, wait
       if (groupLoading) {
         console.log('App: Group data still loading...')
+        initializationInProgress.current = false
         return
       }
       
@@ -124,6 +128,7 @@ export default function AppPage() {
           console.error('App: Error checking groups, redirecting to group selection:', error)
           router.push('/groups')
         }
+        initializationInProgress.current = false
         return
       }
       
@@ -135,6 +140,7 @@ export default function AppPage() {
       
       console.log('App: Initialization complete')
       setAppInitialized(true)
+      initializationInProgress.current = false
     }
     
     handleGroupData()
@@ -142,9 +148,10 @@ export default function AppPage() {
 
   // Load data for the selected group
   const loadDataForSelectedGroup = async () => {
-    if (!selectedGroup) return
+    if (!selectedGroup || dataLoadingInProgress.current) return
     
     console.log('App: Loading data for selected group:', selectedGroup.id, selectedGroup.name)
+    dataLoadingInProgress.current = true
     
     // Check if we have optimized data available and haven't used it yet
     const optimizedData = getCachedGroupData()
@@ -179,6 +186,8 @@ export default function AppPage() {
     } else {
       console.log('App: Optimized data already used, skipping reload')
     }
+    
+    dataLoadingInProgress.current = false
   }
   
   // Listen for group switch events to immediately refresh ALL data
@@ -192,6 +201,8 @@ export default function AppPage() {
       setTripsLoading(true)
       setUtilityDataLoading(true)
       setOptimizedDataUsed(false) // Reset optimized data flag for new group
+      initializationInProgress.current = false // Reset initialization ref
+      dataLoadingInProgress.current = false // Reset data loading ref
       
       // Small delay to ensure API caches are cleared
       setTimeout(() => {
@@ -215,6 +226,8 @@ export default function AppPage() {
       setAccessCodeCopied(false)
       setOptimizedDataUsed(false) // Reset optimized data flag
       setAppInitialized(false) // Reset initialization flag
+      initializationInProgress.current = false // Reset initialization ref
+      dataLoadingInProgress.current = false // Reset data loading ref
     }
 
     window.addEventListener('groupSwitched', handleGroupSwitch as EventListener)
@@ -576,8 +589,7 @@ export default function AppPage() {
   }, [trips])
 
   // Show loading until optimized group data is loaded and processed
-  if (!appInitialized || !groupSelectionComplete || groupLoading || 
-      (tripsLoading && !trips.length) || (utilityDataLoading && !expensesData && !pointsOfInterestData.length)) {
+  if (!appInitialized || !groupSelectionComplete || groupLoading || tripsLoading || utilityDataLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
