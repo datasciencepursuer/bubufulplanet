@@ -79,7 +79,7 @@ export function GroupProvider({ children }: GroupProviderProps) {
           
           // If we have a stored selection and it's valid, use that instead
           if (storedGroupId) {
-            const storedGroupExists = groups.find(g => g.id === storedGroupId)
+            const storedGroupExists = groups.find((g: Group) => g.id === storedGroupId)
             if (storedGroupExists) {
               targetGroupId = storedGroupId
               console.log('GroupContext: Using stored group selection:', storedGroupId)
