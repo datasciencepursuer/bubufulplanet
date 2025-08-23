@@ -18,11 +18,14 @@ export async function GET(request: NextRequest) {
 
     let userGroup
     if (requestedGroupId) {
-      // Get specific group if user is a member
+      // Get specific group if user is a member (by userId or email for invitations)
       userGroup = await prisma.userGroup.findFirst({
         where: { 
-          userId: user.id,
-          groupId: requestedGroupId
+          groupId: requestedGroupId,
+          OR: [
+            { userId: user.id },
+            { email: user.email }
+          ]
         },
         include: { 
           group: {
@@ -36,9 +39,14 @@ export async function GET(request: NextRequest) {
         }
       })
     } else {
-      // Get user's first group (default behavior)
+      // Get user's first group (default behavior - by userId or email for invitations)
       userGroup = await prisma.userGroup.findFirst({
-        where: { userId: user.id },
+        where: { 
+          OR: [
+            { userId: user.id },
+            { email: user.email }
+          ]
+        },
         include: { 
           group: {
             select: {

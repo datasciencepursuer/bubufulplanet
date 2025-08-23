@@ -18,11 +18,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Group ID is required' }, { status: 400 })
     }
 
-    // Verify user is a member of this group
+    // Verify user is a member of this group (by userId or email for invitations)
     const userGroup = await prisma.userGroup.findFirst({
       where: { 
-        userId: user.id,
-        groupId: groupId
+        groupId: groupId,
+        OR: [
+          { userId: user.id },
+          { email: user.email }
+        ]
       },
       include: {
         group: {

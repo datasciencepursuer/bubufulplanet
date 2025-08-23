@@ -12,9 +12,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Get user's groups from UserGroup table
+    // Get user's groups from UserGroup table (by userId or email for invitations)
     const userGroups = await prisma.userGroup.findMany({
-      where: { userId: user.id },
+      where: { 
+        OR: [
+          { userId: user.id },
+          { email: user.email }
+        ]
+      },
       include: {
         group: {
           include: {

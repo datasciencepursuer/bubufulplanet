@@ -26,11 +26,14 @@ export async function GET(request: NextRequest) {
     let groupId: string
 
     if (requestedGroupId) {
-      // Verify user is a member of the requested group
+      // Verify user is a member of the requested group (by userId or email for invitations)
       const userGroup = await prisma.userGroup.findFirst({
         where: { 
-          userId: user.id,
-          groupId: requestedGroupId
+          groupId: requestedGroupId,
+          OR: [
+            { userId: user.id },
+            { email: user.email }
+          ]
         }
       })
 
@@ -40,9 +43,14 @@ export async function GET(request: NextRequest) {
       
       groupId = requestedGroupId
     } else {
-      // Fallback to user's first group
+      // Fallback to user's first group (by userId or email for invitations)
       const userGroup = await prisma.userGroup.findFirst({
-        where: { userId: user.id },
+        where: { 
+          OR: [
+            { userId: user.id },
+            { email: user.email }
+          ]
+        },
         include: { group: true }
       })
 
@@ -93,11 +101,14 @@ export async function POST(request: NextRequest) {
     let groupId: string
 
     if (requestedGroupId) {
-      // Verify user is a member of the requested group
+      // Verify user is a member of the requested group (by userId or email for invitations)
       const userGroup = await prisma.userGroup.findFirst({
         where: { 
-          userId: user.id,
-          groupId: requestedGroupId
+          groupId: requestedGroupId,
+          OR: [
+            { userId: user.id },
+            { email: user.email }
+          ]
         }
       })
 
@@ -107,9 +118,14 @@ export async function POST(request: NextRequest) {
       
       groupId = requestedGroupId
     } else {
-      // Fallback to user's first group
+      // Fallback to user's first group (by userId or email for invitations)
       const userGroup = await prisma.userGroup.findFirst({
-        where: { userId: user.id },
+        where: { 
+          OR: [
+            { userId: user.id },
+            { email: user.email }
+          ]
+        },
         include: { group: true }
       })
 

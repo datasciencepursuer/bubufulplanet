@@ -53,6 +53,7 @@ export default function AppPage() {
   // State for app initialization
   const [appInitialized, setAppInitialized] = useState(false)
   const [groupSelectionComplete, setGroupSelectionComplete] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const groupedFetch = useGroupedFetch()

@@ -22,10 +22,14 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now()
 
     // SINGLE OPTIMIZED QUERY - Get everything we need in one shot
+    // Check UserGroup by both userId (if linked) and email (for invitations)
     const result = await prisma.userGroup.findFirst({
       where: { 
-        userId: user.id,
-        groupId: groupId
+        groupId: groupId,
+        OR: [
+          { userId: user.id },
+          { email: user.email }
+        ]
       },
       include: {
         group: {

@@ -155,6 +155,9 @@ export function GroupProvider({ children }: GroupProviderProps) {
             
             console.log('GroupContext: ✅ Optimized group loaded successfully:', optimizedData.group.id, optimizedData.group.name)
             
+            // IMPORTANT: Return early here to prevent any fallback logic from running
+            return
+            
           } else {
             // Fallback to normal group selection logic
             let targetGroupId = groups[0].id // Default to first group
