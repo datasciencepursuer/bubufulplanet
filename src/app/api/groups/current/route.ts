@@ -18,15 +18,40 @@ export async function GET(request: NextRequest) {
 
     let userGroup
     if (requestedGroupId) {
-      // Get specific group if user is a member (by userId or email for invitations)
-      userGroup = await prisma.userGroup.findFirst({
-        where: { 
+      // Check if user is a member of this group (by userId or email)
+      const groupMember = await prisma.groupMember.findFirst({
+        where: {
           groupId: requestedGroupId,
           OR: [
             { userId: user.id },
             { email: user.email }
           ]
-        },
+        }
+      })
+
+      if (groupMember) {
+        // Ensure UserGroup record exists
+        await prisma.userGroup.upsert({
+          where: {
+            unique_user_group: {
+              userId: user.id,
+              groupId: requestedGroupId
+            }
+          },
+          update: {},
+          create: {
+            userId: user.id,
+            groupId: requestedGroupId,
+            role: groupMember.role === 'adventurer' ? 'leader' : 'member'
+          }
+        })
+
+        // Get specific group
+        userGroup = await prisma.userGroup.findFirst({
+          where: { 
+            userId: user.id,
+            groupId: requestedGroupId
+          },
         include: { 
           group: {
             select: {
@@ -38,15 +63,11 @@ export async function GET(request: NextRequest) {
           }
         }
       })
+      }
     } else {
-      // Get user's first group (default behavior - by userId or email for invitations)
+      // Get user's first group (default behavior)
       userGroup = await prisma.userGroup.findFirst({
-        where: { 
-          OR: [
-            { userId: user.id },
-            { email: user.email }
-          ]
-        },
+        where: { userId: user.id },
         include: { 
           group: {
             select: {

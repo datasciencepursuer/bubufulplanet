@@ -12,14 +12,41 @@ export async function GET() {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Get user's groups from UserGroup table (by userId or email for invitations)
-    const userGroups = await prisma.userGroup.findMany({
-      where: { 
+    // First find all groups where user is a member (by userId or email)
+    const groupMembers = await prisma.groupMember.findMany({
+      where: {
         OR: [
           { userId: user.id },
           { email: user.email }
         ]
       },
+      select: {
+        groupId: true,
+        role: true
+      }
+    })
+
+    // Ensure UserGroup records exist for all groups user is a member of
+    for (const member of groupMembers) {
+      await prisma.userGroup.upsert({
+        where: {
+          unique_user_group: {
+            userId: user.id,
+            groupId: member.groupId
+          }
+        },
+        update: {},
+        create: {
+          userId: user.id,
+          groupId: member.groupId,
+          role: member.role === 'adventurer' ? 'leader' : 'member'
+        }
+      })
+    }
+
+    // Get user's groups from UserGroup table
+    const userGroups = await prisma.userGroup.findMany({
+      where: { userId: user.id },
       include: {
         group: {
           include: {

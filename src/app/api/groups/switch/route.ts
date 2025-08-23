@@ -21,15 +21,42 @@ export async function POST(request: NextRequest) {
     console.log('Group switch optimization: Starting optimized switch to', groupId)
     const startTime = Date.now()
 
-    // SINGLE OPTIMIZED QUERY - Get everything we need in one shot
-    // Check UserGroup by both userId (if linked) and email (for invitations)
-    const result = await prisma.userGroup.findFirst({
-      where: { 
+    // First check if user is a member of this group (by userId or email)
+    const groupMember = await prisma.groupMember.findFirst({
+      where: {
         groupId: groupId,
         OR: [
           { userId: user.id },
           { email: user.email }
         ]
+      }
+    })
+
+    if (!groupMember) {
+      return NextResponse.json({ error: 'User is not a member of this group' }, { status: 403 })
+    }
+
+    // Ensure UserGroup record exists
+    await prisma.userGroup.upsert({
+      where: {
+        unique_user_group: {
+          userId: user.id,
+          groupId: groupId
+        }
+      },
+      update: {},
+      create: {
+        userId: user.id,
+        groupId: groupId,
+        role: groupMember.role === 'adventurer' ? 'leader' : 'member'
+      }
+    })
+
+    // SINGLE OPTIMIZED QUERY - Get everything we need in one shot
+    const result = await prisma.userGroup.findFirst({
+      where: { 
+        userId: user.id,
+        groupId: groupId
       },
       include: {
         group: {

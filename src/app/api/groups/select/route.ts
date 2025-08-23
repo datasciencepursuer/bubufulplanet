@@ -18,14 +18,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Group ID is required' }, { status: 400 })
     }
 
-    // Verify user is a member of this group (by userId or email for invitations)
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { 
+    // Check if user is a member of this group (by userId or email)
+    const groupMember = await prisma.groupMember.findFirst({
+      where: {
         groupId: groupId,
         OR: [
           { userId: user.id },
           { email: user.email }
         ]
+      }
+    })
+
+    if (!groupMember) {
+      return NextResponse.json({ error: 'User is not a member of this group' }, { status: 403 })
+    }
+
+    // Ensure UserGroup record exists
+    await prisma.userGroup.upsert({
+      where: {
+        unique_user_group: {
+          userId: user.id,
+          groupId: groupId
+        }
+      },
+      update: {},
+      create: {
+        userId: user.id,
+        groupId: groupId,
+        role: groupMember.role === 'adventurer' ? 'leader' : 'member'
+      }
+    })
+
+    // Get the UserGroup record
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { 
+        userId: user.id,
+        groupId: groupId
       },
       include: {
         group: {
@@ -39,14 +67,17 @@ export async function POST(request: NextRequest) {
     })
 
     if (!userGroup) {
-      return NextResponse.json({ error: 'User is not a member of this group' }, { status: 403 })
+      return NextResponse.json({ error: 'Failed to create or find UserGroup record' }, { status: 500 })
     }
 
-    // Get user's member info in this group
+    // Use the groupMember we already found (get full details)
     const member = await prisma.groupMember.findFirst({
       where: {
         groupId: groupId,
-        userId: user.id
+        OR: [
+          { userId: user.id },
+          { email: user.email }
+        ]
       },
       select: {
         id: true,

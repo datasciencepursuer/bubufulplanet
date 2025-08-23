@@ -26,14 +26,11 @@ export async function GET(request: NextRequest) {
     let groupId: string
 
     if (requestedGroupId) {
-      // Verify user is a member of the requested group (by userId or email for invitations)
+      // Verify user is a member of the requested group
       const userGroup = await prisma.userGroup.findFirst({
         where: { 
-          groupId: requestedGroupId,
-          OR: [
-            { userId: user.id },
-            { email: user.email }
-          ]
+          userId: user.id,
+          groupId: requestedGroupId
         }
       })
 
@@ -43,14 +40,9 @@ export async function GET(request: NextRequest) {
       
       groupId = requestedGroupId
     } else {
-      // Fallback to user's first group (by userId or email for invitations)
+      // Fallback to user's first group
       const userGroup = await prisma.userGroup.findFirst({
-        where: { 
-          OR: [
-            { userId: user.id },
-            { email: user.email }
-          ]
-        },
+        where: { userId: user.id },
         include: { group: true }
       })
 
@@ -101,14 +93,11 @@ export async function POST(request: NextRequest) {
     let groupId: string
 
     if (requestedGroupId) {
-      // Verify user is a member of the requested group (by userId or email for invitations)
+      // Verify user is a member of the requested group
       const userGroup = await prisma.userGroup.findFirst({
         where: { 
-          groupId: requestedGroupId,
-          OR: [
-            { userId: user.id },
-            { email: user.email }
-          ]
+          userId: user.id,
+          groupId: requestedGroupId
         }
       })
 
@@ -118,14 +107,9 @@ export async function POST(request: NextRequest) {
       
       groupId = requestedGroupId
     } else {
-      // Fallback to user's first group (by userId or email for invitations)
+      // Fallback to user's first group
       const userGroup = await prisma.userGroup.findFirst({
-        where: { 
-          OR: [
-            { userId: user.id },
-            { email: user.email }
-          ]
-        },
+        where: { userId: user.id },
         include: { group: true }
       })
 
