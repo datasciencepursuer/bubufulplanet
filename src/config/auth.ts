@@ -67,7 +67,7 @@ export const authConfig = {
 export function getRedirectUrl(type: keyof typeof authConfig.redirects) {
   const baseUrl = typeof window !== 'undefined' 
     ? window.location.origin 
-    : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+    : process.env.SITE_URL || 'http://localhost:3000'
   
   return `${baseUrl}${authConfig.redirects[type]}`
 }
