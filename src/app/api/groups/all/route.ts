@@ -31,7 +31,9 @@ export async function GET() {
         }
       },
       orderBy: {
-        createdAt: 'asc' // Show oldest groups first (likely their main group)
+        group: {
+          createdAt: 'asc' // Show oldest groups first (likely their main group)
+        }
       }
     })
 
