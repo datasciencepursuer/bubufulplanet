@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
       // Get all group members
       const groupMembers = await prisma.groupMember.findMany({
-        where: { groupId: userGroup.groupId }
+        where: { groupId: groupId }
       });
 
       // Calculate balances
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
         tripInfo = await prisma.trip.findFirst({
           where: {
             id: tripId,
-            groupId: userGroup.groupId
+            groupId: groupId
           },
           select: {
             id: true,

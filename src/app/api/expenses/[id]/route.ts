@@ -77,7 +77,7 @@ export async function GET(
         return NextResponse.json({ error: 'No group found' }, { status: 404 })
       }
 
-      groupId = groupId
+      groupId = userGroup.groupId
     }
       const expense = await prisma.expense.findFirst({
         where: {
@@ -174,7 +174,7 @@ export async function PUT(
         return NextResponse.json({ error: 'No group found' }, { status: 404 })
       }
 
-      groupId = groupId
+      groupId = userGroup.groupId
     }
       const body = await request.json();
       

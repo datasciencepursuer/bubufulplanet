@@ -18,20 +18,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = userGroup.groupId
     }
       // First verify the trip belongs to the user's group
       const trip = await prisma.trip.findFirst({
         where: {
           id: tripId,
-          groupId: userGroup.groupId
+          groupId: groupId
         }
       })
 
@@ -46,7 +71,7 @@ export async function GET(request: NextRequest) {
       const expenses = await prisma.expense.findMany({
         where: {
           tripId: tripId,
-          groupId: userGroup.groupId
+          groupId: groupId
         },
         include: {
           event: true,
@@ -67,7 +92,7 @@ export async function GET(request: NextRequest) {
       
       // Add cache headers for expenses data
       response.headers.set('Cache-Control', 'private, max-age=120, stale-while-revalidate=240'); // 2 min cache, 4 min stale
-      response.headers.set('ETag', `expenses-${userGroup.groupId}-${tripId}-${Date.now()}`);
+      response.headers.set('ETag', `expenses-${groupId}-${tripId}-${Date.now()}`);
       
       return response;
   } catch (error) {
