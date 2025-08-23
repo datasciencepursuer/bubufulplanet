@@ -1,4 +1,4 @@
-/**
+/** auth repush
  * Authentication Configuration
  * Centralized configuration for all authentication-related settings
  */
