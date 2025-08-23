@@ -14,14 +14,40 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const { searchParams } = new URL(request.url)
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = userGroup.groupId
     }
 
     const event = await prisma.event.findFirst({
@@ -29,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         id: id,
         day: {
           trip: {
-            groupId: userGroup.groupId
+            groupId: groupId
           }
         }
       },
@@ -85,14 +111,40 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const { searchParams } = new URL(request.url)
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = userGroup.groupId
     }
 
     // Verify event exists and belongs to user's group
@@ -101,7 +153,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         id: id,
         day: {
           trip: {
-            groupId: userGroup.groupId
+            groupId: groupId
           }
         }
       }
@@ -216,14 +268,40 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const { searchParams } = new URL(request.url)
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = userGroup.groupId
     }
 
     // Verify event exists and belongs to user's group - get trip info for cache revalidation
@@ -232,7 +310,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         id: id,
         day: {
           trip: {
-            groupId: userGroup.groupId
+            groupId: groupId
           }
         }
       },

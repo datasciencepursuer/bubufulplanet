@@ -23,14 +23,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current group (we'll use the first one for now)
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    });
+    // Get groupId from header or query params, fallback to user's first group
+    const { searchParams } = new URL(request.url);
+    const headerGroupId = request.headers.get('x-group-id');
+    const queryGroupId = searchParams.get('groupId');
+    const requestedGroupId = headerGroupId || queryGroupId;
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 });
+    let groupId: string;
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      });
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 });
+      }
+      
+      groupId = requestedGroupId;
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      });
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 });
+      }
+
+      groupId = userGroup.groupId;
     }
 
     // Parse dates as absolute calendar dates (timezone-agnostic)
@@ -44,7 +70,7 @@ export async function POST(request: NextRequest) {
         startDate: start,
         endDate: end,
         destination,
-        groupId: userGroup.groupId,
+        groupId: groupId,
         userId: '' // Legacy field, set to empty string
       }
     });
@@ -88,7 +114,7 @@ export async function POST(request: NextRequest) {
       };
 
     // Revalidate trips cache after creation
-    CacheManager.revalidateTrips(userGroup.groupId);
+    CacheManager.revalidateTrips(groupId);
 
     return NextResponse.json({ trip: normalizedTrip }, { status: 201 });
   } catch (error) {
@@ -118,18 +144,43 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current group (we'll use the first one for now)
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    });
+    // Get groupId from header or query params, fallback to user's first group
+    const headerGroupId = request.headers.get('x-group-id');
+    const queryGroupId = searchParams.get('groupId');
+    const requestedGroupId = headerGroupId || queryGroupId;
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 });
+    let groupId: string;
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      });
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 });
+      }
+      
+      groupId = requestedGroupId;
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      });
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 });
+      }
+
+      groupId = userGroup.groupId;
     }
 
     let whereClause: any = {
-      groupId: userGroup.groupId
+      groupId: groupId
     };
 
     // If specific trip ID requested, add it to the filter
@@ -145,7 +196,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    console.log(`GET trips: Found ${trips.length} trips for group ${userGroup.groupId}:`, trips.map(t => ({ id: t.id, name: t.name, groupId: t.groupId })));
+    console.log(`GET trips: Found ${trips.length} trips for group ${groupId}:`, trips.map(t => ({ id: t.id, name: t.name, groupId: t.groupId })));
 
     // Normalize date formats to ensure consistency using timezone-agnostic method
     const normalizedTrips = trips.map(trip => ({
@@ -159,14 +210,14 @@ export async function GET(request: NextRequest) {
     // Add cache headers with tags for revalidation
     const cacheHeaders = CacheManager.getCacheHeaders(
       CACHE_DURATIONS.TRIPS,
-      [CACHE_TAGS.TRIPS(userGroup.groupId)]
+      [CACHE_TAGS.TRIPS(groupId)]
     );
     
     Object.entries(cacheHeaders).forEach(([key, value]) => {
       response.headers.set(key, value);
     });
     
-    response.headers.set('ETag', CacheManager.generateETag(`trips-${userGroup.groupId}`));
+    response.headers.set('ETag', CacheManager.generateETag(`trips-${groupId}`));
     
     return response;
   } catch (error) {

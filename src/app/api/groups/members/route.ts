@@ -103,17 +103,39 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from query params or use user's current group
+    const { searchParams } = new URL(request.url)
+    const requestedGroupId = searchParams.get('groupId')
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Get user's first group (fallback behavior)
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = userGroup.groupId
     }
-
-    const groupId = userGroup.groupId
 
     // Check if current user is an adventurer using Prisma
     const currentMember = await prisma.groupMember.findFirst({

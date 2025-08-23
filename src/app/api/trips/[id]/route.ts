@@ -30,14 +30,40 @@ export async function PUT(
       )
     }
 
-    // Get user's group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const { searchParams } = new URL(request.url)
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = userGroup.groupId
     }
 
     // Parse dates as absolute calendar dates (timezone-agnostic)
@@ -56,7 +82,7 @@ export async function PUT(
     const existingTrip = await prisma.trip.findUnique({
       where: { 
         id: tripId,
-        groupId: userGroup.groupId 
+        groupId: groupId 
       },
       include: {
         tripDays: {
@@ -145,11 +171,11 @@ export async function PUT(
     } : null
 
     // Revalidate caches after trip update
-    CacheManager.revalidateTrip(tripId, userGroup.groupId);
+    CacheManager.revalidateTrip(tripId, groupId);
     
     // If dates changed, also revalidate events since trip days were regenerated
     if (datesChanged) {
-      CacheManager.revalidateEvents(tripId, userGroup.groupId);
+      CacheManager.revalidateEvents(tripId, groupId);
     }
 
     return NextResponse.json({ 
@@ -192,14 +218,40 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const { searchParams } = new URL(request.url)
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = userGroup.groupId
     }
 
     // First check if trip exists at all
@@ -217,8 +269,8 @@ export async function DELETE(
     }
 
     // Then verify trip belongs to user's group
-    if (tripExists.groupId !== userGroup.groupId) {
-      console.error(`DELETE: Trip ${tripId} belongs to group ${tripExists.groupId} but user is in group ${userGroup.groupId}`)
+    if (tripExists.groupId !== groupId) {
+      console.error(`DELETE: Trip ${tripId} belongs to group ${tripExists.groupId} but user is in group ${groupId}`)
       return NextResponse.json(
         { error: 'Trip not found in your group' },
         { status: 404 }
@@ -231,9 +283,9 @@ export async function DELETE(
     })
 
     // Revalidate all related caches after deletion
-    CacheManager.revalidateTrip(tripId, userGroup.groupId);
-    CacheManager.revalidateEvents(tripId, userGroup.groupId);
-    CacheManager.revalidateExpenses(tripId, userGroup.groupId);
+    CacheManager.revalidateTrip(tripId, groupId);
+    CacheManager.revalidateEvents(tripId, groupId);
+    CacheManager.revalidateExpenses(tripId, groupId);
 
     return NextResponse.json({ success: true })
   } catch (error) {

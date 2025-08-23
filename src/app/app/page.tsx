@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { MapPin, Calendar as CalendarIcon, DollarSign, Settings, ArrowLeft, Plus, LogOut, Trash2, Clock, Users, Copy, Check } from 'lucide-react'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import BearGlobeLoader from '@/components/BearGlobeLoader'
+import { useGroupedFetch } from '@/lib/groupedFetch'
 import { useNotify } from '@/hooks/useNotify'
 import { createClient } from '@/utils/supabase/client'
 import TravelerNameEditor from '@/components/TravelerNameEditor'
@@ -43,6 +44,7 @@ export default function AppPage() {
   const [editingTrip, setEditingTrip] = useState<any>(null)
   const router = useRouter()
   const supabase = createClient()
+  const groupedFetch = useGroupedFetch()
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -81,7 +83,7 @@ export default function AppPage() {
     try {
       setTripsLoading(true)
       // Add cache-busting parameter to ensure fresh data
-      const response = await fetch(`/api/trips?t=${Date.now()}`, {
+      const response = await groupedFetch(`/api/trips?t=${Date.now()}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
@@ -234,7 +236,7 @@ export default function AppPage() {
     setTripToDelete(null)
 
     try {
-      const response = await fetch(`/api/trips/${tripBeingDeleted.id}`, {
+      const response = await groupedFetch(`/api/trips/${tripBeingDeleted.id}`, {
         method: 'DELETE',
       })
 

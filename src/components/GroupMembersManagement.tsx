@@ -289,7 +289,7 @@ export default function GroupMembersManagement() {
                   )}
                 </div>
                 
-                {isAdventurer() && member.role !== 'adventurer' && !member.isCurrentUser && (
+                {isAdventurer() && member.role !== 'adventurer' && (
                   <div className="flex items-center gap-1 ml-4">
                     {editingMember !== member.id && (
                       <>
@@ -301,14 +301,16 @@ export default function GroupMembersManagement() {
                         >
                           <Settings className="w-4 h-4" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setShowConfirmDelete(member.id)}
-                          className="p-1 text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {!member.isCurrentUser && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setShowConfirmDelete(member.id)}
+                            className="p-1 text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>

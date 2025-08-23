@@ -17,14 +17,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group (we'll use the first one for now)
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = userGroup.groupId
     }
 
     let whereClause: any = {}
@@ -35,14 +60,14 @@ export async function GET(request: NextRequest) {
       whereClause.day = {
         trip: {
           id: tripId,
-          groupId: userGroup.groupId
+          groupId: groupId
         }
       }
     } else {
       // Default to all events for the user's group
       whereClause.day = {
         trip: {
-          groupId: userGroup.groupId
+          groupId: groupId
         }
       }
     }
@@ -67,7 +92,7 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.json({ events });
     
     // Determine cache tags based on query parameters
-    const cacheTags = [CACHE_TAGS.EVENTS(userGroup.groupId)];
+    const cacheTags = [CACHE_TAGS.EVENTS(groupId)];
     if (tripId) {
       cacheTags.push(CACHE_TAGS.TRIP_EVENTS(tripId));
     }
@@ -85,7 +110,7 @@ export async function GET(request: NextRequest) {
       response.headers.set(key, value);
     });
     
-    response.headers.set('ETag', CacheManager.generateETag(`events-${userGroup.groupId}-${tripId || dayId || 'all'}`));
+    response.headers.set('ETag', CacheManager.generateETag(`events-${groupId}-${tripId || dayId || 'all'}`));
     
     return response;
   } catch (error) {
@@ -112,14 +137,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group (we'll use the first one for now)
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const { searchParams } = new URL(request.url)
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = userGroup.groupId
     }
 
     console.log('Creating event with simplified data:', {
@@ -173,7 +224,7 @@ export async function POST(request: NextRequest) {
           where: {
             id: dayId,
             trip: {
-              groupId: userGroup.groupId
+              groupId: groupId
             }
           }
         })
@@ -193,9 +244,12 @@ export async function POST(request: NextRequest) {
             data: expenses.map((expense: any) => ({
               eventId: event.id,
               dayId: dayId,
+              tripId: tripDay.tripId,
               description: expense.description,
               amount: expense.amount,
-              category: expense.category
+              category: expense.category,
+              ownerId: expense.ownerId,
+              groupId: groupId
             }))
           })
         }

@@ -44,19 +44,45 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const { searchParams } = new URL(request.url)
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = groupId
     }
       const expense = await prisma.expense.findFirst({
         where: {
           id: id,
-          groupId: userGroup.groupId
+          groupId: groupId
         },
         include: {
           owner: true,
@@ -115,14 +141,40 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const { searchParams } = new URL(request.url)
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = groupId
     }
       const body = await request.json();
       
@@ -141,7 +193,7 @@ export async function PUT(
       const expense = await prisma.expense.findFirst({
         where: {
           id: id,
-          groupId: userGroup.groupId
+          groupId: groupId
         },
         include: {
           trip: true
@@ -160,7 +212,7 @@ export async function PUT(
         const owner = await prisma.groupMember.findFirst({
           where: {
             id: data.ownerId,
-            groupId: userGroup.groupId
+            groupId: groupId
           }
         });
 
@@ -183,7 +235,7 @@ export async function PUT(
           const validParticipants = await prisma.groupMember.findMany({
             where: {
               id: { in: participantIds },
-              groupId: userGroup.groupId
+              groupId: groupId
             }
           });
 
@@ -217,7 +269,7 @@ export async function PUT(
             const validParticipants = await prisma.groupMember.findMany({
               where: {
                 id: { in: participantIds },
-                groupId: userGroup.groupId
+                groupId: groupId
               }
             });
 
@@ -278,7 +330,7 @@ export async function PUT(
         const handleExternalParticipant = async (name: string) => {
           let externalParticipant = await tx.externalParticipant.findFirst({
             where: {
-              groupId: userGroup.groupId,
+              groupId: groupId,
               name: name
             }
           });
@@ -286,7 +338,7 @@ export async function PUT(
           if (!externalParticipant) {
             externalParticipant = await tx.externalParticipant.create({
               data: {
-                groupId: userGroup.groupId,
+                groupId: groupId,
                 name: name
               }
             });
@@ -415,7 +467,7 @@ export async function PUT(
       });
 
       // Revalidate expense caches after update
-      CacheManager.revalidateExpenses(expense.tripId, userGroup.groupId);
+      CacheManager.revalidateExpenses(expense.tripId, groupId);
 
       return NextResponse.json({ expense: updatedExpense });
   } catch (error) {
@@ -443,20 +495,46 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's current group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: { userId: user.id },
-      include: { group: true }
-    })
+    // Get groupId from header or query params, fallback to user's first group
+    const { searchParams } = new URL(request.url)
+    const headerGroupId = request.headers.get('x-group-id')
+    const queryGroupId = searchParams.get('groupId')
+    const requestedGroupId = headerGroupId || queryGroupId
 
-    if (!userGroup) {
-      return NextResponse.json({ error: 'No group found' }, { status: 404 })
+    let groupId: string
+
+    if (requestedGroupId) {
+      // Verify user is a member of the requested group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { 
+          userId: user.id,
+          groupId: requestedGroupId
+        }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'Access denied to this group' }, { status: 403 })
+      }
+      
+      groupId = requestedGroupId
+    } else {
+      // Fallback to user's first group
+      const userGroup = await prisma.userGroup.findFirst({
+        where: { userId: user.id },
+        include: { group: true }
+      })
+
+      if (!userGroup) {
+        return NextResponse.json({ error: 'No group found' }, { status: 404 })
+      }
+
+      groupId = userGroup.groupId
     }
       // Find the expense
       const expense = await prisma.expense.findFirst({
         where: {
           id: id,
-          groupId: userGroup.groupId
+          groupId: groupId
         }
       });
 
@@ -473,7 +551,7 @@ export async function DELETE(
       });
 
       // Revalidate expense caches after deletion
-      CacheManager.revalidateExpenses(expense.tripId, userGroup.groupId);
+      CacheManager.revalidateExpenses(expense.tripId, groupId);
 
       return NextResponse.json({ success: true });
   } catch (error) {
