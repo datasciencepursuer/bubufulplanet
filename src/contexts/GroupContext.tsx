@@ -72,9 +72,27 @@ export function GroupProvider({ children }: GroupProviderProps) {
         const groups = data.groups || []
         setAvailableGroups(groups)
         
-        // Auto-select first group if none selected and groups exist
+        // Check for stored group selection first, then auto-select first group
+        const storedGroupId = localStorage.getItem('selectedGroupId')
         if (!selectedGroup && groups.length > 0) {
-          await selectGroupDirect(groups[0].id, groups)
+          let targetGroupId = groups[0].id // Default to first group
+          
+          // If we have a stored selection and it's valid, use that instead
+          if (storedGroupId) {
+            const storedGroupExists = groups.find(g => g.id === storedGroupId)
+            if (storedGroupExists) {
+              targetGroupId = storedGroupId
+              console.log('GroupContext: Using stored group selection:', storedGroupId)
+            } else {
+              // Clear invalid stored group
+              localStorage.removeItem('selectedGroupId')
+              console.log('GroupContext: Cleared invalid stored group:', storedGroupId)
+            }
+          } else {
+            console.log('GroupContext: No stored group, using first available group:', targetGroupId)
+          }
+          
+          await selectGroupDirect(targetGroupId, groups)
         }
       }
     } catch (error) {
@@ -167,19 +185,6 @@ export function GroupProvider({ children }: GroupProviderProps) {
   const canModify = selectedGroupMember?.permissions?.modify ?? false
   const isAdventurer = selectedGroupMember?.role === 'adventurer'
 
-  // Restore selected group from localStorage when groups are loaded
-  useEffect(() => {
-    const storedGroupId = localStorage.getItem('selectedGroupId')
-    if (storedGroupId && availableGroups.length > 0 && !selectedGroup) {
-      const groupExists = availableGroups.find(g => g.id === storedGroupId)
-      if (groupExists) {
-        selectGroup(storedGroupId)
-      } else {
-        // Clear invalid stored group
-        localStorage.removeItem('selectedGroupId')
-      }
-    }
-  }, [availableGroups])
 
   const value: GroupContextType = {
     selectedGroup,

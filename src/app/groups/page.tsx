@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, MapPin, Calendar } from 'lucide-react'
+import { Users, MapPin, Calendar, ArrowLeft } from 'lucide-react'
 import BearGlobeLoader from '@/components/BearGlobeLoader'
 
 interface TravelGroup {
@@ -78,6 +78,9 @@ export default function GroupSelectionPage() {
       })
 
       if (response.ok) {
+        // Store the selected group in localStorage so GroupContext can pick it up
+        localStorage.setItem('selectedGroupId', groupId)
+        
         // Redirect to main app
         router.push('/app')
       } else {
@@ -95,6 +98,18 @@ export default function GroupSelectionPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-900 via-cyan-900 to-teal-800 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-4xl mx-auto">
+        {/* Back button */}
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => router.push('/app')}
+            className="text-teal-200 hover:text-white hover:bg-white/10"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to App
+          </Button>
+        </div>
+        
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-300 via-cyan-300 to-teal-200 bg-clip-text text-transparent mb-2">
             Welcome back, {userName}!
