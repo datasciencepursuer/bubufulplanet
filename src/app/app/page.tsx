@@ -564,20 +564,15 @@ export default function AppPage() {
                 variant="ghost" 
                 size="sm"
                 onClick={() => {
-                  // If user has multiple groups, go to group selection page
-                  // Otherwise go to homepage
-                  if (availableGroups.length > 1) {
-                    router.push('/groups')
-                  } else {
-                    router.push('/')
-                  }
+                  // Always go to groups page for group switching
+                  router.push('/groups')
                 }}
                 className="gap-1 lg:gap-2"
-                title={availableGroups.length > 1 ? `Switch between ${availableGroups.length} groups` : 'Go back to homepage'}
+                title="Switch groups"
               >
                 <ArrowLeft className="w-4 h-4" /> 
                 <span className="hidden sm:inline">
-                  {availableGroups.length > 1 ? 'Groups' : 'Back'}
+                  Groups
                 </span>
               </Button>
               <div className="min-w-0">

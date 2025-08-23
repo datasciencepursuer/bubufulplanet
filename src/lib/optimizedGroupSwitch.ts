@@ -121,12 +121,14 @@ export class OptimizedGroupSwitcher {
     // Cache the result
     this.currentGroupData = data
     
-    // Store in localStorage for persistence
-    localStorage.setItem('selectedGroupId', groupId)
-    localStorage.setItem('optimizedGroupData', JSON.stringify({
-      ...data,
-      cachedAt: Date.now()
-    }))
+    // Store in localStorage for persistence (only in browser)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedGroupId', groupId)
+      localStorage.setItem('optimizedGroupData', JSON.stringify({
+        ...data,
+        cachedAt: Date.now()
+      }))
+    }
 
     return data
   }
@@ -140,7 +142,11 @@ export class OptimizedGroupSwitcher {
       return this.currentGroupData
     }
 
-    // Check localStorage cache
+    // Check localStorage cache only if we're in the browser
+    if (typeof window === 'undefined') {
+      return null
+    }
+
     try {
       const cached = localStorage.getItem('optimizedGroupData')
       if (cached) {
@@ -167,7 +173,9 @@ export class OptimizedGroupSwitcher {
       }
     } catch (error) {
       console.warn('OptimizedGroupSwitcher: Failed to load cache', error)
-      localStorage.removeItem('optimizedGroupData')
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('optimizedGroupData')
+      }
     }
 
     return null
@@ -179,8 +187,10 @@ export class OptimizedGroupSwitcher {
   clearCache(): void {
     console.log('OptimizedGroupSwitcher: Clearing all cache')
     this.currentGroupData = null
-    localStorage.removeItem('optimizedGroupData')
-    localStorage.removeItem('selectedGroupId')
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('optimizedGroupData')
+      localStorage.removeItem('selectedGroupId')
+    }
   }
 
   /**
@@ -189,7 +199,9 @@ export class OptimizedGroupSwitcher {
   invalidateCurrentGroup(): void {
     console.log('OptimizedGroupSwitcher: Invalidating current group cache')
     this.currentGroupData = null
-    localStorage.removeItem('optimizedGroupData')
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('optimizedGroupData')
+    }
   }
 
   /**

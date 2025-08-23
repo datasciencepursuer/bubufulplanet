@@ -114,7 +114,7 @@ export function createGroupedFetch() {
  */
 export function updateGroupName(newName: string) {
   const optimizedData = getCachedGroupData()
-  if (optimizedData) {
+  if (optimizedData && typeof window !== 'undefined') {
     const updatedData = {
       ...optimizedData,
       group: {

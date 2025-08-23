@@ -1,14 +1,13 @@
 'use client'
 
-import { useState, useEffect, useContext } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { UserPlus, Settings, Trash2, Shield, Eye, Edit, Plus } from 'lucide-react'
-import { usePermissions } from '@/hooks/usePermissions'
 import { getRoleDisplay, getPermissionDisplay } from '@/lib/permissions'
 import ConfirmDialog from './ConfirmDialog'
 import { useNotify } from '@/hooks/useNotify'
-import { GroupContext } from '@/contexts/GroupContext'
+import { useOptimizedGroup, createGroupedFetch } from '@/lib/groupUtils'
 
 interface GroupMember {
   id: string
@@ -25,15 +24,15 @@ interface GroupMember {
   isLinked?: boolean // Whether the user has signed up and linked their account
 }
 
-export default function GroupMembersManagement() {
-  const { error } = useNotify()
-  const context = useContext(GroupContext)
-  
-  if (!context) {
-    throw new Error('GroupMembersManagement must be used within a GroupProvider')
-  }
+interface GroupMembersManagementProps {
+  readOnly?: boolean
+}
 
-  const { selectedGroup } = context
+export default function GroupMembersManagement({ readOnly = false }: GroupMembersManagementProps) {
+  const { error } = useNotify()
+  const { selectedGroup, isAdventurer } = useOptimizedGroup()
+  const groupedFetch = createGroupedFetch()
+  
   const [members, setMembers] = useState<GroupMember[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddMember, setShowAddMember] = useState(false)
@@ -46,7 +45,6 @@ export default function GroupMembersManagement() {
   })
   const [editingMember, setEditingMember] = useState<string | null>(null)
   const [showConfirmDelete, setShowConfirmDelete] = useState<string | null>(null)
-  const { isAdventurer } = usePermissions()
 
   useEffect(() => {
     if (selectedGroup?.id) {
@@ -61,12 +59,7 @@ export default function GroupMembersManagement() {
     }
     
     try {
-      const response = await fetch(`/api/groups/members?groupId=${selectedGroup.id}`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
+      const response = await groupedFetch(`/api/groups/members?groupId=${selectedGroup.id}`)
       if (response.ok) {
         const data = await response.json()
         setMembers(data.members || [])
@@ -82,13 +75,11 @@ export default function GroupMembersManagement() {
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMemberName.trim() || !newMemberEmail.trim() || !selectedGroup?.id) return
+    if (!newMemberName.trim() || !newMemberEmail.trim() || !selectedGroup?.id || readOnly) return
 
     try {
-      const response = await fetch(`/api/groups/members?groupId=${selectedGroup.id}`, {
+      const response = await groupedFetch(`/api/groups/members?groupId=${selectedGroup.id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ 
           travelerName: newMemberName.trim(),
           email: newMemberEmail.trim().toLowerCase(),
@@ -113,13 +104,11 @@ export default function GroupMembersManagement() {
   }
 
   const handleUpdatePermissions = async (memberId: string, permissions: any) => {
-    if (!selectedGroup?.id) return
+    if (!selectedGroup?.id || readOnly) return
     
     try {
-      const response = await fetch(`/api/groups/members?groupId=${selectedGroup.id}`, {
+      const response = await groupedFetch(`/api/groups/members?groupId=${selectedGroup.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ memberId, permissions })
       })
 
@@ -137,8 +126,10 @@ export default function GroupMembersManagement() {
   }
 
   const handleRemoveMember = async (memberId: string) => {
+    if (readOnly) return
+    
     try {
-      const response = await fetch(`/api/groups/members/${memberId}`, {
+      const response = await groupedFetch(`/api/groups/members/${memberId}`, {
         method: 'DELETE'
       })
 
@@ -176,10 +167,10 @@ export default function GroupMembersManagement() {
           <div>
             <CardTitle className="text-xl">Group Members</CardTitle>
             <CardDescription>
-              {isAdventurer() ? 'Manage member permissions' : 'View group members'}
+              {isAdventurer ? 'Manage member permissions' : 'View group members'}
             </CardDescription>
           </div>
-          {isAdventurer() && (
+          {isAdventurer && !readOnly && (
             <Button
               size="sm"
               onClick={() => setShowAddMember(true)}
@@ -233,7 +224,7 @@ export default function GroupMembersManagement() {
                             ))
                           }}
                           className="rounded"
-                          disabled={member.role === 'adventurer'}
+                          disabled={member.role === 'adventurer' || readOnly}
                         />
                         <Plus className="w-3 h-3" />
                         Can create trips & events
@@ -249,7 +240,7 @@ export default function GroupMembersManagement() {
                             ))
                           }}
                           className="rounded"
-                          disabled={member.role === 'adventurer'}
+                          disabled={member.role === 'adventurer' || readOnly}
                         />
                         <Edit className="w-3 h-3" />
                         Can edit & delete items
@@ -263,7 +254,7 @@ export default function GroupMembersManagement() {
                               handleUpdatePermissions(member.id, memberToUpdate.permissions)
                             }
                           }}
-                          disabled={member.role === 'adventurer'}
+                          disabled={member.role === 'adventurer' || readOnly}
                         >
                           Save
                         </Button>
@@ -289,7 +280,7 @@ export default function GroupMembersManagement() {
                   )}
                 </div>
                 
-                {isAdventurer() && member.role !== 'adventurer' && (
+                {isAdventurer && member.role !== 'adventurer' && !readOnly && (
                   <div className="flex items-center gap-1 ml-4">
                     {editingMember !== member.id && (
                       <>
@@ -321,7 +312,7 @@ export default function GroupMembersManagement() {
         </div>
 
         {/* Add Member Form */}
-        {showAddMember && (
+        {showAddMember && !readOnly && (
           <div className="border-t p-4 bg-gray-50">
             <form onSubmit={handleAddMember} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -391,7 +382,7 @@ export default function GroupMembersManagement() {
               <div className="flex gap-2">
                 <Button 
                   type="submit" 
-                  disabled={!newMemberName.trim() || !newMemberEmail.trim()}
+                  disabled={!newMemberName.trim() || !newMemberEmail.trim() || readOnly}
                   className="flex-1"
                 >
                   Send Invitation
