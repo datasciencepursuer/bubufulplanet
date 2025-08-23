@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { UserPlus, Settings, Trash2, Shield, Eye, Edit, Plus } from 'lucide-react'
@@ -8,6 +8,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { getRoleDisplay, getPermissionDisplay } from '@/lib/permissions'
 import ConfirmDialog from './ConfirmDialog'
 import { useNotify } from '@/hooks/useNotify'
+import { GroupContext } from '@/contexts/GroupContext'
 
 interface GroupMember {
   id: string
@@ -26,6 +27,13 @@ interface GroupMember {
 
 export default function GroupMembersManagement() {
   const { error } = useNotify()
+  const context = useContext(GroupContext)
+  
+  if (!context) {
+    throw new Error('GroupMembersManagement must be used within a GroupProvider')
+  }
+
+  const { selectedGroup } = context
   const [members, setMembers] = useState<GroupMember[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddMember, setShowAddMember] = useState(false)
@@ -41,15 +49,29 @@ export default function GroupMembersManagement() {
   const { isAdventurer } = usePermissions()
 
   useEffect(() => {
-    loadMembers()
-  }, [])
+    if (selectedGroup?.id) {
+      loadMembers()
+    }
+  }, [selectedGroup?.id])
 
   const loadMembers = async () => {
+    if (!selectedGroup?.id) {
+      setLoading(false)
+      return
+    }
+    
     try {
-      const response = await fetch('/api/groups/members')
+      const response = await fetch(`/api/groups/members?groupId=${selectedGroup.id}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
       if (response.ok) {
         const data = await response.json()
         setMembers(data.members || [])
+      } else {
+        console.error('Failed to load members:', response.status, response.statusText)
       }
     } catch (error) {
       console.error('Error loading members:', error)
@@ -60,12 +82,13 @@ export default function GroupMembersManagement() {
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMemberName.trim() || !newMemberEmail.trim()) return
+    if (!newMemberName.trim() || !newMemberEmail.trim() || !selectedGroup?.id) return
 
     try {
-      const response = await fetch('/api/groups/members', {
+      const response = await fetch(`/api/groups/members?groupId=${selectedGroup.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ 
           travelerName: newMemberName.trim(),
           email: newMemberEmail.trim().toLowerCase(),
@@ -90,10 +113,13 @@ export default function GroupMembersManagement() {
   }
 
   const handleUpdatePermissions = async (memberId: string, permissions: any) => {
+    if (!selectedGroup?.id) return
+    
     try {
-      const response = await fetch('/api/groups/members', {
+      const response = await fetch(`/api/groups/members?groupId=${selectedGroup.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ memberId, permissions })
       })
 
