@@ -153,8 +153,10 @@ export default function GroupSelectionPage() {
       localStorage.setItem('optimizedSwitchComplete', 'true')
       
       console.log('Groups page: Optimized data loaded, navigating to app...')
+      console.log('Groups page: Stored group ID:', localStorage.getItem('selectedGroupId'))
+      console.log('Groups page: Optimized switch flag:', localStorage.getItem('optimizedSwitchComplete'))
       
-      // Small delay to show success feedback to user
+      // Small delay to show success feedback to user and ensure localStorage writes complete
       await new Promise(resolve => setTimeout(resolve, 500))
       
       // Navigate to app

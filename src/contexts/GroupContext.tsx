@@ -100,15 +100,27 @@ export function GroupProvider({ children }: GroupProviderProps) {
           // If we have a stored selection and it's valid, use that instead
           if (storedGroupId) {
             const storedGroupExists = groups.find((g: Group) => g.id === storedGroupId)
+            console.log('GroupContext: Checking stored group:', {
+              storedGroupId,
+              availableGroupIds: groups.map((g: Group) => g.id),
+              storedGroupExists: !!storedGroupExists
+            })
+            
             if (storedGroupExists) {
               targetGroupId = storedGroupId
-              console.log('GroupContext: Using stored group selection:', storedGroupId, isFromGroupSelection ? '(from group selection)' : '(from cache)')
+              console.log('GroupContext: ✅ Using stored group selection:', storedGroupId, isFromGroupSelection ? '(from group selection)' : '(from cache)')
             } else {
-              // Clear invalid stored group
-              localStorage.removeItem('selectedGroupId')
-              localStorage.removeItem('groupSelectionInProgress')
-              localStorage.removeItem('groupValidationData')
-              console.log('GroupContext: Cleared invalid stored group:', storedGroupId)
+              // For optimized switches, don't clear the data immediately - the group might be valid
+              if (optimizedSwitchComplete) {
+                console.log('GroupContext: ⚠️ Stored group not found in available groups, but optimized switch is complete. Keeping stored ID.')
+                targetGroupId = storedGroupId // Use it anyway since optimized switch validated it
+              } else {
+                // Clear invalid stored group only if not from optimized switch
+                localStorage.removeItem('selectedGroupId')
+                localStorage.removeItem('groupSelectionInProgress')
+                localStorage.removeItem('groupValidationData')
+                console.log('GroupContext: ❌ Cleared invalid stored group:', storedGroupId)
+              }
             }
           } else {
             console.log('GroupContext: No stored group, using first available group:', targetGroupId)
@@ -118,7 +130,7 @@ export function GroupProvider({ children }: GroupProviderProps) {
           const optimizedData = getCachedGroupData()
           const isOptimizedSwitch = localStorage.getItem('optimizedSwitchComplete') === 'true'
           
-          if (isOptimizedSwitch && optimizedData && optimizedData.group?.id === targetGroupId) {
+          if ((isOptimizedSwitch || optimizedSwitchComplete) && optimizedData && optimizedData.group?.id === targetGroupId) {
             console.log('GroupContext: Using optimized group data:', optimizedData.group.name)
             
             // Set the group data directly from optimized response
