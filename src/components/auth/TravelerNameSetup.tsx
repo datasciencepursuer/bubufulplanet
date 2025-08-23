@@ -55,10 +55,10 @@ export default function TravelerNameSetup({ defaultName = '', onComplete, onSkip
             </div>
             <div>
               <CardTitle className="text-2xl font-bold bg-gradient-to-r from-teal-300 via-cyan-300 to-teal-200 bg-clip-text text-transparent">
-                Welcome to Bubuful Planet!
+                Welcome Adventurer!
               </CardTitle>
               <CardDescription className="text-teal-200 mt-2">
-                What should we call you on your adventures?
+                Confirm or edit your traveler name for your adventures
               </CardDescription>
             </div>
           </CardHeader>

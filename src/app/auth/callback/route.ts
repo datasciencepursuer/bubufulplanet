@@ -80,7 +80,7 @@ export async function GET(request: Request) {
               createdById: user.id,
               groupMembers: {
                 create: {
-                  travelerName: 'New Traveler', // Temporary name that will be updated in setup
+                  travelerName: userName, // Use OAuth display name, editable in setup
                   email: userEmail,
                   userId: user.id,
                   role: 'adventurer',

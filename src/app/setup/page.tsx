@@ -22,23 +22,29 @@ export default function SetupPage() {
           return
         }
 
-        // Check if user actually needs setup
+        // Check if user actually needs setup and get current traveler name
         const response = await fetch('/api/groups/current')
         if (response.ok) {
           const data = await response.json()
-          if (data.travelerName && data.travelerName !== 'New Traveler') {
-            // User already has a valid traveler name, redirect to app
-            router.push('/app')
-            return
+          if (data.travelerName) {
+            // Set the current traveler name as default (editable)
+            setDefaultName(data.travelerName)
+          } else {
+            // Fallback to OAuth metadata if no traveler name exists
+            const name = user.user_metadata?.full_name || 
+                        user.user_metadata?.name || 
+                        user.email?.split('@')[0] || 
+                        'Traveler'
+            setDefaultName(name)
           }
+        } else {
+          // Fallback to OAuth metadata if API fails
+          const name = user.user_metadata?.full_name || 
+                      user.user_metadata?.name || 
+                      user.email?.split('@')[0] || 
+                      'Traveler'
+          setDefaultName(name)
         }
-
-        // Set default name from user metadata
-        const name = user.user_metadata?.full_name || 
-                    user.user_metadata?.name || 
-                    user.email?.split('@')[0] || 
-                    'Traveler'
-        setDefaultName(name)
         
       } catch (error) {
         console.error('Error checking user:', error)
