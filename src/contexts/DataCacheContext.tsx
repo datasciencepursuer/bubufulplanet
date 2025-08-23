@@ -3,6 +3,7 @@
 import { createContext, useContext, useCallback, ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { GroupMember } from '@prisma/client'
+import { createGroupedFetch } from '@/lib/groupUtils'
 
 interface DataCacheContextType {
   groupMembers: GroupMember[]
@@ -25,7 +26,8 @@ export function useDataCache() {
 
 // API function for fetching group members
 async function fetchGroupMembers(): Promise<GroupMember[]> {
-  const response = await fetch('/api/groups/members')
+  const groupedFetch = createGroupedFetch()
+  const response = await groupedFetch('/api/groups/members')
   if (!response.ok) {
     throw new Error('Failed to fetch group members')
   }

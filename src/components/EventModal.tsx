@@ -9,6 +9,7 @@ import type { Event, Expense } from '@prisma/client'
 import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventColors'
 import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
 import { TIME_SLOTS, formatTimeSlot, getNextTimeSlot, getValidEndTimeOptions } from '@/lib/timeSlotUtils'
+import { createGroupedFetch } from '@/lib/groupUtils'
 
 interface Destination {
   name: string
@@ -73,7 +74,8 @@ export default function EventModal({
 
   const fetchDestinations = useCallback(async () => {
     try {
-      const response = await fetch('/api/groups/current')
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch('/api/groups/current')
       
       if (response.ok) {
         const data = await response.json()

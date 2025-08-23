@@ -13,6 +13,7 @@ import type { Expense, CreateExpenseRequest, UpdateExpenseRequest } from '@/type
 import type { GroupMember, Event } from '@prisma/client';
 import { formatCurrency, calculateEvenSplit, validateSplitPercentages } from '@/types/expense';
 import { useNotify } from '@/hooks/useNotify';
+import { createGroupedFetch } from '@/lib/groupUtils';
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -371,7 +372,8 @@ export default function ExpenseModal({
   // Fetch external participants for suggestions
   const fetchExternalParticipants = async () => {
     try {
-      const response = await fetch('/api/external-participants');
+      const groupedFetch = createGroupedFetch();
+      const response = await groupedFetch('/api/external-participants');
       if (response.ok) {
         const data = await response.json();
         setExternalParticipants(data.externalParticipants || []);

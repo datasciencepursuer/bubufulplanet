@@ -8,7 +8,7 @@ import type { Expense } from '@/types/expense'
 
 // Server-side data fetching functions that work with Prisma directly
 
-export async function getServerSession() {
+export async function getServerSession(requestedGroupId?: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
@@ -16,17 +16,37 @@ export async function getServerSession() {
     throw new Error('Unauthorized - No valid session found')
   }
 
-  // Get user's current group
-  const userGroup = await prisma.userGroup.findFirst({
-    where: { userId: user.id },
-    include: { group: true }
-  })
+  let groupId: string
 
-  if (!userGroup) {
-    throw new Error('No group found')
+  if (requestedGroupId) {
+    // Verify user is a member of the requested group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { 
+        userId: user.id,
+        groupId: requestedGroupId
+      }
+    })
+
+    if (!userGroup) {
+      throw new Error('Access denied to this group')
+    }
+    
+    groupId = requestedGroupId
+  } else {
+    // Fallback to user's first group
+    const userGroup = await prisma.userGroup.findFirst({
+      where: { userId: user.id },
+      include: { group: true }
+    })
+
+    if (!userGroup) {
+      throw new Error('No group found')
+    }
+
+    groupId = userGroup.groupId
   }
 
-  return { groupId: userGroup.groupId, userId: user.id }
+  return { groupId, userId: user.id }
 }
 
 export async function fetchTripServerSide(tripId: string): Promise<Trip> {
@@ -237,7 +257,7 @@ export function fetchTripDataServerSideCached(tripId: string, groupId: string) {
 }
 
 // Combined server-side data fetch - uses cached version
-export async function fetchTripDataServerSide(tripId: string) {
-  const { groupId } = await getServerSession()
+export async function fetchTripDataServerSide(tripId: string, requestedGroupId?: string | null) {
+  const { groupId } = await getServerSession(requestedGroupId)
   return fetchTripDataServerSideCached(tripId, groupId)
 }

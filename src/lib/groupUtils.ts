@@ -86,9 +86,10 @@ export function useOptimizedGroup() {
  * Simple grouped fetch utility using optimized data
  */
 export function createGroupedFetch() {
-  const optimizedData = getCachedGroupData()
-  
   return async (url: string, options: RequestInit = {}, bustCache: boolean = false) => {
+    // Get fresh group data on each call
+    const optimizedData = getCachedGroupData()
+    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> || {}),

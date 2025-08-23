@@ -443,37 +443,35 @@ export default function GroupMembersManagement({ readOnly = false }: GroupMember
           </div>
         )}
 
-        {/* Leave Group Section */}
-        {!readOnly && (
-          <div className="border-t p-4 bg-red-50">
-            <div className="flex items-start justify-between">
-              <div>
-                <h4 className="font-medium text-red-800 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  Danger Zone
-                </h4>
-                <p className="text-sm text-red-600 mt-1">
-                  Leave this travel group permanently. This action cannot be undone.
+        {/* Leave Group Section - Always available to all users */}
+        <div className="border-t p-4 bg-red-50">
+          <div className="flex items-start justify-between">
+            <div>
+              <h4 className="font-medium text-red-800 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Danger Zone
+              </h4>
+              <p className="text-sm text-red-600 mt-1">
+                Leave this travel group permanently. This action cannot be undone.
+              </p>
+              {isAdventurer && (
+                <p className="text-xs text-red-500 mt-1">
+                  Note: As the group leader, you can only leave if there are other adventurers in the group.
                 </p>
-                {isAdventurer && (
-                  <p className="text-xs text-red-500 mt-1">
-                    Note: As the group leader, you can only leave if there are other adventurers in the group.
-                  </p>
-                )}
-              </div>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowLeaveGroup(true)}
-                className="gap-2"
-                disabled={leavingGroup}
-              >
-                <LogOut className="w-4 h-4" />
-                {leavingGroup ? 'Leaving...' : 'Leave Group'}
-              </Button>
+              )}
             </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowLeaveGroup(true)}
+              className="gap-2"
+              disabled={leavingGroup}
+            >
+              <LogOut className="w-4 h-4" />
+              {leavingGroup ? 'Leaving...' : 'Leave Group'}
+            </Button>
           </div>
-        )}
+        </div>
 
         {/* Confirm Delete Dialog */}
         <ConfirmDialog

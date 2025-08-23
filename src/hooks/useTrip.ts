@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Trip, TripDay, Event } from '@prisma/client'
 import type { Expense, CreateExpenseRequest, UpdateExpenseRequest } from '@/types/expense'
 import { useNotify } from '@/hooks/useNotify'
+import { createGroupedFetch } from '@/lib/groupUtils'
 
 // Event API data format
 type EventApiData = {
@@ -18,9 +19,10 @@ type EventApiData = {
   color: string
 }
 
-// API functions
+// API functions with group context
 async function fetchTrip(tripId: string): Promise<Trip> {
-  const response = await fetch(`/api/trips?id=${tripId}`)
+  const groupedFetch = createGroupedFetch()
+  const response = await groupedFetch(`/api/trips?id=${tripId}`)
   if (!response.ok) {
     throw new Error('Failed to fetch trip')
   }
@@ -32,7 +34,8 @@ async function fetchTrip(tripId: string): Promise<Trip> {
 }
 
 async function fetchTripDays(tripId: string): Promise<TripDay[]> {
-  const response = await fetch(`/api/trips/${tripId}/days`)
+  const groupedFetch = createGroupedFetch()
+  const response = await groupedFetch(`/api/trips/${tripId}/days`)
   if (!response.ok) {
     throw new Error('Failed to fetch trip days')
   }
@@ -41,7 +44,8 @@ async function fetchTripDays(tripId: string): Promise<TripDay[]> {
 }
 
 async function fetchEvents(tripId: string): Promise<Event[]> {
-  const response = await fetch(`/api/events?tripId=${tripId}`)
+  const groupedFetch = createGroupedFetch()
+  const response = await groupedFetch(`/api/events?tripId=${tripId}`)
   if (!response.ok) {
     throw new Error('Failed to fetch events')
   }
@@ -50,7 +54,8 @@ async function fetchEvents(tripId: string): Promise<Event[]> {
 }
 
 async function fetchExpenses(tripId: string): Promise<Expense[]> {
-  const response = await fetch(`/api/events/expenses?tripId=${tripId}`)
+  const groupedFetch = createGroupedFetch()
+  const response = await groupedFetch(`/api/events/expenses?tripId=${tripId}`)
   if (!response.ok) {
     throw new Error('Failed to fetch expenses')
   }
@@ -133,7 +138,8 @@ export function useCreateExpense(tripId: string) {
 
   return useMutation({
     mutationFn: async (expenseData: CreateExpenseRequest) => {
-      const response = await fetch('/api/expenses', {
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(expenseData),
@@ -217,7 +223,8 @@ export function useUpdateExpense(tripId: string) {
 
   return useMutation({
     mutationFn: async ({ id, ...expenseData }: UpdateExpenseRequest & { id: string }) => {
-      const response = await fetch(`/api/expenses/${id}`, {
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch(`/api/expenses/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(expenseData),
@@ -246,7 +253,8 @@ export function useDeleteExpense(tripId: string) {
 
   return useMutation({
     mutationFn: async (expenseId: string) => {
-      const response = await fetch(`/api/expenses/${expenseId}`, {
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch(`/api/expenses/${expenseId}`, {
         method: 'DELETE',
       })
 
@@ -294,7 +302,8 @@ export function useCreateEvent(tripId: string) {
 
   return useMutation({
     mutationFn: async (eventData: EventApiData) => {
-      const response = await fetch('/api/events', {
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event: eventData }),
@@ -367,7 +376,8 @@ export function useUpdateEvent(tripId: string) {
 
   return useMutation({
     mutationFn: async ({ id, ...eventData }: EventApiData & { id: string }) => {
-      const response = await fetch(`/api/events/${id}`, {
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch(`/api/events/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event: eventData }),
@@ -418,7 +428,8 @@ export function useDeleteEvent(tripId: string) {
 
   return useMutation({
     mutationFn: async (eventId: string) => {
-      const response = await fetch(`/api/events/${eventId}`, {
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch(`/api/events/${eventId}`, {
         method: 'DELETE',
       })
 
@@ -475,7 +486,8 @@ export function useUpdateTrip(tripId: string) {
 
   return useMutation({
     mutationFn: async (tripData: { name: string, destination: string, startDate: string, endDate: string }) => {
-      const response = await fetch(`/api/trips/${tripId}`, {
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch(`/api/trips/${tripId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tripData),

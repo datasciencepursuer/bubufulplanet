@@ -7,6 +7,8 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
   
   try {
     // Prefetch all trip data on the server using Prisma directly
+    // Note: This uses the user's first group, which might not be the current group
+    // The client component will handle group context and reload if needed
     const initialData = await fetchTripDataServerSide(id)
     
     return (
@@ -17,11 +19,16 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
     )
   } catch (error) {
     console.error('Error fetching trip data:', error)
-    // Redirect to trips list if trip not found or unauthorized
+    // If server-side fails, let client handle it (might be wrong group context)
     if (error instanceof Error && error.message.includes('Unauthorized')) {
       redirect('/auth')
     } else {
-      redirect('/trips')
+      // Don't redirect for "Trip not found" - let client try with correct group context
+      return (
+        <TripDetailClient 
+          tripId={id}
+        />
+      )
     }
   }
 }

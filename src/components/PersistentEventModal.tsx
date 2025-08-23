@@ -9,6 +9,7 @@ import { EVENT_COLORS, getEventColor, DEFAULT_EVENT_COLOR } from '@/lib/eventCol
 import { getTripDateInfo, getTripDateStyles } from '@/lib/tripDayUtils'
 import { normalizeDate, createAbsoluteDate, extractTimeString, to12HourComponents, to24HourTime, TIME_OPTIONS_12H, calculateDefaultEndTime } from '@/lib/dateTimeUtils'
 import { format } from 'date-fns'
+import { createGroupedFetch } from '@/lib/groupUtils'
 
 interface Destination {
   name: string
@@ -103,7 +104,8 @@ export default function PersistentEventModal({
 
   const fetchDestinations = useCallback(async () => {
     try {
-      const response = await fetch('/api/groups/current')
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch('/api/groups/current')
       
       if (response.ok) {
         const data = await response.json()
