@@ -80,13 +80,15 @@ export default function AppPage() {
     const initializeApp = async () => {
       console.log('App: Starting initialization check')
       
-      // First check if we're coming from an optimized group switch
-      const groupSelectionInProgress = localStorage.getItem('groupSelectionInProgress') === 'true'
-      const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
-      
-      if (groupSelectionInProgress && !optimizedSwitchComplete) {
-        console.log('App: Group selection still in progress, waiting...')
-        return
+      // First check if we're coming from an optimized group switch (client-side only)
+      if (typeof window !== 'undefined') {
+        const groupSelectionInProgress = localStorage.getItem('groupSelectionInProgress') === 'true'
+        const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
+        
+        if (groupSelectionInProgress && !optimizedSwitchComplete) {
+          console.log('App: Group selection still in progress, waiting...')
+          return
+        }
       }
       
       // Wait for GroupContext to finish loading
@@ -101,13 +103,16 @@ export default function AppPage() {
         return
       }
       
-      // If coming from optimized switch, ensure the selected group matches what was selected
-      if (optimizedSwitchComplete) {
-        const storedGroupId = localStorage.getItem('selectedGroupId')
-        if (storedGroupId && selectedGroup.id !== storedGroupId) {
-          console.log('App: Group mismatch detected, waiting for correct group selection...')
-          console.log('App: Expected:', storedGroupId, 'Got:', selectedGroup.id)
-          return
+      // If coming from optimized switch, ensure the selected group matches what was selected (client-side only)
+      if (typeof window !== 'undefined') {
+        const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
+        if (optimizedSwitchComplete) {
+          const storedGroupId = localStorage.getItem('selectedGroupId')
+          if (storedGroupId && selectedGroup.id !== storedGroupId) {
+            console.log('App: Group mismatch detected, waiting for correct group selection...')
+            console.log('App: Expected:', storedGroupId, 'Got:', selectedGroup.id)
+            return
+          }
         }
       }
       
@@ -130,9 +135,9 @@ export default function AppPage() {
     
     console.log('App: Loading data for selected group:', selectedGroup.id, selectedGroup.name)
     
-    // Check if we have optimized data available
+    // Check if we have optimized data available (client-side only)
     const optimizedData = getCachedGroupData()
-    const isOptimizedSwitch = localStorage.getItem('optimizedSwitchComplete') === 'true'
+    const isOptimizedSwitch = typeof window !== 'undefined' && localStorage.getItem('optimizedSwitchComplete') === 'true'
     
     if (isOptimizedSwitch && optimizedData && optimizedData.group.id === selectedGroup.id) {
       console.log('App: Using optimized pre-loaded data')
@@ -144,8 +149,10 @@ export default function AppPage() {
       setTripsLoading(false)
       setUtilityDataLoading(false)
       
-      // Clear the flag
-      localStorage.removeItem('optimizedSwitchComplete')
+      // Clear the flag (client-side only)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('optimizedSwitchComplete')
+      }
       
       console.log('App: Optimized data loaded:', {
         trips: optimizedData.trips?.length || 0,
@@ -559,6 +566,8 @@ export default function AppPage() {
           <BearGlobeLoader />
           <div className="mt-4 text-sm text-gray-600">
             {(() => {
+              if (typeof window === 'undefined') return "Loading..."
+              
               const groupSelectionInProgress = localStorage.getItem('groupSelectionInProgress') === 'true'
               const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
               
