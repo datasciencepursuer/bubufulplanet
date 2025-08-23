@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
+import { optimizedGroupSwitcher } from '@/lib/optimizedGroupSwitch'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, MapPin, Calendar, ArrowLeft } from 'lucide-react'
@@ -111,78 +112,42 @@ export default function GroupSelectionPage() {
 
   const selectGroup = async (groupId: string) => {
     try {
-      console.log('Groups page: Starting group selection:', groupId)
+      console.log('Groups page: Starting OPTIMIZED group selection:', groupId)
       setSelecting(groupId)
       
-      // Step 1: Call the select API
-      const selectResponse = await fetch('/api/groups/select', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ groupId }),
-      })
-
-      if (!selectResponse.ok) {
-        console.error('Failed to select group via API')
-        setSelecting(null)
-        return
-      }
-
-      console.log('Groups page: Group selection API succeeded')
-
-      // Step 2: Validate the group by fetching current group details
-      const cacheBuster = Date.now()
-      const validationResponse = await fetch(`/api/groups/current?groupId=${groupId}&t=${cacheBuster}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      })
-
-      if (!validationResponse.ok) {
-        console.error('Failed to validate selected group')
-        setSelecting(null)
-        return
-      }
-
-      const validationData = await validationResponse.json()
-      console.log('Groups page: Group validation succeeded:', validationData.group.name)
+      // Use the new optimized group switcher - single API call gets ALL data
+      const groupData = await optimizedGroupSwitcher.switchToGroup(groupId, false)
       
-      // Step 3: Store validation data to display to user
-      setValidationData(validationData)
+      console.log(`Groups page: Optimized switch completed in ${groupData.performance.queryTimeMs}ms`)
+      console.log('Groups page: Loaded data:', {
+        trips: groupData.trips.length,
+        members: groupData.allMembers.length,
+        pointsOfInterest: groupData.pointsOfInterest.length,
+        expenses: groupData.expensesSummary.totalExpenses
+      })
+      
+      // Store validation data to display to user
+      setValidationData({
+        group: groupData.group,
+        currentMember: groupData.currentMember,
+        role: groupData.currentMember.role
+      })
 
-      // Step 4: Pre-load some essential data to ensure it's ready
-      const [tripsResponse, expensesResponse] = await Promise.all([
-        fetch(`/api/trips?t=${cacheBuster}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        }),
-        fetch(`/api/expenses/personal-summary?t=${cacheBuster}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        })
-      ])
-
-      console.log('Groups page: Pre-loaded data - trips:', tripsResponse.ok, 'expenses:', expensesResponse.ok)
-
-      // Step 5: Store the selected group data
-      localStorage.setItem('selectedGroupId', groupId)
+      // Store flags for GroupContext to use pre-loaded data
       localStorage.setItem('groupSelectionInProgress', 'true')
-      localStorage.setItem('groupValidationData', JSON.stringify(validationData))
+      localStorage.setItem('optimizedSwitchComplete', 'true')
       
-      console.log('Groups page: All validation complete, navigating to app...')
+      console.log('Groups page: Optimized data loaded, navigating to app...')
       
-      // Step 6: Small delay to ensure all async operations complete
-      await new Promise(resolve => setTimeout(resolve, 200))
+      // Small delay to show success feedback to user
+      await new Promise(resolve => setTimeout(resolve, 500))
       
-      // Step 7: Navigate to app
+      // Navigate to app
       router.push('/app')
     } catch (error) {
-      console.error('Error during group selection:', error)
+      console.error('Error during optimized group selection:', error)
       setSelecting(null)
+      setValidationData(null)
     }
   }
 

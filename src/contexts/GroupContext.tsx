@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { getCachedGroupData } from '@/lib/optimizedGroupSwitch'
 
 interface Group {
   id: string
@@ -104,8 +105,39 @@ export function GroupProvider({ children }: GroupProviderProps) {
             console.log('GroupContext: No stored group, using first available group:', targetGroupId)
           }
           
-          // If we have pre-validated data from group selection, use it directly
-          if (isFromGroupSelection && validationData) {
+          // Check for optimized group data first
+          const optimizedData = getCachedGroupData()
+          const isOptimizedSwitch = localStorage.getItem('optimizedSwitchComplete') === 'true'
+          
+          if (isOptimizedSwitch && optimizedData && optimizedData.group.id === targetGroupId) {
+            console.log('GroupContext: Using optimized group data:', optimizedData.group.name)
+            
+            // Set the group data directly from optimized response
+            setSelectedGroup({
+              id: optimizedData.group.id,
+              name: optimizedData.group.name,
+              accessCode: optimizedData.group.accessCode,
+              role: optimizedData.currentMember.role,
+              memberCount: optimizedData.allMembers.length,
+              tripCount: optimizedData.trips.length
+            })
+
+            setSelectedGroupMember({
+              id: optimizedData.currentMember.id,
+              travelerName: optimizedData.currentMember.name,
+              role: optimizedData.currentMember.role,
+              permissions: optimizedData.currentMember.permissions
+            })
+
+            // Store selection in localStorage for persistence
+            localStorage.setItem('selectedGroupId', targetGroupId)
+            
+            // Clear the flags
+            localStorage.removeItem('groupSelectionInProgress')
+            localStorage.removeItem('groupValidationData')
+            
+            console.log('GroupContext: Optimized group loaded successfully')
+          } else if (isFromGroupSelection && validationData) {
             try {
               const parsedValidationData = JSON.parse(validationData)
               console.log('GroupContext: Using pre-validated group data:', parsedValidationData.group.name)

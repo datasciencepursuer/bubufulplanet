@@ -16,6 +16,7 @@ import BearGlobeLoader from '@/components/BearGlobeLoader'
 import { useGroupedFetch } from '@/lib/groupedFetch'
 import { useNotify } from '@/hooks/useNotify'
 import { createClient } from '@/utils/supabase/client'
+import { optimizedGroupSwitcher, getCachedGroupData } from '@/lib/optimizedGroupSwitch'
 import TravelerNameEditor from '@/components/TravelerNameEditor'
 import GroupSelector from '@/components/GroupSelector'
 import GroupNameEditor from '@/components/GroupNameEditor'
@@ -74,8 +75,34 @@ export default function AppPage() {
   useEffect(() => {
     if (selectedGroup && !groupSwitching) {
       console.log('App: Selected group changed to:', selectedGroup.id, selectedGroup.name)
-      // Force cache busting when group changes to ensure fresh data
-      loadAllData()
+      
+      // Check if we have optimized data available
+      const optimizedData = getCachedGroupData()
+      const isOptimizedSwitch = localStorage.getItem('optimizedSwitchComplete') === 'true'
+      
+      if (isOptimizedSwitch && optimizedData && optimizedData.group.id === selectedGroup.id) {
+        console.log('App: Using optimized pre-loaded data')
+        
+        // Use the pre-loaded data
+        setTrips(optimizedData.trips || [])
+        setExpensesData(optimizedData.expensesSummary || null)
+        setPointsOfInterestData(optimizedData.pointsOfInterest || [])
+        setTripsLoading(false)
+        setUtilityDataLoading(false)
+        
+        // Clear the flag
+        localStorage.removeItem('optimizedSwitchComplete')
+        
+        console.log('App: Optimized data loaded:', {
+          trips: optimizedData.trips?.length || 0,
+          expenses: optimizedData.expensesSummary ? 'loaded' : 'none',
+          pointsOfInterest: optimizedData.pointsOfInterest?.length || 0
+        })
+      } else {
+        console.log('App: Loading data normally (no optimization)')
+        // Force cache busting when group changes to ensure fresh data
+        loadAllData()
+      }
     }
   }, [selectedGroup, groupSwitching])
   
