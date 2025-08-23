@@ -98,6 +98,9 @@ export function createGroupedFetch() {
     // Add group ID to headers if available
     if (optimizedData?.group.id) {
       headers['x-group-id'] = optimizedData.group.id
+      console.log('GroupedFetch: Using group ID:', optimizedData.group.id, 'for URL:', url)
+    } else {
+      console.warn('GroupedFetch: No group ID available for URL:', url)
     }
 
     // Add cache busting if requested

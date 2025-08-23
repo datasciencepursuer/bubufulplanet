@@ -8,9 +8,10 @@ interface DialogProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   children: React.ReactNode
+  noBackdrop?: boolean
 }
 
-const Dialog = ({ open = false, onOpenChange, children }: DialogProps) => {
+const Dialog = ({ open = false, onOpenChange, children, noBackdrop = false }: DialogProps) => {
   React.useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden'
@@ -27,10 +28,12 @@ const Dialog = ({ open = false, onOpenChange, children }: DialogProps) => {
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-        onClick={() => onOpenChange?.(false)}
-      />
+      {!noBackdrop && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          onClick={() => onOpenChange?.(false)}
+        />
+      )}
       {children}
     </>
   )

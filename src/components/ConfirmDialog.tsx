@@ -13,6 +13,7 @@ interface ConfirmDialogProps {
   confirmText?: string
   cancelText?: string
   variant?: 'destructive' | 'default'
+  noBackdrop?: boolean
 }
 
 export default function ConfirmDialog({
@@ -23,7 +24,8 @@ export default function ConfirmDialog({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  variant = 'destructive'
+  variant = 'destructive',
+  noBackdrop = false
 }: ConfirmDialogProps) {
   const handleConfirm = () => {
     onConfirm()
@@ -31,7 +33,7 @@ export default function ConfirmDialog({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose} noBackdrop={noBackdrop}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-3">

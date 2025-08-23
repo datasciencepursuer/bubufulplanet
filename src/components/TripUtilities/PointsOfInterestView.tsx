@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MapPin, Plus, Edit2, Trash2, X, Link, ExternalLink, StickyNote, Map, Calendar } from 'lucide-react'
-import { useOptimizedGroup } from '@/lib/groupUtils'
+import { useOptimizedGroup, createGroupedFetch } from '@/lib/groupUtils'
 import ConfirmDialog from '../ConfirmDialog'
 
 interface PointOfInterest {
@@ -83,7 +83,8 @@ export default function PointsOfInterestView({
 
   const loadAvailableTrips = async () => {
     try {
-      const response = await fetch('/api/trips')
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch('/api/trips')
       if (response.ok) {
         const data = await response.json()
         setAvailableTrips(data.trips || [])
@@ -113,6 +114,13 @@ export default function PointsOfInterestView({
 
     try {
       setSaving(true)
+      
+      console.log('POI: Saving POI with group context:', { 
+        operation: isUpdate ? 'update' : 'create',
+        tempId,
+        editingId,
+        destinationName: formData.destinationName
+      })
       
       // Optimistic update - immediately update the UI
       const optimisticPoi: PointOfInterest = {
@@ -145,7 +153,8 @@ export default function PointsOfInterestView({
         ? { id: editingId, ...formData }
         : formData
 
-      const response = await fetch('/api/points-of-interest', {
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch('/api/points-of-interest', {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -249,7 +258,8 @@ export default function PointsOfInterestView({
       setOptimisticData(updatedData)
       setHasOptimisticUpdates(true)
       
-      const response = await fetch(`/api/points-of-interest?id=${poiId}`, {
+      const groupedFetch = createGroupedFetch()
+      const response = await groupedFetch(`/api/points-of-interest?id=${poiId}`, {
         method: 'DELETE'
       })
 
@@ -558,6 +568,7 @@ export default function PointsOfInterestView({
         message={`Are you sure you want to delete "${poiToDelete?.name}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
+        noBackdrop={true}
       />
     </Card>
   )
