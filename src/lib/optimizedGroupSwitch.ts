@@ -147,13 +147,21 @@ export class OptimizedGroupSwitcher {
         const parsedCache = JSON.parse(cached)
         const cacheAge = Date.now() - parsedCache.cachedAt
         
-        // Use cache if less than 5 minutes old
-        if (cacheAge < 5 * 60 * 1000) {
+        // Use cache if less than 5 minutes old and has required structure
+        if (cacheAge < 5 * 60 * 1000 && parsedCache.group && parsedCache.currentMember) {
           console.log('OptimizedGroupSwitcher: Using localStorage cache')
-          this.currentGroupData = parsedCache
-          return parsedCache
+          // Ensure arrays exist with fallbacks
+          const safeCache = {
+            ...parsedCache,
+            trips: parsedCache.trips || [],
+            allMembers: parsedCache.allMembers || [],
+            pointsOfInterest: parsedCache.pointsOfInterest || [],
+            expensesSummary: parsedCache.expensesSummary || null
+          }
+          this.currentGroupData = safeCache
+          return safeCache
         } else {
-          console.log('OptimizedGroupSwitcher: Cache expired, clearing')
+          console.log('OptimizedGroupSwitcher: Cache expired or invalid, clearing')
           localStorage.removeItem('optimizedGroupData')
         }
       }

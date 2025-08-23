@@ -109,7 +109,7 @@ export function GroupProvider({ children }: GroupProviderProps) {
           const optimizedData = getCachedGroupData()
           const isOptimizedSwitch = localStorage.getItem('optimizedSwitchComplete') === 'true'
           
-          if (isOptimizedSwitch && optimizedData && optimizedData.group.id === targetGroupId) {
+          if (isOptimizedSwitch && optimizedData && optimizedData.group?.id === targetGroupId) {
             console.log('GroupContext: Using optimized group data:', optimizedData.group.name)
             
             // Set the group data directly from optimized response
@@ -118,16 +118,18 @@ export function GroupProvider({ children }: GroupProviderProps) {
               name: optimizedData.group.name,
               accessCode: optimizedData.group.accessCode,
               role: optimizedData.currentMember.role,
-              memberCount: optimizedData.allMembers.length,
-              tripCount: optimizedData.trips.length
+              memberCount: optimizedData.allMembers?.length || 0,
+              tripCount: optimizedData.trips?.length || 0
             })
 
-            setSelectedGroupMember({
-              id: optimizedData.currentMember.id,
-              travelerName: optimizedData.currentMember.name,
-              role: optimizedData.currentMember.role,
-              permissions: optimizedData.currentMember.permissions
-            })
+            if (optimizedData.currentMember) {
+              setSelectedGroupMember({
+                id: optimizedData.currentMember.id,
+                travelerName: optimizedData.currentMember.name,
+                role: optimizedData.currentMember.role,
+                permissions: optimizedData.currentMember.permissions
+              })
+            }
 
             // Store selection in localStorage for persistence
             localStorage.setItem('selectedGroupId', targetGroupId)

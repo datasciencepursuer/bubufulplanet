@@ -108,8 +108,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate expense summary efficiently (simplified version)
-    // Flatten expenses from all trips
-    const expenses = result.group.trips.flatMap(trip => trip.expenses || [])
+    // Flatten expenses from all trips with proper null checks
+    const expenses = (result.group.trips || []).flatMap(trip => trip.expenses || [])
     const currentMemberId = currentMember.id
     
     let totalYouOwe = 0
@@ -117,23 +117,28 @@ export async function POST(request: NextRequest) {
     
     // Quick expense calculation - more detailed version can be loaded later if needed
     for (const expense of expenses) {
-      if (expense.ownerId === currentMemberId) {
-        // Money others owe to current member
-        for (const participant of expense.participants) {
-          if (participant.participantId && participant.participantId !== currentMemberId) {
-            totalOwedToYou += Number(participant.amountOwed)
+      try {
+        if (expense.ownerId === currentMemberId) {
+          // Money others owe to current member
+          for (const participant of expense.participants || []) {
+            if (participant.participantId && participant.participantId !== currentMemberId) {
+              totalOwedToYou += Number(participant.amountOwed || 0)
+            }
+          }
+        } else {
+          // Money current member owes to others
+          const myParticipation = (expense.participants || []).find(p => p.participantId === currentMemberId)
+          if (myParticipation) {
+            totalYouOwe += Number(myParticipation.amountOwed || 0)
           }
         }
-      } else {
-        // Money current member owes to others
-        const myParticipation = expense.participants.find(p => p.participantId === currentMemberId)
-        if (myParticipation) {
-          totalYouOwe += Number(myParticipation.amountOwed)
-        }
+      } catch (error) {
+        console.warn('Error calculating expense for expense ID:', expense.id, error)
+        // Continue processing other expenses
       }
     }
 
-    // Build comprehensive response
+    // Build comprehensive response with proper null checks
     const optimizedResponse = {
       // Group information
       group: {
@@ -152,8 +157,8 @@ export async function POST(request: NextRequest) {
         joinedAt: currentMember.joinedAt.toISOString()
       },
 
-      // All group members
-      allMembers: result.group.groupMembers.map(member => ({
+      // All group members (ensure array is never undefined)
+      allMembers: (result.group.groupMembers || []).map(member => ({
         id: member.id,
         traveler_name: member.travelerName,
         role: member.role,
@@ -161,8 +166,8 @@ export async function POST(request: NextRequest) {
         joined_at: member.joinedAt.toISOString()
       })),
 
-      // Trips data (strip out expenses from response to keep it clean)
-      trips: result.group.trips.map(trip => ({
+      // Trips data (ensure array is never undefined)
+      trips: (result.group.trips || []).map(trip => ({
         id: trip.id,
         name: trip.name,
         destination: trip.destination,
@@ -171,15 +176,15 @@ export async function POST(request: NextRequest) {
         createdAt: trip.createdAt.toISOString()
       })),
 
-      // Points of interest
-      pointsOfInterest: result.group.pointsOfInterest.map(poi => ({
+      // Points of interest (ensure array is never undefined)
+      pointsOfInterest: (result.group.pointsOfInterest || []).map(poi => ({
         id: poi.id,
         destinationName: poi.destinationName,
         address: poi.address,
         notes: poi.notes,
         link: poi.link,
         tripId: poi.tripId,
-        trip: poi.tripId ? result.group.trips.find(t => t.id === poi.tripId) : null
+        trip: poi.tripId ? (result.group.trips || []).find(t => t.id === poi.tripId) : null
       })),
 
       // Simplified expense summary
@@ -197,9 +202,9 @@ export async function POST(request: NextRequest) {
       performance: {
         queryTimeMs: Date.now() - startTime,
         dataPoints: {
-          trips: result.group.trips.length,
-          members: result.group.groupMembers.length,
-          pointsOfInterest: result.group.pointsOfInterest.length,
+          trips: (result.group.trips || []).length,
+          members: (result.group.groupMembers || []).length,
+          pointsOfInterest: (result.group.pointsOfInterest || []).length,
           expenses: expenses.length
         }
       }
