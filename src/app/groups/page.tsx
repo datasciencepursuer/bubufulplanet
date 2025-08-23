@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, MapPin, Calendar, ArrowLeft } from 'lucide-react'
@@ -19,13 +20,46 @@ interface TravelGroup {
 export default function GroupSelectionPage() {
   const router = useRouter()
   const supabase = createClient()
+  const queryClient = useQueryClient()
   const [loading, setLoading] = useState(true)
   const [groups, setGroups] = useState<TravelGroup[]>([])
   const [userName, setUserName] = useState('')
+  const [selecting, setSelecting] = useState<string | null>(null)
+  const [validationData, setValidationData] = useState<any>(null)
 
   useEffect(() => {
-    const loadGroups = async () => {
+    const clearAllCacheAndLoadGroups = async () => {
       try {
+        console.log('Groups page: Clearing ALL cache (like logout)')
+        
+        // COMPLETE CACHE CLEARING - as if user logged out
+        
+        // 1. Clear React Query cache
+        await queryClient.clear()
+        
+        // 2. Clear ALL localStorage data except auth
+        const authKeys = ['supabase.auth.token', 'sb-', 'auth-token']
+        const allKeys = Object.keys(localStorage)
+        allKeys.forEach(key => {
+          const shouldKeepAuth = authKeys.some(authKey => key.includes(authKey))
+          if (!shouldKeepAuth) {
+            localStorage.removeItem(key)
+          }
+        })
+        
+        // 3. Clear ALL sessionStorage
+        sessionStorage.clear()
+        
+        // 4. Force browser cache invalidation for API calls
+        const cacheBuster = Date.now()
+        
+        // 5. Dispatch cache clear event
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('completeCache Clear', { 
+            detail: { timestamp: cacheBuster } 
+          }))
+        }
+
         const { data: { user } } = await supabase.auth.getUser()
         
         if (!user) {
@@ -40,10 +74,19 @@ export default function GroupSelectionPage() {
                     'Adventurer'
         setUserName(name)
 
-        // Fetch user's groups (use same endpoint as GroupContext for consistency)
-        const response = await fetch('/api/user/groups')
+        // Fetch user's groups with strong cache busting
+        const response = await fetch(`/api/user/groups?t=${cacheBuster}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        })
+        
         if (response.ok) {
           const data = await response.json()
+          console.log('Groups page: Loaded fresh groups:', data.groups?.length || 0)
           setGroups(data.groups || [])
           
           // If user only has one group, redirect to app
@@ -63,15 +106,16 @@ export default function GroupSelectionPage() {
       }
     }
 
-    loadGroups()
-  }, [router, supabase.auth])
+    clearAllCacheAndLoadGroups()
+  }, [router, supabase.auth, queryClient])
 
   const selectGroup = async (groupId: string) => {
     try {
-      console.log('Groups page: Selecting group:', groupId)
+      console.log('Groups page: Starting group selection:', groupId)
+      setSelecting(groupId)
       
-      // Set the selected group as current
-      const response = await fetch('/api/groups/select', {
+      // Step 1: Call the select API
+      const selectResponse = await fetch('/api/groups/select', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,25 +123,66 @@ export default function GroupSelectionPage() {
         body: JSON.stringify({ groupId }),
       })
 
-      if (response.ok) {
-        // Store the selected group in localStorage so GroupContext can pick it up
-        localStorage.setItem('selectedGroupId', groupId)
-        
-        // Add a flag to indicate we're coming from group selection
-        localStorage.setItem('groupSelectionInProgress', 'true')
-        
-        console.log('Groups page: Stored group selection:', groupId)
-        
-        // Small delay to ensure localStorage write completes
-        await new Promise(resolve => setTimeout(resolve, 100))
-        
-        // Redirect to main app
-        router.push('/app')
-      } else {
-        console.error('Failed to select group')
+      if (!selectResponse.ok) {
+        console.error('Failed to select group via API')
+        setSelecting(null)
+        return
       }
+
+      console.log('Groups page: Group selection API succeeded')
+
+      // Step 2: Validate the group by fetching current group details
+      const cacheBuster = Date.now()
+      const validationResponse = await fetch(`/api/groups/current?groupId=${groupId}&t=${cacheBuster}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      if (!validationResponse.ok) {
+        console.error('Failed to validate selected group')
+        setSelecting(null)
+        return
+      }
+
+      const validationData = await validationResponse.json()
+      console.log('Groups page: Group validation succeeded:', validationData.group.name)
+      
+      // Step 3: Store validation data to display to user
+      setValidationData(validationData)
+
+      // Step 4: Pre-load some essential data to ensure it's ready
+      const [tripsResponse, expensesResponse] = await Promise.all([
+        fetch(`/api/trips?t=${cacheBuster}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        }),
+        fetch(`/api/expenses/personal-summary?t=${cacheBuster}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        })
+      ])
+
+      console.log('Groups page: Pre-loaded data - trips:', tripsResponse.ok, 'expenses:', expensesResponse.ok)
+
+      // Step 5: Store the selected group data
+      localStorage.setItem('selectedGroupId', groupId)
+      localStorage.setItem('groupSelectionInProgress', 'true')
+      localStorage.setItem('groupValidationData', JSON.stringify(validationData))
+      
+      console.log('Groups page: All validation complete, navigating to app...')
+      
+      // Step 6: Small delay to ensure all async operations complete
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Step 7: Navigate to app
+      router.push('/app')
     } catch (error) {
-      console.error('Error selecting group:', error)
+      console.error('Error during group selection:', error)
+      setSelecting(null)
     }
   }
 
@@ -129,12 +214,25 @@ export default function GroupSelectionPage() {
           </p>
         </div>
 
+        {/* Show validation data if selecting */}
+        {selecting && validationData && (
+          <div className="mb-6 bg-white/20 backdrop-blur-lg border-white/30 rounded-lg p-4">
+            <div className="text-center text-white">
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-white mb-2"></div>
+              <p className="text-lg font-semibold">Preparing {validationData.group.name}...</p>
+              <p className="text-teal-200 text-sm">Loading your trips and data</p>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {groups.map((group) => (
             <Card 
               key={group.id}
-              className="bg-white/10 backdrop-blur-lg border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-200 cursor-pointer"
-              onClick={() => selectGroup(group.id)}
+              className={`bg-white/10 backdrop-blur-lg border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-200 cursor-pointer ${
+                selecting === group.id ? 'ring-2 ring-teal-400' : ''
+              }`}
+              onClick={() => selecting ? null : selectGroup(group.id)}
             >
               <CardHeader className="text-center space-y-4">
                 <div className="inline-block p-3 bg-gradient-to-br from-teal-400/20 to-cyan-500/20 rounded-2xl mx-auto">
@@ -159,11 +257,19 @@ export default function GroupSelectionPage() {
                 <Button
                   onClick={(e) => {
                     e.stopPropagation()
-                    selectGroup(group.id)
+                    if (!selecting) selectGroup(group.id)
                   }}
-                  className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white font-semibold"
+                  disabled={selecting === group.id}
+                  className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white font-semibold disabled:opacity-50"
                 >
-                  Enter Group
+                  {selecting === group.id ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Validating...
+                    </div>
+                  ) : (
+                    'Enter Group'
+                  )}
                 </Button>
               </CardContent>
             </Card>

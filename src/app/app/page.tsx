@@ -96,8 +96,29 @@ export default function AppPage() {
       }, 50)
     }
 
+    const handleCompleteCacheClear = (event: CustomEvent) => {
+      console.log('App: Received complete cache clear event (like logout)')
+      // Reset ALL state as if the user just logged in
+      setTrips([])
+      setExpensesData(null)
+      setPointsOfInterestData([])
+      setTripsLoading(true)
+      setUtilityDataLoading(true)
+      setShowTripForm(false)
+      setSelectedDates(null)
+      setEditingTrip(null)
+      setShowDeleteConfirm(false)
+      setTripToDelete(null)
+      setAccessCodeCopied(false)
+    }
+
     window.addEventListener('groupSwitched', handleGroupSwitch as EventListener)
-    return () => window.removeEventListener('groupSwitched', handleGroupSwitch as EventListener)
+    window.addEventListener('completeCacheClear', handleCompleteCacheClear as EventListener)
+    
+    return () => {
+      window.removeEventListener('groupSwitched', handleGroupSwitch as EventListener)
+      window.removeEventListener('completeCacheClear', handleCompleteCacheClear as EventListener)
+    }
   }, [])
 
   // Load all data when group changes (trips, expenses, points of interest)

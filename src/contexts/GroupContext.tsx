@@ -82,6 +82,7 @@ export function GroupProvider({ children }: GroupProviderProps) {
         // Check for stored group selection first, then auto-select first group
         const storedGroupId = localStorage.getItem('selectedGroupId')
         const isFromGroupSelection = localStorage.getItem('groupSelectionInProgress') === 'true'
+        const validationData = localStorage.getItem('groupValidationData')
         
         if (!selectedGroup && groups.length > 0) {
           let targetGroupId = groups[0].id // Default to first group
@@ -96,18 +97,59 @@ export function GroupProvider({ children }: GroupProviderProps) {
               // Clear invalid stored group
               localStorage.removeItem('selectedGroupId')
               localStorage.removeItem('groupSelectionInProgress')
+              localStorage.removeItem('groupValidationData')
               console.log('GroupContext: Cleared invalid stored group:', storedGroupId)
             }
           } else {
             console.log('GroupContext: No stored group, using first available group:', targetGroupId)
           }
           
-          // Clear the group selection flag
-          if (isFromGroupSelection) {
-            localStorage.removeItem('groupSelectionInProgress')
+          // If we have pre-validated data from group selection, use it directly
+          if (isFromGroupSelection && validationData) {
+            try {
+              const parsedValidationData = JSON.parse(validationData)
+              console.log('GroupContext: Using pre-validated group data:', parsedValidationData.group.name)
+              
+              // Set the group data directly from validation
+              setSelectedGroup({
+                id: parsedValidationData.group.id,
+                name: parsedValidationData.group.name,
+                accessCode: parsedValidationData.group.accessCode,
+                role: parsedValidationData.role,
+                memberCount: groups.find(g => g.id === parsedValidationData.group.id)?.memberCount || 0,
+                tripCount: groups.find(g => g.id === parsedValidationData.group.id)?.tripCount || 0
+              })
+
+              if (parsedValidationData.currentMember) {
+                setSelectedGroupMember({
+                  id: parsedValidationData.currentMember.id,
+                  travelerName: parsedValidationData.currentMember.name,
+                  role: parsedValidationData.currentMember.role,
+                  permissions: parsedValidationData.currentMember.permissions
+                })
+              }
+
+              // Store selection in localStorage for persistence
+              localStorage.setItem('selectedGroupId', targetGroupId)
+              
+              // Clear the validation flags
+              localStorage.removeItem('groupSelectionInProgress')
+              localStorage.removeItem('groupValidationData')
+              
+              console.log('GroupContext: Pre-validated group loaded successfully')
+            } catch (error) {
+              console.error('GroupContext: Failed to parse validation data, falling back to API call')
+              await selectGroupDirect(targetGroupId, groups)
+            }
+          } else {
+            // Clear the group selection flag
+            if (isFromGroupSelection) {
+              localStorage.removeItem('groupSelectionInProgress')
+              localStorage.removeItem('groupValidationData')
+            }
+            
+            await selectGroupDirect(targetGroupId, groups)
           }
-          
-          await selectGroupDirect(targetGroupId, groups)
         }
       }
     } catch (error) {
