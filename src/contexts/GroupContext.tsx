@@ -130,8 +130,21 @@ export function GroupProvider({ children }: GroupProviderProps) {
           const optimizedData = getCachedGroupData()
           const isOptimizedSwitch = localStorage.getItem('optimizedSwitchComplete') === 'true'
           
-          if ((isOptimizedSwitch || optimizedSwitchComplete) && optimizedData && optimizedData.group?.id === targetGroupId) {
+          console.log('GroupContext: Optimization check:', {
+            optimizedData: optimizedData ? {
+              groupId: optimizedData.group?.id,
+              groupName: optimizedData.group?.name
+            } : 'null',
+            isOptimizedSwitch,
+            targetGroupId,
+            storedGroupId
+          })
+          
+          if ((isOptimizedSwitch || optimizedSwitchComplete) && optimizedData) {
             console.log('GroupContext: Using optimized group data:', optimizedData.group.name)
+            
+            // For optimized switches, trust the optimized data's group ID over calculated targetGroupId
+            targetGroupId = optimizedData.group.id
             
             // Set the group data directly from optimized response
             setSelectedGroup({
@@ -153,7 +166,7 @@ export function GroupProvider({ children }: GroupProviderProps) {
             }
 
             // Store selection in localStorage for persistence
-            localStorage.setItem('selectedGroupId', targetGroupId)
+            localStorage.setItem('selectedGroupId', optimizedData.group.id)
             
             // Clear the flags
             localStorage.removeItem('groupSelectionInProgress')
