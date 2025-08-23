@@ -77,7 +77,40 @@ export async function GET(request: NextRequest) {
     })
 
     if (!member) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+      // Debug: Check what member records exist for this user and group
+      const debugMembers = await prisma.groupMember.findMany({
+        where: {
+          OR: [
+            { groupId, userId: user.id },
+            { groupId, email: user.email },
+            { userId: user.id }
+          ]
+        },
+        select: {
+          id: true,
+          groupId: true,
+          userId: true,
+          email: true,
+          travelerName: true
+        }
+      })
+      
+      console.log('Debug - Member not found:', {
+        requestedGroupId: groupId,
+        userId: user.id,
+        userEmail: user.email,
+        availableMembers: debugMembers
+      })
+      
+      return NextResponse.json({ 
+        error: 'Member not found',
+        debug: {
+          requestedGroupId: groupId,
+          userId: user.id,
+          userEmail: user.email,
+          availableMembers: debugMembers
+        }
+      }, { status: 404 })
     }
 
     // Get all group members using Prisma
