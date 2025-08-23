@@ -66,9 +66,24 @@ export function GroupProvider({ children }: GroupProviderProps) {
   const [switching, setSwitching] = useState(false)
   const queryClient = useQueryClient()
 
-  // Load available groups on mount
+  // Load available groups on mount, but respect optimized group selection timing
   useEffect(() => {
-    refreshGroups()
+    const initializeGroups = async () => {
+      // Check if we're in the middle of an optimized group switch
+      const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
+      const groupSelectionInProgress = localStorage.getItem('groupSelectionInProgress') === 'true'
+      
+      if (groupSelectionInProgress || optimizedSwitchComplete) {
+        console.log('GroupContext: Optimized group switch detected, waiting for completion...')
+        
+        // Wait a bit longer for the optimized switch to fully complete
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+      
+      await refreshGroups()
+    }
+    
+    initializeGroups()
   }, [])
 
   const refreshGroups = async () => {

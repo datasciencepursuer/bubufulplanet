@@ -80,6 +80,15 @@ export default function AppPage() {
     const initializeApp = async () => {
       console.log('App: Starting initialization check')
       
+      // First check if we're coming from an optimized group switch
+      const groupSelectionInProgress = localStorage.getItem('groupSelectionInProgress') === 'true'
+      const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
+      
+      if (groupSelectionInProgress && !optimizedSwitchComplete) {
+        console.log('App: Group selection still in progress, waiting...')
+        return
+      }
+      
       // Wait for GroupContext to finish loading
       if (groupLoading || groupSwitching) {
         console.log('App: Waiting for group context to finish loading/switching')
@@ -90,6 +99,16 @@ export default function AppPage() {
       if (!selectedGroup) {
         console.log('App: No selected group yet, waiting...')
         return
+      }
+      
+      // If coming from optimized switch, ensure the selected group matches what was selected
+      if (optimizedSwitchComplete) {
+        const storedGroupId = localStorage.getItem('selectedGroupId')
+        if (storedGroupId && selectedGroup.id !== storedGroupId) {
+          console.log('App: Group mismatch detected, waiting for correct group selection...')
+          console.log('App: Expected:', storedGroupId, 'Got:', selectedGroup.id)
+          return
+        }
       }
       
       console.log('App: Group selection complete:', selectedGroup.id, selectedGroup.name)
@@ -539,12 +558,19 @@ export default function AppPage() {
         <div className="text-center">
           <BearGlobeLoader />
           <div className="mt-4 text-sm text-gray-600">
-            {groupLoading && "Loading groups..."}
-            {groupSwitching && "Switching groups..."}
-            {!groupSelectionComplete && selectedGroup && "Finalizing group selection..."}
-            {tripsLoading && "Loading trips..."}
-            {utilityDataLoading && "Loading data..."}
-            {!appInitialized && !groupLoading && !groupSwitching && "Preparing your workspace..."}
+            {(() => {
+              const groupSelectionInProgress = localStorage.getItem('groupSelectionInProgress') === 'true'
+              const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
+              
+              if (groupSelectionInProgress && !optimizedSwitchComplete) return "Completing group selection..."
+              if (groupLoading) return "Loading groups..."
+              if (groupSwitching) return "Switching groups..."
+              if (!groupSelectionComplete && selectedGroup) return "Finalizing group selection..."
+              if (tripsLoading) return "Loading trips..."
+              if (utilityDataLoading) return "Loading data..."
+              if (!appInitialized && !groupLoading && !groupSwitching) return "Preparing your workspace..."
+              return "Loading..."
+            })()}
           </div>
         </div>
       </div>

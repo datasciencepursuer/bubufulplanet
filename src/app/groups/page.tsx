@@ -156,8 +156,19 @@ export default function GroupSelectionPage() {
       console.log('Groups page: Stored group ID:', localStorage.getItem('selectedGroupId'))
       console.log('Groups page: Optimized switch flag:', localStorage.getItem('optimizedSwitchComplete'))
       
+      // Additional validation to ensure the database call completed successfully
+      const storedGroupId = localStorage.getItem('selectedGroupId')
+      if (storedGroupId === groupId && groupData.group.id === groupId) {
+        console.log('Groups page: ✅ Database call completed successfully, group IDs match')
+      } else {
+        console.warn('Groups page: ⚠️ Group ID mismatch detected')
+        console.warn('Requested:', groupId)
+        console.warn('Stored:', storedGroupId)
+        console.warn('DB Response:', groupData.group.id)
+      }
+      
       // Small delay to show success feedback to user and ensure localStorage writes complete
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 800))
       
       // Navigate to app
       router.push('/app')
