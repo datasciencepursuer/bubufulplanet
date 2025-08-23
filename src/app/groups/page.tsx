@@ -38,15 +38,30 @@ export default function GroupSelectionPage() {
         // 1. Clear React Query cache
         await queryClient.clear()
         
-        // 2. Clear ALL localStorage data except auth
+        // 2. Clear localStorage data except auth (but preserve any fresh group selection)
         const authKeys = ['supabase.auth.token', 'sb-', 'auth-token']
         const allKeys = Object.keys(localStorage)
         allKeys.forEach(key => {
           const shouldKeepAuth = authKeys.some(authKey => key.includes(authKey))
-          if (!shouldKeepAuth) {
+          // Don't clear fresh optimized group data that might exist from a recent selection
+          const isOptimizedGroupData = key === 'optimizedGroupData' || key === 'selectedGroupId'
+          const isFreshOptimizedData = isOptimizedGroupData && localStorage.getItem('optimizedSwitchComplete') === 'true'
+          
+          if (!shouldKeepAuth && !isFreshOptimizedData) {
             localStorage.removeItem(key)
           }
         })
+        
+        // If we don't have fresh optimized data, clear all group-related data for a clean start
+        if (localStorage.getItem('optimizedSwitchComplete') !== 'true') {
+          localStorage.removeItem('selectedGroupId')
+          localStorage.removeItem('optimizedGroupData')
+          localStorage.removeItem('groupSelectionInProgress')
+          localStorage.removeItem('groupValidationData')
+          console.log('Groups page: Cleared all group data for fresh start')
+        } else {
+          console.log('Groups page: Preserved fresh optimized group data')
+        }
         
         // 3. Clear ALL sessionStorage
         sessionStorage.clear()

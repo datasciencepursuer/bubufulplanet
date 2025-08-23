@@ -84,6 +84,15 @@ export function GroupProvider({ children }: GroupProviderProps) {
         const storedGroupId = localStorage.getItem('selectedGroupId')
         const isFromGroupSelection = localStorage.getItem('groupSelectionInProgress') === 'true'
         const validationData = localStorage.getItem('groupValidationData')
+        const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
+        
+        console.log('GroupContext: Current state:', {
+          selectedGroup: selectedGroup?.id || 'none',
+          storedGroupId,
+          isFromGroupSelection,
+          optimizedSwitchComplete,
+          availableGroups: groups.map(g => ({ id: g.id, name: g.name }))
+        })
         
         if (!selectedGroup && groups.length > 0) {
           let targetGroupId = groups[0].id // Default to first group
