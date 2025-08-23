@@ -94,7 +94,12 @@ export function GroupProvider({ children }: GroupProviderProps) {
       }
 
       // Get detailed group info including member permissions using the updated current endpoint
-      const response = await fetch(`/api/groups/current?groupId=${groupId}`)
+      const response = await fetch(`/api/groups/current?groupId=${groupId}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
       if (response.ok) {
         const data = await response.json()
         
@@ -118,6 +123,14 @@ export function GroupProvider({ children }: GroupProviderProps) {
 
         // Store selection in localStorage for persistence
         localStorage.setItem('selectedGroupId', groupId)
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Failed to select group:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+          groupId
+        })
       }
     } catch (error) {
       console.error('Error selecting group:', error)
