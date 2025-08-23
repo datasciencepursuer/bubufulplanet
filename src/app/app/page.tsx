@@ -43,6 +43,11 @@ export default function AppPage() {
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
   const [accessCodeCopied, setAccessCodeCopied] = useState(false)
   const [editingTrip, setEditingTrip] = useState<any>(null)
+  
+  // State for utility components data
+  const [expensesData, setExpensesData] = useState<any>(null)
+  const [pointsOfInterestData, setPointsOfInterestData] = useState<any[]>([])
+  const [utilityDataLoading, setUtilityDataLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const groupedFetch = useGroupedFetch()
@@ -65,30 +70,90 @@ export default function AppPage() {
     checkAuth()
   }, [supabase.auth, router])
 
-  // Load trips when selected group changes
+  // Load all data when selected group changes
   useEffect(() => {
     if (selectedGroup && !groupSwitching) {
       // Force cache busting when group changes to ensure fresh data
-      loadTripsWithCacheBust()
+      loadAllData()
     }
   }, [selectedGroup, groupSwitching])
   
-  // Listen for group switch events to immediately refresh data
+  // Listen for group switch events to immediately refresh ALL data
   useEffect(() => {
     const handleGroupSwitch = (event: CustomEvent) => {
-      console.log('App: Received group switch event, refreshing trips')
-      // Clear trips immediately and reload
+      console.log('App: Received group switch event, refreshing all data')
+      // Clear all data immediately and reload
       setTrips([])
+      setExpensesData(null)
+      setPointsOfInterestData([])
       setTripsLoading(true)
+      setUtilityDataLoading(true)
+      
       // Small delay to ensure API caches are cleared
       setTimeout(() => {
-        loadTripsWithCacheBust()
+        loadAllData()
       }, 50)
     }
 
     window.addEventListener('groupSwitched', handleGroupSwitch as EventListener)
     return () => window.removeEventListener('groupSwitched', handleGroupSwitch as EventListener)
   }, [])
+
+  // Load all data when group changes (trips, expenses, points of interest)
+  const loadAllData = async () => {
+    if (!selectedGroup) return
+    
+    // Load trips and utility data in parallel
+    await Promise.all([
+      loadTripsWithCacheBust(),
+      loadUtilityData()
+    ])
+  }
+
+  // Load utility components data (expenses and points of interest)
+  const loadUtilityData = async () => {
+    if (!selectedGroup) return
+    
+    try {
+      setUtilityDataLoading(true)
+      
+      // Load expenses and points of interest in parallel
+      const [expensesResponse, poiResponse] = await Promise.all([
+        groupedFetch('/api/expenses/personal-summary', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        }, true),
+        groupedFetch('/api/points-of-interest', {
+          cache: 'no-store', 
+          headers: { 'Cache-Control': 'no-cache' }
+        }, true)
+      ])
+
+      // Handle expenses data
+      if (expensesResponse.ok) {
+        const expensesData = await expensesResponse.json()
+        setExpensesData(expensesData)
+      } else {
+        console.error('Failed to load expenses:', expensesResponse.status)
+        setExpensesData(null)
+      }
+
+      // Handle points of interest data
+      if (poiResponse.ok) {
+        const poiData = await poiResponse.json()
+        setPointsOfInterestData(poiData.pointsOfInterest || [])
+      } else {
+        console.error('Failed to load points of interest:', poiResponse.status)
+        setPointsOfInterestData([])
+      }
+    } catch (error) {
+      console.error('Error loading utility data:', error)
+      setExpensesData(null)
+      setPointsOfInterestData([])
+    } finally {
+      setUtilityDataLoading(false)
+    }
+  }
 
   // Load trips with cache busting for group switches
   const loadTripsWithCacheBust = async () => {
@@ -118,6 +183,14 @@ export default function AppPage() {
     } finally {
       setTripsLoading(false)
     }
+  }
+
+  // Force refresh all data (clears any stale data)
+  const forceRefreshAll = async () => {
+    setTrips([]) // Clear current trips immediately  
+    setExpensesData(null)
+    setPointsOfInterestData([])
+    await loadAllData()
   }
 
   // Force refresh trips data (clears any stale data)
@@ -245,8 +318,8 @@ export default function AppPage() {
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      // Force refresh trips after creating/updating
-      await forceRefreshTrips()
+      // Force refresh all data after creating/updating trips (expenses might be affected)
+      await forceRefreshAll()
       setEditingTrip(null)
       setShowTripForm(false)
       
@@ -296,7 +369,7 @@ export default function AppPage() {
       }
 
       // Success: force refresh to ensure no stale data
-      await forceRefreshTrips()
+      await forceRefreshAll()
     } catch (error) {
       console.error('Error deleting trip:', error)
       // Rollback: restore original trips state
@@ -375,7 +448,7 @@ export default function AppPage() {
     return { currentTrip: current || null, upcomingTrips: upcoming, pastTrips: past }
   }, [trips])
 
-  if (groupLoading || (tripsLoading && !trips.length) || groupSwitching) {
+  if (groupLoading || (tripsLoading && !trips.length) || groupSwitching || (utilityDataLoading && !expensesData && !pointsOfInterestData.length)) {
     return <BearGlobeLoader />
   }
 
@@ -547,7 +620,7 @@ export default function AppPage() {
               {/* Next Trip Card - Moved from utility cards */}
               <AllTripsView 
                 trips={trips} 
-                onTripsChange={forceRefreshTrips}
+                onTripsChange={forceRefreshAll}
                 onEditTrip={handleEditTrip}
                 onDeleteTrip={handleDeleteTripClick}
               />
@@ -577,8 +650,17 @@ export default function AppPage() {
               
               {/* Mobile Utility Sections */}
               <div className="space-y-4">
-                <PointsOfInterestView className="w-full" />
-                <ExpensesView className="w-full" />
+                <PointsOfInterestView 
+                  className="w-full" 
+                  data={pointsOfInterestData}
+                  loading={utilityDataLoading}
+                  onDataChange={loadUtilityData}
+                />
+                <ExpensesView 
+                  className="w-full"
+                  data={expensesData}
+                  loading={utilityDataLoading}
+                />
               </div>
             </div>
           </div>
@@ -586,8 +668,17 @@ export default function AppPage() {
           {/* Desktop Utility Sidebar */}
           <div className="hidden lg:flex h-full flex-col space-y-4">
             <div className="flex-1 flex flex-col space-y-4">
-              <PointsOfInterestView className="flex-1" />
-              <ExpensesView className="flex-1" />
+              <PointsOfInterestView 
+                className="flex-1" 
+                data={pointsOfInterestData}
+                loading={utilityDataLoading}
+                onDataChange={loadUtilityData}
+              />
+              <ExpensesView 
+                className="flex-1"
+                data={expensesData}
+                loading={utilityDataLoading}
+              />
             </div>
           </div>
         </div>

@@ -23,11 +23,19 @@ interface PointOfInterest {
 interface PointsOfInterestViewProps {
   className?: string
   tripId?: string // Optional tripId to filter by specific trip
+  data?: PointOfInterest[]
+  loading?: boolean
+  onDataChange?: () => Promise<void> // Callback to refresh data after changes
 }
 
-export default function PointsOfInterestView({ className, tripId }: PointsOfInterestViewProps) {
-  const [pointsOfInterest, setPointsOfInterest] = useState<PointOfInterest[]>([])
-  const [loading, setLoading] = useState(true)
+export default function PointsOfInterestView({ 
+  className, 
+  tripId, 
+  data = [], 
+  loading = false, 
+  onDataChange 
+}: PointsOfInterestViewProps) {
+  const pointsOfInterest = data
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -49,32 +57,14 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
   const [availableTrips, setAvailableTrips] = useState<Array<{ id: string; name: string }>>([])
 
   useEffect(() => {
-    loadPointsOfInterest()
     if (!tripId) {
       loadAvailableTrips()
     }
   }, [tripId])
 
-  const loadPointsOfInterest = async () => {
-    try {
-      setLoading(true)
-      const url = tripId 
-        ? `/api/points-of-interest?tripId=${tripId}`
-        : '/api/points-of-interest'
-      
-      const response = await fetch(url)
-      
-      if (response.ok) {
-        const data = await response.json()
-        setPointsOfInterest(data.pointsOfInterest || [])
-      } else {
-        throw new Error('Failed to load points of interest')
-      }
-    } catch (error) {
-      console.error('Error loading points of interest:', error)
-      setError('Failed to load points of interest')
-    } finally {
-      setLoading(false)
+  const refreshData = async () => {
+    if (onDataChange) {
+      await onDataChange()
     }
   }
 
@@ -125,7 +115,7 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
         throw new Error(errorData.error || 'Failed to save point of interest')
       }
 
-      await loadPointsOfInterest()
+      await refreshData()
       resetForm()
       if (!editingId) {
         setIsEditing(false)
@@ -169,7 +159,7 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
         throw new Error(errorData.error || 'Failed to delete point of interest')
       }
 
-      await loadPointsOfInterest()
+      await refreshData()
       setPoiToDelete(null)
     } catch (error) {
       console.error('Error deleting point of interest:', error)
@@ -224,7 +214,7 @@ export default function PointsOfInterestView({ className, tripId }: PointsOfInte
         <CardContent>
           <div className="text-center py-4">
             <p className="text-red-600 mb-2">{error}</p>
-            <Button onClick={loadPointsOfInterest} size="sm">Try Again</Button>
+            <Button onClick={refreshData} size="sm">Try Again</Button>
           </div>
         </CardContent>
       </Card>

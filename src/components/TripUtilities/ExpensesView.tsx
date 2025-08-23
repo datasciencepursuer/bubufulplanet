@@ -37,34 +37,13 @@ interface PersonalExpenseSummary {
 
 interface ExpensesViewProps {
   className?: string
+  data?: PersonalExpenseSummary | null
+  loading?: boolean
 }
 
-export default function ExpensesView({ className }: ExpensesViewProps) {
-  const [summary, setSummary] = useState<PersonalExpenseSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export default function ExpensesView({ className, data, loading = false }: ExpensesViewProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
-
-  useEffect(() => {
-    loadExpenses()
-  }, [])
-
-  const loadExpenses = async () => {
-    try {
-      const response = await fetch('/api/expenses/personal-summary')
-      
-      if (!response.ok) {
-        throw new Error('Failed to load expenses')
-      }
-      
-      const data = await response.json()
-      setSummary(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load expenses')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const summary = data
 
   if (loading) {
     return (
@@ -78,25 +57,6 @@ export default function ExpensesView({ className }: ExpensesViewProps) {
         <CardContent>
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-800"></div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (error) {
-    return (
-      <Card className={className}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-green-600" />
-            My Expenses
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-4">
-            <p className="text-red-600 mb-2">{error}</p>
-            <Button onClick={loadExpenses} size="sm">Try Again</Button>
           </div>
         </CardContent>
       </Card>
