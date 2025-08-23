@@ -50,12 +50,15 @@ export default function AppPage() {
   const [appInitialized, setAppInitialized] = useState(false)
   const [groupSelectionComplete, setGroupSelectionComplete] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
+  const [optimizedDataUsed, setOptimizedDataUsed] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const groupedFetch = createGroupedFetch()
 
   useEffect(() => {
-    const checkAuthAndGroup = async () => {
+    if (appInitialized) return // Skip if already initialized
+    
+    const checkAuth = async () => {
       try {
         // Check for Supabase auth
         const { data: { user } } = await supabase.auth.getUser()
@@ -64,60 +67,22 @@ export default function AppPage() {
           router.push('/login')
           return
         }
-
-        // Check if user has group access by making a groups API call
-        // This will determine if user needs to be redirected to group selection
-        try {
-          const response = await fetch('/api/user/groups', {
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0'
-            }
-          })
-          
-          if (response.ok) {
-            const data = await response.json()
-            const userGroups = data.groups || []
-            
-            // If user has no groups, redirect to setup
-            if (userGroups.length === 0) {
-              router.push('/setup')
-              return
-            }
-            
-            // If user has multiple groups, redirect to group selection
-            if (userGroups.length > 1) {
-              router.push('/groups')
-              return
-            }
-            
-            // User has exactly one group - continue loading
-            console.log('App: User has single group, continuing to load app')
-          } else if (response.status === 404) {
-            // No groups found, redirect to setup
-            router.push('/setup')
-            return
-          } else {
-            console.error('Failed to check user groups:', response.status)
-            // Let the existing group loading logic handle this
-          }
-        } catch (groupCheckError) {
-          console.error('Error checking user groups:', groupCheckError)
-          // Let the existing group loading logic handle this
-        }
       } catch (error) {
         console.error('Auth check failed:', error)
         router.push('/login')
       }
     }
-    checkAuthAndGroup()
-  }, [supabase.auth, router])
+    checkAuth()
+  }, [supabase.auth, router, appInitialized])
 
   // Handle group data and redirect logic
   useEffect(() => {
     const handleGroupData = async () => {
+      // Skip if already initialized
+      if (appInitialized) {
+        return
+      }
+
       console.log('App: Starting initialization with optimized group data')
       
       // If still loading, wait
@@ -173,7 +138,7 @@ export default function AppPage() {
     }
     
     handleGroupData()
-  }, [groupLoading, selectedGroup, router])
+  }, [groupLoading, selectedGroup, appInitialized, router])
 
   // Load data for the selected group
   const loadDataForSelectedGroup = async () => {
@@ -181,11 +146,11 @@ export default function AppPage() {
     
     console.log('App: Loading data for selected group:', selectedGroup.id, selectedGroup.name)
     
-    // Check if we have optimized data available (client-side only)
+    // Check if we have optimized data available and haven't used it yet
     const optimizedData = getCachedGroupData()
     const isOptimizedSwitch = typeof window !== 'undefined' && localStorage.getItem('optimizedSwitchComplete') === 'true'
     
-    if (isOptimizedSwitch && optimizedData && optimizedData.group.id === selectedGroup.id) {
+    if (!optimizedDataUsed && isOptimizedSwitch && optimizedData && optimizedData.group.id === selectedGroup.id) {
       console.log('App: Using optimized pre-loaded data')
       
       // Use the pre-loaded data
@@ -194,10 +159,12 @@ export default function AppPage() {
       setPointsOfInterestData(optimizedData.pointsOfInterest || [])
       setTripsLoading(false)
       setUtilityDataLoading(false)
+      setOptimizedDataUsed(true)
       
-      // Clear the flag (client-side only)
+      // Clear the flags ONLY after successful data loading (client-side only)
       if (typeof window !== 'undefined') {
         localStorage.removeItem('optimizedSwitchComplete')
+        localStorage.removeItem('groupSelectionInProgress')
       }
       
       console.log('App: Optimized data loaded:', {
@@ -205,10 +172,12 @@ export default function AppPage() {
         expenses: optimizedData.expensesSummary ? 'loaded' : 'none',
         pointsOfInterest: optimizedData.pointsOfInterest?.length || 0
       })
-    } else {
+    } else if (!optimizedDataUsed) {
       console.log('App: Loading data normally (no optimization)')
       // Force cache busting when group changes to ensure fresh data
       await loadAllData()
+    } else {
+      console.log('App: Optimized data already used, skipping reload')
     }
   }
   
@@ -222,6 +191,7 @@ export default function AppPage() {
       setPointsOfInterestData([])
       setTripsLoading(true)
       setUtilityDataLoading(true)
+      setOptimizedDataUsed(false) // Reset optimized data flag for new group
       
       // Small delay to ensure API caches are cleared
       setTimeout(() => {
@@ -243,6 +213,8 @@ export default function AppPage() {
       setShowDeleteConfirm(false)
       setTripToDelete(null)
       setAccessCodeCopied(false)
+      setOptimizedDataUsed(false) // Reset optimized data flag
+      setAppInitialized(false) // Reset initialization flag
     }
 
     window.addEventListener('groupSwitched', handleGroupSwitch as EventListener)
