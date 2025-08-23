@@ -233,12 +233,28 @@ export default function AppPage() {
       dataLoadingInProgress.current = false // Reset data loading ref
     }
 
+    const handleExpenseUpdated = (event: CustomEvent) => {
+      console.log('App: Received expense updated event, refreshing expenses data')
+      // Reload only expenses data
+      loadExpensesData()
+    }
+
+    const handlePoiUpdated = (event: CustomEvent) => {
+      console.log('App: Received POI updated event, refreshing POI data')
+      // Reload only POI data
+      loadPointsOfInterestData()
+    }
+
     window.addEventListener('groupSwitched', handleGroupSwitch as EventListener)
     window.addEventListener('completeCacheClear', handleCompleteCacheClear as EventListener)
+    window.addEventListener('expenseUpdated', handleExpenseUpdated as EventListener)
+    window.addEventListener('poiUpdated', handlePoiUpdated as EventListener)
     
     return () => {
       window.removeEventListener('groupSwitched', handleGroupSwitch as EventListener)
       window.removeEventListener('completeCacheClear', handleCompleteCacheClear as EventListener)
+      window.removeEventListener('expenseUpdated', handleExpenseUpdated as EventListener)
+      window.removeEventListener('poiUpdated', handlePoiUpdated as EventListener)
     }
   }, [])
 
@@ -295,6 +311,52 @@ export default function AppPage() {
       setPointsOfInterestData([])
     } finally {
       setUtilityDataLoading(false)
+    }
+  }
+
+  // Load expenses data only
+  const loadExpensesData = async () => {
+    if (!selectedGroup) return
+    
+    try {
+      const response = await groupedFetch('/api/expenses/personal-summary', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      }, true)
+
+      if (response.ok) {
+        const expensesData = await response.json()
+        setExpensesData(expensesData)
+      } else {
+        console.error('Failed to load expenses:', response.status)
+        setExpensesData(null)
+      }
+    } catch (error) {
+      console.error('Error loading expenses data:', error)
+      setExpensesData(null)
+    }
+  }
+
+  // Load points of interest data only
+  const loadPointsOfInterestData = async () => {
+    if (!selectedGroup) return
+    
+    try {
+      const response = await groupedFetch('/api/points-of-interest', {
+        cache: 'no-store', 
+        headers: { 'Cache-Control': 'no-cache' }
+      }, true)
+
+      if (response.ok) {
+        const poiData = await response.json()
+        setPointsOfInterestData(poiData.pointsOfInterest || [])
+      } else {
+        console.error('Failed to load points of interest:', response.status)
+        setPointsOfInterestData([])
+      }
+    } catch (error) {
+      console.error('Error loading points of interest data:', error)
+      setPointsOfInterestData([])
     }
   }
 

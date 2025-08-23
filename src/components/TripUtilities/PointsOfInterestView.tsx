@@ -35,7 +35,13 @@ export default function PointsOfInterestView({
   loading = false, 
   onDataChange 
 }: PointsOfInterestViewProps) {
-  const pointsOfInterest = data
+  // Optimistic updates: local state that overrides props data when needed
+  const [optimisticData, setOptimisticData] = useState<PointOfInterest[]>([])
+  const [hasOptimisticUpdates, setHasOptimisticUpdates] = useState(false)
+  
+  // Use optimistic data if available, otherwise use props data
+  const pointsOfInterest = hasOptimisticUpdates ? optimisticData : data
+  
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -43,6 +49,13 @@ export default function PointsOfInterestView({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [poiToDelete, setPoiToDelete] = useState<{ id: string; name: string } | null>(null)
   const { canCreate, canModify } = useOptimizedGroup()
+  
+  // Update optimistic data when props data changes
+  useEffect(() => {
+    if (!hasOptimisticUpdates) {
+      setOptimisticData(data)
+    }
+  }, [data, hasOptimisticUpdates])
   
   // Form state
   const [formData, setFormData] = useState({
@@ -94,8 +107,38 @@ export default function PointsOfInterestView({
   const handleSave = async () => {
     if (!formData.destinationName.trim()) return
 
+    // Generate temporary ID for new items
+    const tempId = editingId || `temp-${Date.now()}`
+    const isUpdate = !!editingId
+
     try {
       setSaving(true)
+      
+      // Optimistic update - immediately update the UI
+      const optimisticPoi: PointOfInterest = {
+        id: tempId,
+        destinationName: formData.destinationName.trim(),
+        address: formData.address.trim() || null,
+        notes: formData.notes.trim() || null,
+        link: formData.link.trim() || null,
+        tripId: formData.tripId || null,
+        trip: formData.tripId 
+          ? availableTrips.find(t => t.id === formData.tripId) || null 
+          : null
+      }
+      
+      if (isUpdate) {
+        // Update existing item
+        const updatedData = optimisticData.map(poi => 
+          poi.id === editingId ? optimisticPoi : poi
+        )
+        setOptimisticData(updatedData)
+      } else {
+        // Add new item at the beginning
+        setOptimisticData([optimisticPoi, ...optimisticData])
+      }
+      
+      setHasOptimisticUpdates(true)
       
       const method = editingId ? 'PUT' : 'POST'
       const body = editingId 
@@ -115,13 +158,61 @@ export default function PointsOfInterestView({
         throw new Error(errorData.error || 'Failed to save point of interest')
       }
 
-      await refreshData()
+      const result = await response.json()
+      
+      // Replace temp item with real data from server
+      if (isUpdate) {
+        const updatedData = optimisticData.map(poi => 
+          poi.id === editingId ? result.pointOfInterest : poi
+        )
+        setOptimisticData(updatedData)
+      } else {
+        const updatedData = optimisticData.map(poi => 
+          poi.id === tempId ? result.pointOfInterest : poi
+        )
+        setOptimisticData(updatedData)
+      }
+      
+      // Refresh parent data in background
+      if (onDataChange) {
+        await onDataChange()
+      }
+      
+      // Dispatch global event to refresh POI data across components
+      window.dispatchEvent(new CustomEvent('poiUpdated', { 
+        detail: { 
+          operation: isUpdate ? 'update' : 'create',
+          poi: result.pointOfInterest 
+        } 
+      }))
+      
+      // Reset optimistic updates after successful server sync
+      setTimeout(() => {
+        setHasOptimisticUpdates(false)
+      }, 100)
+      
       resetForm()
       if (!editingId) {
         setIsEditing(false)
       }
     } catch (error) {
       console.error('Error saving point of interest:', error)
+      
+      // Revert optimistic update on error
+      if (isUpdate) {
+        // Restore original data
+        const originalPoi = data.find(poi => poi.id === editingId)
+        if (originalPoi) {
+          const revertedData = optimisticData.map(poi => 
+            poi.id === editingId ? originalPoi : poi
+          )
+          setOptimisticData(revertedData)
+        }
+      } else {
+        // Remove the temporary item
+        setOptimisticData(optimisticData.filter(poi => poi.id !== tempId))
+      }
+      
       alert(error instanceof Error ? error.message : 'Failed to save point of interest. Please try again.')
     } finally {
       setSaving(false)
@@ -149,8 +240,16 @@ export default function PointsOfInterestView({
   const handleDeleteConfirm = async () => {
     if (!poiToDelete) return
 
+    const poiId = poiToDelete.id
+    const originalPoi = optimisticData.find(poi => poi.id === poiId)
+
     try {
-      const response = await fetch(`/api/points-of-interest?id=${poiToDelete.id}`, {
+      // Optimistic update - immediately remove from UI
+      const updatedData = optimisticData.filter(poi => poi.id !== poiId)
+      setOptimisticData(updatedData)
+      setHasOptimisticUpdates(true)
+      
+      const response = await fetch(`/api/points-of-interest?id=${poiId}`, {
         method: 'DELETE'
       })
 
@@ -159,10 +258,41 @@ export default function PointsOfInterestView({
         throw new Error(errorData.error || 'Failed to delete point of interest')
       }
 
-      await refreshData()
+      // Refresh parent data in background
+      if (onDataChange) {
+        await onDataChange()
+      }
+      
+      // Dispatch global event to refresh POI data across components
+      window.dispatchEvent(new CustomEvent('poiUpdated', { 
+        detail: { 
+          operation: 'delete',
+          poiId: poiId 
+        } 
+      }))
+      
+      // Reset optimistic updates after successful server sync
+      setTimeout(() => {
+        setHasOptimisticUpdates(false)
+      }, 100)
+      
       setPoiToDelete(null)
     } catch (error) {
       console.error('Error deleting point of interest:', error)
+      
+      // Revert optimistic update on error - restore the deleted item
+      if (originalPoi) {
+        const revertedData = [...optimisticData]
+        // Find where to insert it back (maintain order)
+        const originalIndex = data.findIndex(poi => poi.id === poiId)
+        if (originalIndex !== -1) {
+          revertedData.splice(originalIndex, 0, originalPoi)
+        } else {
+          revertedData.push(originalPoi)
+        }
+        setOptimisticData(revertedData)
+      }
+      
       alert(error instanceof Error ? error.message : 'Failed to delete point of interest. Please try again.')
     }
   }

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { UserPlus, Settings, Trash2, Shield, Eye, Edit, Plus } from 'lucide-react'
+import { UserPlus, Settings, Trash2, Shield, Eye, Edit, Plus, LogOut, AlertTriangle } from 'lucide-react'
 import { getRoleDisplay, getPermissionDisplay } from '@/lib/permissions'
 import ConfirmDialog from './ConfirmDialog'
 import { useNotify } from '@/hooks/useNotify'
@@ -29,9 +30,10 @@ interface GroupMembersManagementProps {
 }
 
 export default function GroupMembersManagement({ readOnly = false }: GroupMembersManagementProps) {
-  const { error } = useNotify()
+  const { error, success } = useNotify()
   const { selectedGroup, isAdventurer } = useOptimizedGroup()
   const groupedFetch = createGroupedFetch()
+  const router = useRouter()
   
   const [members, setMembers] = useState<GroupMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,6 +47,8 @@ export default function GroupMembersManagement({ readOnly = false }: GroupMember
   })
   const [editingMember, setEditingMember] = useState<string | null>(null)
   const [showConfirmDelete, setShowConfirmDelete] = useState<string | null>(null)
+  const [showLeaveGroup, setShowLeaveGroup] = useState(false)
+  const [leavingGroup, setLeavingGroup] = useState(false)
 
   useEffect(() => {
     if (selectedGroup?.id) {
@@ -143,6 +147,38 @@ export default function GroupMembersManagement({ readOnly = false }: GroupMember
     } catch (err) {
       console.error('Error removing member:', err)
       error('Remove Failed', 'Failed to remove member. Please try again.')
+    }
+  }
+
+  const handleLeaveGroup = async () => {
+    if (!selectedGroup?.id || leavingGroup) return
+    
+    try {
+      setLeavingGroup(true)
+      const response = await fetch('/api/groups/leave', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ groupId: selectedGroup.id }),
+      })
+
+      if (response.ok) {
+        success('Left Group', 'You have successfully left the group.')
+        setShowLeaveGroup(false)
+        // Redirect to groups page or login if user has no other groups
+        setTimeout(() => {
+          router.push('/groups')
+        }, 1500)
+      } else {
+        const data = await response.json()
+        error('Leave Failed', data.error || 'Failed to leave group')
+      }
+    } catch (err) {
+      console.error('Error leaving group:', err)
+      error('Leave Failed', 'Failed to leave group. Please try again.')
+    } finally {
+      setLeavingGroup(false)
     }
   }
 
@@ -407,6 +443,38 @@ export default function GroupMembersManagement({ readOnly = false }: GroupMember
           </div>
         )}
 
+        {/* Leave Group Section */}
+        {!readOnly && (
+          <div className="border-t p-4 bg-red-50">
+            <div className="flex items-start justify-between">
+              <div>
+                <h4 className="font-medium text-red-800 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Danger Zone
+                </h4>
+                <p className="text-sm text-red-600 mt-1">
+                  Leave this travel group permanently. This action cannot be undone.
+                </p>
+                {isAdventurer && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Note: As the group leader, you can only leave if there are other adventurers in the group.
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowLeaveGroup(true)}
+                className="gap-2"
+                disabled={leavingGroup}
+              >
+                <LogOut className="w-4 h-4" />
+                {leavingGroup ? 'Leaving...' : 'Leave Group'}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Confirm Delete Dialog */}
         <ConfirmDialog
           isOpen={!!showConfirmDelete}
@@ -420,6 +488,17 @@ export default function GroupMembersManagement({ readOnly = false }: GroupMember
           message="Are you sure you want to remove this member from the group? They will need to rejoin with the access code."
           confirmText="Remove"
           cancelText="Cancel"
+        />
+
+        {/* Confirm Leave Group Dialog */}
+        <ConfirmDialog
+          isOpen={showLeaveGroup}
+          onClose={() => setShowLeaveGroup(false)}
+          onConfirm={handleLeaveGroup}
+          title="Leave Group"
+          message={`Are you sure you want to leave "${selectedGroup?.name}"? You will lose access to all trips, events, and group data. You'll need an invitation or access code to rejoin.`}
+          confirmText={leavingGroup ? 'Leaving...' : 'Leave Group'}
+          cancelText="Stay in Group"
         />
       </CardContent>
     </Card>

@@ -321,6 +321,14 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
       }
       createExpenseMutation.mutate(createData)
     }
+    
+    // Dispatch global event to refresh expense data across components
+    window.dispatchEvent(new CustomEvent('expenseUpdated', { 
+      detail: { 
+        operation: isEditing ? 'update' : 'create',
+        tripId: tripId 
+      } 
+    }))
   }
   
   const handleEditExpense = (expense: Expense) => {
@@ -344,6 +352,15 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
     
     // Use React Query mutation for delete (with optimistic updates)
     deleteExpenseMutation.mutate(expenseId)
+    
+    // Dispatch global event to refresh expense data across components
+    window.dispatchEvent(new CustomEvent('expenseUpdated', { 
+      detail: { 
+        operation: 'delete',
+        tripId: tripId,
+        expenseId: expenseId 
+      } 
+    }))
   }
 
   // Show loading spinner only if we don't have initial data and we're loading
@@ -747,6 +764,15 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
             setSelectedExpense(undefined)
             setPrefilledEventId(null)
             deleteExpenseMutation.mutate(expenseId)
+            
+            // Dispatch global event to refresh expense data across components
+            window.dispatchEvent(new CustomEvent('expenseUpdated', { 
+              detail: { 
+                operation: 'delete',
+                tripId: tripId,
+                expenseId: expenseId 
+              } 
+            }))
           }}
         />
       )}
