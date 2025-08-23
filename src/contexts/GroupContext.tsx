@@ -91,7 +91,7 @@ export function GroupProvider({ children }: GroupProviderProps) {
           storedGroupId,
           isFromGroupSelection,
           optimizedSwitchComplete,
-          availableGroups: groups.map(g => ({ id: g.id, name: g.name }))
+          availableGroups: groups.map((g: Group) => ({ id: g.id, name: g.name }))
         })
         
         if (!selectedGroup && groups.length > 0) {
