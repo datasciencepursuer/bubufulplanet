@@ -13,29 +13,25 @@ import { Button } from '@/components/ui/button'
 import { MapPin, Calendar as CalendarIcon, DollarSign, Settings, ArrowLeft, Plus, LogOut, Trash2, Clock, Users, Copy, Check } from 'lucide-react'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import BearGlobeLoader from '@/components/BearGlobeLoader'
-import { useGroupedFetch } from '@/lib/groupedFetch'
+// Removed useGroupedFetch - using createGroupedFetch from groupUtils
 import { useNotify } from '@/hooks/useNotify'
 import { createClient } from '@/utils/supabase/client'
 import { optimizedGroupSwitcher, getCachedGroupData } from '@/lib/optimizedGroupSwitch'
 import TravelerNameEditor from '@/components/TravelerNameEditor'
-import GroupSelector from '@/components/GroupSelector'
+// Removed GroupSelector - using direct optimized data access
 import GroupNameEditor from '@/components/GroupNameEditor'
-import { useGroup } from '@/contexts/GroupContext'
+import { useOptimizedGroup, createGroupedFetch, updateGroupName } from '@/lib/groupUtils'
 
 export default function AppPage() {
   const { warning } = useNotify()
   const { 
     selectedGroup, 
     selectedGroupMember, 
-    loading: groupLoading,
-    switching: groupSwitching, 
+    isLoading: groupLoading,
     canCreate, 
     canModify, 
-    isAdventurer,
-    updateSelectedGroupName,
-    selectGroup,
-    availableGroups
-  } = useGroup()
+    isAdventurer
+  } = useOptimizedGroup()
   const [showTripForm, setShowTripForm] = useState(false)
   const [selectedDates, setSelectedDates] = useState<{ start: Date; end: Date } | null>(null)
   const [tripsLoading, setTripsLoading] = useState(true)
@@ -56,7 +52,7 @@ export default function AppPage() {
   const [isHydrated, setIsHydrated] = useState(false)
   const router = useRouter()
   const supabase = createClient()
-  const groupedFetch = useGroupedFetch()
+  const groupedFetch = createGroupedFetch()
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -76,54 +72,21 @@ export default function AppPage() {
     checkAuth()
   }, [supabase.auth, router])
 
-  // Wait for group selection to complete before initializing app
+  // Simple initialization for optimized group data
   useEffect(() => {
     const initializeApp = async () => {
-      console.log('App: Starting initialization check')
+      console.log('App: Starting initialization with optimized group data')
       
-      // First check if we're coming from an optimized group switch (client-side only)
-      if (typeof window !== 'undefined') {
-        const groupSelectionInProgress = localStorage.getItem('groupSelectionInProgress') === 'true'
-        const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
-        
-        if (groupSelectionInProgress && !optimizedSwitchComplete) {
-          console.log('App: Group selection still in progress, waiting...')
-          return
-        }
-      }
-      
-      // Wait for GroupContext to finish loading
-      // Note: For optimized switches, groupSwitching is never true, so we only wait for groupLoading
-      if (groupLoading) {
-        console.log('App: Waiting for group context to finish loading')
-        return
-      }
-      
-      // For optimized switches, we don't need to wait for groupSwitching since it bypasses GroupContext switching
-      
-      // Check if we have a selected group
+      // Check if we have a selected group from optimized data
       if (!selectedGroup) {
-        console.log('App: No selected group yet, waiting...')
+        console.log('App: No optimized group data yet, waiting...')
         return
       }
       
-      // If coming from optimized switch, ensure the selected group matches what was selected (client-side only)
-      if (typeof window !== 'undefined') {
-        const optimizedSwitchComplete = localStorage.getItem('optimizedSwitchComplete') === 'true'
-        if (optimizedSwitchComplete) {
-          const storedGroupId = localStorage.getItem('selectedGroupId')
-          if (storedGroupId && selectedGroup.id !== storedGroupId) {
-            console.log('App: Group mismatch detected, waiting for correct group selection...')
-            console.log('App: Expected:', storedGroupId, 'Got:', selectedGroup.id)
-            return
-          }
-        }
-      }
-      
-      console.log('App: Group selection complete:', selectedGroup.id, selectedGroup.name)
+      console.log('App: Using optimized group data:', selectedGroup.id, selectedGroup.name)
       setGroupSelectionComplete(true)
       
-      // Now load data for the selected group
+      // Load additional data for the selected group
       await loadDataForSelectedGroup()
       
       console.log('App: Initialization complete')
@@ -131,7 +94,7 @@ export default function AppPage() {
     }
     
     initializeApp()
-  }, [selectedGroup, groupLoading])
+  }, [selectedGroup])
 
   // Load data for the selected group
   const loadDataForSelectedGroup = async () => {
@@ -561,8 +524,7 @@ export default function AppPage() {
     return { currentTrip: current || null, upcomingTrips: upcoming, pastTrips: past }
   }, [trips])
 
-  // Show loading until everything is properly initialized
-  // Note: Removed groupSwitching check since optimized switches bypass GroupContext switching
+  // Show loading until optimized group data is loaded and processed
   if (!appInitialized || !groupSelectionComplete || groupLoading || 
       (tripsLoading && !trips.length) || (utilityDataLoading && !expensesData && !pointsOfInterestData.length)) {
     return (
@@ -624,7 +586,7 @@ export default function AppPage() {
                     groupId={selectedGroup.id}
                     currentName={selectedGroup.name}
                     canEdit={isAdventurer}
-                    onNameUpdate={updateSelectedGroupName}
+                    onNameUpdate={updateGroupName}
                     className="text-base lg:text-lg"
                   />
                 ) : (
@@ -669,12 +631,15 @@ export default function AppPage() {
             
             {/* Right Section */}
             <div className="flex items-center gap-1 lg:gap-3 justify-end">
-              <GroupSelector
-                currentGroupId={selectedGroup?.id || null}
-                onGroupChange={selectGroup}
-                onManageGroup={(groupId) => router.push('/group-settings')}
-                switching={groupSwitching}
-              />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => router.push('/groups')}
+                className="gap-1 lg:gap-2"
+              >
+                <Users className="w-4 h-4" /> 
+                <span className="hidden sm:inline">Switch Group</span>
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm"

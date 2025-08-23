@@ -5,7 +5,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext"
 import { NotificationContainer } from "@/components/NotificationContainer"
 import QueryProvider from "@/providers/QueryProvider"
 import { DataCacheProvider } from "@/contexts/DataCacheContext"
-import { GroupProvider } from "@/contexts/GroupContext"
+// Removed GroupProvider - using direct optimized data access
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -25,12 +25,10 @@ export default function RootLayout({
         <QueryProvider>
           <NotificationProvider>
             <DataCacheProvider>
-              <GroupProvider>
-                <main className="min-h-screen bg-background">
-                  {children}
-                </main>
-                <NotificationContainer />
-              </GroupProvider>
+              <main className="min-h-screen bg-background">
+                {children}
+              </main>
+              <NotificationContainer />
             </DataCacheProvider>
           </NotificationProvider>
         </QueryProvider>
