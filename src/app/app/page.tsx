@@ -72,6 +72,14 @@ export default function AppPage() {
     checkAuth()
   }, [supabase.auth, router])
 
+  // Redirect to groups if no optimized group data
+  useEffect(() => {
+    if (!groupLoading && !selectedGroup) {
+      console.log('App: No optimized group data found, redirecting to group selection')
+      router.push('/groups')
+    }
+  }, [groupLoading, selectedGroup, router])
+
   // Simple initialization for optimized group data
   useEffect(() => {
     const initializeApp = async () => {
