@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface Group {
   id: string
@@ -44,6 +45,9 @@ interface GroupContextType {
   canCreate: boolean
   canModify: boolean
   isAdventurer: boolean
+  
+  // Events
+  onGroupChange?: (newGroupId: string, oldGroupId?: string) => void
 }
 
 export const GroupContext = createContext<GroupContextType | undefined>(undefined)
@@ -57,6 +61,7 @@ export function GroupProvider({ children }: GroupProviderProps) {
   const [selectedGroupMember, setSelectedGroupMember] = useState<GroupMember | null>(null)
   const [availableGroups, setAvailableGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
   // Load available groups on mount
   useEffect(() => {
@@ -102,20 +107,43 @@ export function GroupProvider({ children }: GroupProviderProps) {
     }
   }
 
+  // Clear all caches when switching groups
+  const clearAllCaches = async (newGroupId: string) => {
+    console.log('GroupContext: Clearing all caches for group switch to:', newGroupId)
+    
+    // Clear React Query cache (group members, etc.)
+    queryClient.clear()
+    
+    // Force browser to bypass cache for next requests
+    if (typeof window !== 'undefined') {
+      // Clear any stored cache timestamps
+      const cacheKeys = Object.keys(localStorage).filter(key => key.startsWith('cache_'))
+      cacheKeys.forEach(key => localStorage.removeItem(key))
+    }
+  }
+
   const selectGroupDirect = async (groupId: string, groups: Group[]) => {
     try {
       // Find the group in provided groups array
-      const group = groups.find(g => g.id === groupId)
+      const group = groups.find((g: Group) => g.id === groupId)
       if (!group) {
         console.error('Group not found in provided groups')
         return
       }
 
+      // Clear all caches when switching groups (but not on initial load)
+      if (selectedGroup && selectedGroup.id !== groupId) {
+        await clearAllCaches(groupId)
+      }
+
       // Get detailed group info including member permissions using the updated current endpoint
-      const response = await fetch(`/api/groups/current?groupId=${groupId}`, {
+      const cacheBuster = Date.now()
+      const response = await fetch(`/api/groups/current?groupId=${groupId}&t=${cacheBuster}`, {
         credentials: 'include',
+        cache: 'no-store',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
         }
       })
       if (response.ok) {
@@ -141,6 +169,8 @@ export function GroupProvider({ children }: GroupProviderProps) {
 
         // Store selection in localStorage for persistence
         localStorage.setItem('selectedGroupId', groupId)
+        
+        console.log('GroupContext: Successfully selected group:', groupId, group.name)
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Failed to select group:')

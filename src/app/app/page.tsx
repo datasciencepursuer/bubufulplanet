@@ -67,9 +67,40 @@ export default function AppPage() {
   // Load trips when selected group changes
   useEffect(() => {
     if (selectedGroup) {
-      loadTrips()
+      // Force cache busting when group changes to ensure fresh data
+      loadTripsWithCacheBust()
     }
   }, [selectedGroup])
+
+  // Load trips with cache busting for group switches
+  const loadTripsWithCacheBust = async () => {
+    if (!selectedGroup) return
+    
+    try {
+      setTripsLoading(true)
+      // Use cache busting to ensure fresh data from new group
+      const response = await groupedFetch(`/api/trips`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        }
+      }, true) // Enable cache busting
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Loaded fresh trips from API for group:', selectedGroup.id, '- Count:', data.trips?.length || 0)
+        setTrips(data.trips || [])
+      } else {
+        console.error('Failed to load trips:', response.status, response.statusText)
+        setTrips([]) // Clear trips if API fails
+      }
+    } catch (error) {
+      console.error('Error loading trips:', error)
+      setTrips([]) // Clear trips on error
+    } finally {
+      setTripsLoading(false)
+    }
+  }
 
   // Force refresh trips data (clears any stale data)
   const forceRefreshTrips = async () => {

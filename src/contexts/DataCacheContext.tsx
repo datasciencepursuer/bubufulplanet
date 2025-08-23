@@ -10,6 +10,7 @@ interface DataCacheContextType {
   membersError: Error | null
   refreshGroupMembers: () => Promise<void>
   invalidateGroupMembers: () => void
+  clearAllCache: () => void
 }
 
 const DataCacheContext = createContext<DataCacheContextType | undefined>(undefined)
@@ -63,12 +64,17 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     queryClient.invalidateQueries({ queryKey: ['groupMembers'] })
   }, [queryClient])
 
+  const clearAllCache = useCallback(() => {
+    queryClient.clear()
+  }, [queryClient])
+
   const value: DataCacheContextType = {
     groupMembers,
     isLoadingMembers,
     membersError: membersError as Error | null,
     refreshGroupMembers,
     invalidateGroupMembers,
+    clearAllCache,
   }
 
   return (

@@ -2,7 +2,8 @@
 export async function groupedFetch(
   url: string, 
   selectedGroupId: string | null = null,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  bustCache: boolean = false
 ): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -14,8 +15,17 @@ export async function groupedFetch(
     headers['x-group-id'] = selectedGroupId
   }
 
-  return fetch(url, {
+  // Add cache busting if requested
+  let finalUrl = url
+  if (bustCache) {
+    const separator = url.includes('?') ? '&' : '?'
+    finalUrl = `${url}${separator}t=${Date.now()}`
+    headers['Cache-Control'] = 'no-cache'
+  }
+
+  return fetch(finalUrl, {
     credentials: 'include',
+    cache: bustCache ? 'no-store' : options.cache,
     ...options,
     headers,
   })
@@ -34,7 +44,7 @@ export function useGroupedFetch() {
 
   const { selectedGroup } = context
 
-  return (url: string, options: RequestInit = {}) => {
-    return groupedFetch(url, selectedGroup?.id || null, options)
+  return (url: string, options: RequestInit = {}, bustCache: boolean = false) => {
+    return groupedFetch(url, selectedGroup?.id || null, options, bustCache)
   }
 }
