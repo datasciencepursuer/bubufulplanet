@@ -49,6 +49,10 @@ export default function AppPage() {
   const [expensesData, setExpensesData] = useState<any>(null)
   const [pointsOfInterestData, setPointsOfInterestData] = useState<any[]>([])
   const [utilityDataLoading, setUtilityDataLoading] = useState(false)
+  
+  // State for app initialization
+  const [appInitialized, setAppInitialized] = useState(false)
+  const [groupSelectionComplete, setGroupSelectionComplete] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const groupedFetch = useGroupedFetch()
@@ -71,40 +75,70 @@ export default function AppPage() {
     checkAuth()
   }, [supabase.auth, router])
 
-  // Load all data when selected group changes
+  // Wait for group selection to complete before initializing app
   useEffect(() => {
-    if (selectedGroup && !groupSwitching) {
-      console.log('App: Selected group changed to:', selectedGroup.id, selectedGroup.name)
+    const initializeApp = async () => {
+      console.log('App: Starting initialization check')
       
-      // Check if we have optimized data available
-      const optimizedData = getCachedGroupData()
-      const isOptimizedSwitch = localStorage.getItem('optimizedSwitchComplete') === 'true'
-      
-      if (isOptimizedSwitch && optimizedData && optimizedData.group.id === selectedGroup.id) {
-        console.log('App: Using optimized pre-loaded data')
-        
-        // Use the pre-loaded data
-        setTrips(optimizedData.trips || [])
-        setExpensesData(optimizedData.expensesSummary || null)
-        setPointsOfInterestData(optimizedData.pointsOfInterest || [])
-        setTripsLoading(false)
-        setUtilityDataLoading(false)
-        
-        // Clear the flag
-        localStorage.removeItem('optimizedSwitchComplete')
-        
-        console.log('App: Optimized data loaded:', {
-          trips: optimizedData.trips?.length || 0,
-          expenses: optimizedData.expensesSummary ? 'loaded' : 'none',
-          pointsOfInterest: optimizedData.pointsOfInterest?.length || 0
-        })
-      } else {
-        console.log('App: Loading data normally (no optimization)')
-        // Force cache busting when group changes to ensure fresh data
-        loadAllData()
+      // Wait for GroupContext to finish loading
+      if (groupLoading || groupSwitching) {
+        console.log('App: Waiting for group context to finish loading/switching')
+        return
       }
+      
+      // Check if we have a selected group
+      if (!selectedGroup) {
+        console.log('App: No selected group yet, waiting...')
+        return
+      }
+      
+      console.log('App: Group selection complete:', selectedGroup.id, selectedGroup.name)
+      setGroupSelectionComplete(true)
+      
+      // Now load data for the selected group
+      await loadDataForSelectedGroup()
+      
+      console.log('App: Initialization complete')
+      setAppInitialized(true)
     }
-  }, [selectedGroup, groupSwitching])
+    
+    initializeApp()
+  }, [selectedGroup, groupLoading, groupSwitching])
+
+  // Load data for the selected group
+  const loadDataForSelectedGroup = async () => {
+    if (!selectedGroup) return
+    
+    console.log('App: Loading data for selected group:', selectedGroup.id, selectedGroup.name)
+    
+    // Check if we have optimized data available
+    const optimizedData = getCachedGroupData()
+    const isOptimizedSwitch = localStorage.getItem('optimizedSwitchComplete') === 'true'
+    
+    if (isOptimizedSwitch && optimizedData && optimizedData.group.id === selectedGroup.id) {
+      console.log('App: Using optimized pre-loaded data')
+      
+      // Use the pre-loaded data
+      setTrips(optimizedData.trips || [])
+      setExpensesData(optimizedData.expensesSummary || null)
+      setPointsOfInterestData(optimizedData.pointsOfInterest || [])
+      setTripsLoading(false)
+      setUtilityDataLoading(false)
+      
+      // Clear the flag
+      localStorage.removeItem('optimizedSwitchComplete')
+      
+      console.log('App: Optimized data loaded:', {
+        trips: optimizedData.trips?.length || 0,
+        expenses: optimizedData.expensesSummary ? 'loaded' : 'none',
+        pointsOfInterest: optimizedData.pointsOfInterest?.length || 0
+      })
+    } else {
+      console.log('App: Loading data normally (no optimization)')
+      // Force cache busting when group changes to ensure fresh data
+      await loadAllData()
+    }
+  }
   
   // Listen for group switch events to immediately refresh ALL data
   useEffect(() => {
@@ -497,8 +531,24 @@ export default function AppPage() {
     return { currentTrip: current || null, upcomingTrips: upcoming, pastTrips: past }
   }, [trips])
 
-  if (groupLoading || (tripsLoading && !trips.length) || groupSwitching || (utilityDataLoading && !expensesData && !pointsOfInterestData.length)) {
-    return <BearGlobeLoader />
+  // Show loading until everything is properly initialized
+  if (!appInitialized || !groupSelectionComplete || groupLoading || groupSwitching || 
+      (tripsLoading && !trips.length) || (utilityDataLoading && !expensesData && !pointsOfInterestData.length)) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <BearGlobeLoader />
+          <div className="mt-4 text-sm text-gray-600">
+            {groupLoading && "Loading groups..."}
+            {groupSwitching && "Switching groups..."}
+            {!groupSelectionComplete && selectedGroup && "Finalizing group selection..."}
+            {tripsLoading && "Loading trips..."}
+            {utilityDataLoading && "Loading data..."}
+            {!appInitialized && !groupLoading && !groupSwitching && "Preparing your workspace..."}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
