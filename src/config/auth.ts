@@ -67,7 +67,17 @@ export const authConfig = {
 export function getRedirectUrl(type: keyof typeof authConfig.redirects) {
   const baseUrl = typeof window !== 'undefined' 
     ? window.location.origin 
-    : process.env.SITE_URL || 'http://localhost:3000'
+    : process.env.SITE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+  
+  // Debug logging (remove after fixing)
+  if (typeof window === 'undefined') {
+    console.log('Server-side getRedirectUrl:', {
+      SITE_URL: process.env.SITE_URL,
+      VERCEL_URL: process.env.VERCEL_URL,
+      baseUrl,
+      finalUrl: `${baseUrl}${authConfig.redirects[type]}`
+    })
+  }
   
   return `${baseUrl}${authConfig.redirects[type]}`
 }
