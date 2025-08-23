@@ -81,6 +81,8 @@ export function GroupProvider({ children }: GroupProviderProps) {
         
         // Check for stored group selection first, then auto-select first group
         const storedGroupId = localStorage.getItem('selectedGroupId')
+        const isFromGroupSelection = localStorage.getItem('groupSelectionInProgress') === 'true'
+        
         if (!selectedGroup && groups.length > 0) {
           let targetGroupId = groups[0].id // Default to first group
           
@@ -89,14 +91,20 @@ export function GroupProvider({ children }: GroupProviderProps) {
             const storedGroupExists = groups.find((g: Group) => g.id === storedGroupId)
             if (storedGroupExists) {
               targetGroupId = storedGroupId
-              console.log('GroupContext: Using stored group selection:', storedGroupId)
+              console.log('GroupContext: Using stored group selection:', storedGroupId, isFromGroupSelection ? '(from group selection)' : '(from cache)')
             } else {
               // Clear invalid stored group
               localStorage.removeItem('selectedGroupId')
+              localStorage.removeItem('groupSelectionInProgress')
               console.log('GroupContext: Cleared invalid stored group:', storedGroupId)
             }
           } else {
             console.log('GroupContext: No stored group, using first available group:', targetGroupId)
+          }
+          
+          // Clear the group selection flag
+          if (isFromGroupSelection) {
+            localStorage.removeItem('groupSelectionInProgress')
           }
           
           await selectGroupDirect(targetGroupId, groups)
@@ -220,11 +228,21 @@ export function GroupProvider({ children }: GroupProviderProps) {
   }
 
   const selectGroup = async (groupId: string) => {
+    console.log('GroupContext.selectGroup called with:', groupId)
+    
     // Ensure we have available groups before selecting
     if (availableGroups.length === 0) {
-      console.warn('No available groups loaded yet, waiting...')
-      return
+      console.warn('GroupContext: No available groups loaded yet, refreshing...')
+      await refreshGroups()
+      if (availableGroups.length === 0) {
+        console.error('GroupContext: Still no groups after refresh')
+        return
+      }
     }
+    
+    // Store the selection in localStorage for persistence
+    localStorage.setItem('selectedGroupId', groupId)
+    
     await selectGroupDirect(groupId, availableGroups)
   }
 

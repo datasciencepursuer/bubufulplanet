@@ -73,6 +73,7 @@ export default function AppPage() {
   // Load all data when selected group changes
   useEffect(() => {
     if (selectedGroup && !groupSwitching) {
+      console.log('App: Selected group changed to:', selectedGroup.id, selectedGroup.name)
       // Force cache busting when group changes to ensure fresh data
       loadAllData()
     }

@@ -40,8 +40,8 @@ export default function GroupSelectionPage() {
                     'Adventurer'
         setUserName(name)
 
-        // Fetch user's groups
-        const response = await fetch('/api/groups/all')
+        // Fetch user's groups (use same endpoint as GroupContext for consistency)
+        const response = await fetch('/api/user/groups')
         if (response.ok) {
           const data = await response.json()
           setGroups(data.groups || [])
@@ -68,6 +68,8 @@ export default function GroupSelectionPage() {
 
   const selectGroup = async (groupId: string) => {
     try {
+      console.log('Groups page: Selecting group:', groupId)
+      
       // Set the selected group as current
       const response = await fetch('/api/groups/select', {
         method: 'POST',
@@ -80,6 +82,14 @@ export default function GroupSelectionPage() {
       if (response.ok) {
         // Store the selected group in localStorage so GroupContext can pick it up
         localStorage.setItem('selectedGroupId', groupId)
+        
+        // Add a flag to indicate we're coming from group selection
+        localStorage.setItem('groupSelectionInProgress', 'true')
+        
+        console.log('Groups page: Stored group selection:', groupId)
+        
+        // Small delay to ensure localStorage write completes
+        await new Promise(resolve => setTimeout(resolve, 100))
         
         // Redirect to main app
         router.push('/app')
