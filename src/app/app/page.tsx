@@ -16,7 +16,7 @@ import BearGlobeLoader from '@/components/BearGlobeLoader'
 // Removed useGroupedFetch - using createGroupedFetch from groupUtils
 import { useNotify } from '@/hooks/useNotify'
 import { createClient } from '@/utils/supabase/client'
-import { optimizedGroupSwitcher, getCachedGroupData } from '@/lib/optimizedGroupSwitch'
+import { optimizedGroupSwitcher, getCachedGroupData, getLastSelectedGroupId } from '@/lib/optimizedGroupSwitch'
 import TravelerNameEditor from '@/components/TravelerNameEditor'
 // Removed GroupSelector - using direct optimized data access
 import GroupNameEditor from '@/components/GroupNameEditor'
@@ -51,11 +51,13 @@ export default function AppPage() {
   const [groupSelectionComplete, setGroupSelectionComplete] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
   const [optimizedDataUsed, setOptimizedDataUsed] = useState(false)
+  const [initializationTimedOut, setInitializationTimedOut] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const groupedFetch = createGroupedFetch()
   const initializationInProgress = useRef(false)
   const dataLoadingInProgress = useRef(false)
+  const initializationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (appInitialized) return // Skip if already initialized
@@ -77,7 +79,7 @@ export default function AppPage() {
     checkAuth()
   }, [supabase.auth, router, appInitialized])
 
-  // Handle group data and redirect logic
+  // Handle group data and redirect logic with timeout fallback
   useEffect(() => {
     const handleGroupData = async () => {
       // Skip if already initialized or initialization is in progress
@@ -88,6 +90,19 @@ export default function AppPage() {
       console.log('App: Starting initialization with optimized group data')
       initializationInProgress.current = true
       
+      // Start timeout for OAuth stalling scenarios (10 seconds)
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current)
+      }
+      
+      initializationTimeoutRef.current = setTimeout(() => {
+        console.log('App: Initialization timeout reached, checking for fallback options')
+        if (!appInitialized && !initializationTimedOut) {
+          setInitializationTimedOut(true)
+          handleInitializationTimeout()
+        }
+      }, 10000)
+      
       // If still loading, wait
       if (groupLoading) {
         console.log('App: Group data still loading...')
@@ -95,9 +110,30 @@ export default function AppPage() {
         return
       }
       
+      // Clear timeout on successful load
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current)
+        initializationTimeoutRef.current = null
+      }
+      
       // If no group data after loading is complete, check for groups and redirect
       if (!selectedGroup) {
         console.log('App: No optimized group data found after loading')
+        
+        // Check if we have a last selected group from OAuth re-login
+        const lastSelectedGroupId = getLastSelectedGroupId()
+        if (lastSelectedGroupId) {
+          console.log('App: Found last selected group, attempting to switch:', lastSelectedGroupId)
+          try {
+            await optimizedGroupSwitcher.switchToGroup(lastSelectedGroupId, false)
+            // Let the next render cycle handle the loaded data
+            initializationInProgress.current = false
+            return
+          } catch (error) {
+            console.error('App: Failed to switch to last selected group:', error)
+            // Continue with normal flow
+          }
+        }
         
         try {
           // Make a final check for user groups before redirecting
@@ -148,6 +184,44 @@ export default function AppPage() {
     
     handleGroupData()
   }, [groupLoading, selectedGroup, appInitialized, router])
+
+  // Handle initialization timeout - fallback to group selection
+  const handleInitializationTimeout = async () => {
+    console.log('App: Handling initialization timeout')
+    
+    // Clear any pending timeouts
+    if (initializationTimeoutRef.current) {
+      clearTimeout(initializationTimeoutRef.current)
+      initializationTimeoutRef.current = null
+    }
+    
+    // Check if we have a last selected group to try
+    const lastSelectedGroupId = getLastSelectedGroupId()
+    if (lastSelectedGroupId) {
+      console.log('App: Timeout fallback - attempting last selected group:', lastSelectedGroupId)
+      try {
+        await optimizedGroupSwitcher.switchToGroup(lastSelectedGroupId, false)
+        setInitializationTimedOut(false)
+        initializationInProgress.current = false
+        return
+      } catch (error) {
+        console.error('App: Timeout fallback - failed to switch to last group:', error)
+      }
+    }
+    
+    // Default fallback: redirect to groups page
+    console.log('App: Timeout fallback - redirecting to groups page')
+    router.push('/groups')
+  }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Load data for the selected group
   const loadDataForSelectedGroup = async () => {
@@ -653,8 +727,8 @@ export default function AppPage() {
     return { currentTrip: current || null, upcomingTrips: upcoming, pastTrips: past }
   }, [trips])
 
-  // Show loading until optimized group data is loaded and processed
-  if (!appInitialized || !groupSelectionComplete || groupLoading || tripsLoading || utilityDataLoading) {
+  // Show loading until optimized group data is loaded and processed (or timeout)
+  if ((!appInitialized || !groupSelectionComplete || groupLoading || tripsLoading || utilityDataLoading) && !initializationTimedOut) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -674,6 +748,31 @@ export default function AppPage() {
               if (!appInitialized && !groupLoading) return "Preparing your workspace..."
               return "Loading..."
             })()}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show timeout fallback message
+  if (initializationTimedOut) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <BearGlobeLoader />
+          <div className="mt-4">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              Taking longer than expected...
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              We're having trouble loading your group data. This sometimes happens after re-logging.
+            </p>
+            <Button 
+              onClick={() => router.push('/groups')} 
+              className="bg-teal-600 hover:bg-teal-700"
+            >
+              Choose Group Manually
+            </Button>
           </div>
         </div>
       </div>

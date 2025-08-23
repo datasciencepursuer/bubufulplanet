@@ -128,6 +128,9 @@ export class OptimizedGroupSwitcher {
         ...data,
         cachedAt: Date.now()
       }))
+      
+      // Remember this as the last selected group
+      rememberLastGroup(groupId)
     }
 
     return data
@@ -224,3 +227,60 @@ export const getCachedGroupData = () =>
 
 export const clearGroupCache = () => 
   optimizedGroupSwitcher.clearCache()
+
+/**
+ * Remember the last selected group ID for OAuth re-login scenarios
+ */
+export function rememberLastGroup(groupId: string): void {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.setItem('lastSelectedGroupId', groupId)
+    localStorage.setItem('lastGroupSelectedAt', Date.now().toString())
+  } catch (error) {
+    console.error('Error remembering last group:', error)
+  }
+}
+
+/**
+ * Get the last selected group ID (valid for 24 hours)
+ */
+export function getLastSelectedGroupId(): string | null {
+  if (typeof window === 'undefined') return null
+  
+  try {
+    const groupId = localStorage.getItem('lastSelectedGroupId')
+    const selectedAt = localStorage.getItem('lastGroupSelectedAt')
+    
+    if (!groupId || !selectedAt) return null
+    
+    // Check if the stored group ID is less than 24 hours old
+    const age = Date.now() - parseInt(selectedAt, 10)
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000
+    
+    if (age > TWENTY_FOUR_HOURS) {
+      localStorage.removeItem('lastSelectedGroupId')
+      localStorage.removeItem('lastGroupSelectedAt')
+      return null
+    }
+    
+    return groupId
+  } catch (error) {
+    console.error('Error getting last selected group:', error)
+    return null
+  }
+}
+
+/**
+ * Clear the last selected group memory
+ */
+export function clearLastSelectedGroup(): void {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.removeItem('lastSelectedGroupId')
+    localStorage.removeItem('lastGroupSelectedAt')
+  } catch (error) {
+    console.error('Error clearing last selected group:', error)
+  }
+}
