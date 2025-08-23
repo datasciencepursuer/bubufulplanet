@@ -1,5 +1,6 @@
 // Lightweight utilities to replace GroupContext for optimized switches
 
+import { useState, useEffect } from 'react'
 import { getCachedGroupData } from '@/lib/optimizedGroupSwitch'
 
 export interface Group {
@@ -27,9 +28,15 @@ export interface GroupMember {
  * Get current group and member info from optimized data
  */
 export function useOptimizedGroup() {
-  const optimizedData = getCachedGroupData()
+  const [mounted, setMounted] = useState(false)
   
-  if (!optimizedData) {
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  
+  const optimizedData = mounted ? getCachedGroupData() : null
+  
+  if (!mounted || !optimizedData) {
     return {
       selectedGroup: null,
       selectedGroupMember: null,
