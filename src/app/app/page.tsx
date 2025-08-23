@@ -93,10 +93,13 @@ export default function AppPage() {
       }
       
       // Wait for GroupContext to finish loading
-      if (groupLoading || groupSwitching) {
-        console.log('App: Waiting for group context to finish loading/switching')
+      // Note: For optimized switches, groupSwitching is never true, so we only wait for groupLoading
+      if (groupLoading) {
+        console.log('App: Waiting for group context to finish loading')
         return
       }
+      
+      // For optimized switches, we don't need to wait for groupSwitching since it bypasses GroupContext switching
       
       // Check if we have a selected group
       if (!selectedGroup) {
@@ -128,7 +131,7 @@ export default function AppPage() {
     }
     
     initializeApp()
-  }, [selectedGroup, groupLoading, groupSwitching])
+  }, [selectedGroup, groupLoading])
 
   // Load data for the selected group
   const loadDataForSelectedGroup = async () => {
@@ -559,7 +562,8 @@ export default function AppPage() {
   }, [trips])
 
   // Show loading until everything is properly initialized
-  if (!appInitialized || !groupSelectionComplete || groupLoading || groupSwitching || 
+  // Note: Removed groupSwitching check since optimized switches bypass GroupContext switching
+  if (!appInitialized || !groupSelectionComplete || groupLoading || 
       (tripsLoading && !trips.length) || (utilityDataLoading && !expensesData && !pointsOfInterestData.length)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -574,11 +578,10 @@ export default function AppPage() {
               
               if (groupSelectionInProgress && !optimizedSwitchComplete) return "Completing group selection..."
               if (groupLoading) return "Loading groups..."
-              if (groupSwitching) return "Switching groups..."
               if (!groupSelectionComplete && selectedGroup) return "Finalizing group selection..."
               if (tripsLoading) return "Loading trips..."
               if (utilityDataLoading) return "Loading data..."
-              if (!appInitialized && !groupLoading && !groupSwitching) return "Preparing your workspace..."
+              if (!appInitialized && !groupLoading) return "Preparing your workspace..."
               return "Loading..."
             })()}
           </div>
