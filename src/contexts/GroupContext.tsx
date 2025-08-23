@@ -150,7 +150,7 @@ export function GroupProvider({ children }: GroupProviderProps) {
           const storedGroupId = localStorage.getItem('selectedGroupId')
           
           console.log('GroupContext: Normal path - selecting group:', {
-            selectedGroup: selectedGroup?.id || 'none',
+            selectedGroup: (selectedGroup as Group | null)?.id || 'none',
             storedGroupId,
             availableGroups: groups.map((g: Group) => ({ id: g.id, name: g.name }))
           })
