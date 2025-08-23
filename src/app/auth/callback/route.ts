@@ -62,7 +62,16 @@ export async function GET(request: Request) {
 
         // Check if user has any groups (including newly linked ones)
         const userGroups = await prisma.userGroup.findMany({
-          where: { userId: user.id }
+          where: { userId: user.id },
+          include: {
+            group: {
+              select: {
+                id: true,
+                name: true,
+                accessCode: true
+              }
+            }
+          }
         })
 
         let isFirstTimeUser = false
@@ -107,6 +116,11 @@ export async function GET(request: Request) {
         // Redirect first-time users to setup
         if (isFirstTimeUser) {
           return NextResponse.redirect(`${origin}/setup`)
+        }
+        
+        // If user has multiple groups, redirect to group selection
+        if (userGroups.length > 1) {
+          return NextResponse.redirect(`${origin}/groups`)
         }
       } catch (dbError) {
         console.error('Error processing user groups:', dbError)
