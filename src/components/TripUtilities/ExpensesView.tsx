@@ -12,7 +12,7 @@ interface PersonalExpenseSummary {
   totalYouOwe: number
   totalOwedToYou: number
   netBalance: number
-  tripBreakdowns: {
+  tripBreakdowns?: {
     tripId: string
     tripName: string
     tripDestination: string | null
@@ -21,17 +21,17 @@ interface PersonalExpenseSummary {
     youOwe: number
     owedToYou: number
   }[]
-  peopleYouOwe: {
+  peopleYouOwe?: {
     memberId: string
     memberName: string
     amount: number
-    trips: { tripId: string; tripName: string; amount: number }[]
+    trips?: { tripId: string; tripName: string; amount: number }[]
   }[]
-  peopleWhoOweYou: {
+  peopleWhoOweYou?: {
     memberId: string
     memberName: string
     amount: number
-    trips: { tripId: string; tripName: string; amount: number }[]
+    trips?: { tripId: string; tripName: string; amount: number }[]
   }[]
 }
 
@@ -127,7 +127,7 @@ export default function ExpensesView({ className, data, loading = false }: Expen
           </div>
 
           {/* Trip Breakdown */}
-          {summary.tripBreakdowns.length > 0 && (
+          {summary.tripBreakdowns && summary.tripBreakdowns.length > 0 && (
             <div className="border-t pt-4">
               <Button
                 variant="ghost"
@@ -152,7 +152,7 @@ export default function ExpensesView({ className, data, loading = false }: Expen
               
               {expandedSections.has('trips') && (
                 <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
-                  {summary.tripBreakdowns.map((trip) => (
+                  {summary.tripBreakdowns?.map((trip) => (
                     <div key={trip.tripId} className="bg-gray-50 rounded p-3 text-sm">
                       <div className="font-medium text-gray-900">{trip.tripName}</div>
                       <div className="text-xs text-gray-500 mb-2">{trip.tripDestination || 'No destination'}</div>
@@ -182,7 +182,7 @@ export default function ExpensesView({ className, data, loading = false }: Expen
           )}
 
           {/* People You Owe */}
-          {summary.peopleYouOwe.length > 0 && (
+          {summary.peopleYouOwe && summary.peopleYouOwe.length > 0 && (
             <div className="border-t pt-4">
               <Button
                 variant="ghost"
@@ -200,21 +200,21 @@ export default function ExpensesView({ className, data, loading = false }: Expen
               >
                 <span className="flex items-center gap-2 font-medium text-red-700">
                   <Users className="w-4 h-4" />
-                  Who You Owe ({summary.peopleYouOwe.length})
+                  Who You Owe ({summary.peopleYouOwe?.length || 0})
                 </span>
                 <ChevronRight className={`w-4 h-4 transition-transform ${expandedSections.has('owe') ? 'rotate-90' : ''}`} />
               </Button>
               
               {expandedSections.has('owe') && (
                 <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
-                  {summary.peopleYouOwe.map((person) => (
+                  {summary.peopleYouOwe?.map((person) => (
                     <div key={person.memberId} className="bg-red-50 rounded p-3">
                       <div className="flex justify-between items-start mb-1">
                         <span className="font-medium text-gray-900">{person.memberName}</span>
                         <span className="font-bold text-red-700">{formatCurrency(person.amount)}</span>
                       </div>
                       <div className="text-xs text-gray-600 space-y-1">
-                        {person.trips.map((trip) => (
+                        {person.trips?.map((trip) => (
                           <div key={trip.tripId} className="flex justify-between">
                             <span className="truncate mr-2">{trip.tripName}</span>
                             <span className="font-medium">{formatCurrency(trip.amount)}</span>
@@ -229,7 +229,7 @@ export default function ExpensesView({ className, data, loading = false }: Expen
           )}
 
           {/* People Who Owe You */}
-          {summary.peopleWhoOweYou.length > 0 && (
+          {summary.peopleWhoOweYou && summary.peopleWhoOweYou.length > 0 && (
             <div className="border-t pt-4">
               <Button
                 variant="ghost"
@@ -247,21 +247,21 @@ export default function ExpensesView({ className, data, loading = false }: Expen
               >
                 <span className="flex items-center gap-2 font-medium text-green-700">
                   <Users className="w-4 h-4" />
-                  Who Owes You ({summary.peopleWhoOweYou.length})
+                  Who Owes You ({summary.peopleWhoOweYou?.length || 0})
                 </span>
                 <ChevronRight className={`w-4 h-4 transition-transform ${expandedSections.has('owed') ? 'rotate-90' : ''}`} />
               </Button>
               
               {expandedSections.has('owed') && (
                 <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
-                  {summary.peopleWhoOweYou.map((person) => (
+                  {summary.peopleWhoOweYou?.map((person) => (
                     <div key={person.memberId} className="bg-green-50 rounded p-3">
                       <div className="flex justify-between items-start mb-1">
                         <span className="font-medium text-gray-900">{person.memberName}</span>
                         <span className="font-bold text-green-700">{formatCurrency(person.amount)}</span>
                       </div>
                       <div className="text-xs text-gray-600 space-y-1">
-                        {person.trips.map((trip) => (
+                        {person.trips?.map((trip) => (
                           <div key={trip.tripId} className="flex justify-between">
                             <span className="truncate mr-2">{trip.tripName}</span>
                             <span className="font-medium">{formatCurrency(trip.amount)}</span>
