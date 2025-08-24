@@ -4,7 +4,7 @@ import { Calendar, Clock, MapPin, DollarSign, Palette, FileText, Edit, X } from 
 import { Button } from '@/components/ui/button'
 import type { Event } from '@prisma/client'
 import type { Expense } from '@/types/expense'
-import { getEventColor } from '@/lib/eventColors'
+import { getEventColor, EVENT_COLORS } from '@/lib/eventColors'
 import { formatDateRange, extractTimeString, normalizeDate } from '@/lib/tripDayUtils'
 
 interface EventPropertiesPanelProps {
@@ -28,6 +28,7 @@ export default function EventPropertiesPanel({
   }
 
   const eventColor = getEventColor(selectedEvent.color || '#fbf2c4')
+  const eventColorInfo = EVENT_COLORS.find(c => c.color === (selectedEvent.color || '#fbf2c4')) || EVENT_COLORS[0]
   const eventExpenses = expenses.filter(expense => expense.eventId === selectedEvent.id)
   const totalExpenses = eventExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0)
 
@@ -87,7 +88,7 @@ export default function EventPropertiesPanel({
           <div className="flex items-start gap-3">
             <div
               className="w-4 h-4 rounded-full border border-gray-300 mt-1 flex-shrink-0"
-              style={{ backgroundColor: eventColor.color }}
+              style={{ backgroundColor: eventColor.background }}
             />
             <div className="flex-1 min-w-0">
               <h4 className="text-lg font-medium text-gray-900 break-words">{selectedEvent.title}</h4>
@@ -158,7 +159,7 @@ export default function EventPropertiesPanel({
           <div className="pt-2 border-t border-gray-100">
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <Palette className="h-3 w-3" />
-              <span>Color: {eventColor.name}</span>
+              <span>Color: {eventColorInfo.name}</span>
             </div>
           </div>
         </div>
