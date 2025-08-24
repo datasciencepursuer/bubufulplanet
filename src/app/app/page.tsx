@@ -90,6 +90,18 @@ export default function AppPage() {
               router.push(setupData.redirect)
               return
             }
+            
+            // If setup API returns /app but user just came from setup page,
+            // automatically redirect to groups to mimic Continue button
+            if (setupData.redirect === '/app' && typeof window !== 'undefined') {
+              const fromSetup = sessionStorage.getItem('fromSetup')
+              if (fromSetup === 'true') {
+                console.log('First-time user setup complete, automatically continuing to group selection')
+                sessionStorage.removeItem('fromSetup') // Clean up flag
+                router.push('/groups')
+                return
+              }
+            }
           } else {
             // Check if it's an OAuth authentication error
             const errorData = await setupResponse.json().catch(() => ({}))
@@ -227,9 +239,9 @@ export default function AppPage() {
       initializationTimeoutRef.current = null
     }
     
-    // Check if we have a last selected group to try
+    // Check if we have a last selected group to try (only for existing users)
     const lastSelectedGroupId = getLastSelectedGroupId()
-    if (lastSelectedGroupId) {
+    if (lastSelectedGroupId && selectedGroup) {
       console.log('App: Timeout fallback - attempting last selected group:', lastSelectedGroupId)
       try {
         await optimizedGroupSwitcher.switchToGroup(lastSelectedGroupId, false)
@@ -238,6 +250,10 @@ export default function AppPage() {
         return
       } catch (error) {
         console.error('App: Timeout fallback - failed to switch to last group:', error)
+        // Clear invalid group ID from localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('lastSelectedGroupId')
+        }
       }
     }
     
@@ -809,18 +825,18 @@ export default function AppPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
           <BearGlobeLoader />
-          <div className="mt-4">
+          <div className="mt-2">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">
-              Taking longer than expected...
+              Your Group is ready!
             </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              We're having trouble loading your group data. This sometimes happens after re-logging.
+            <p className="text-sm text-gray-600 mb-3">
+              Everything is set up and ready to go. Click continue to access your travel group.
             </p>
             <Button 
               onClick={() => router.push('/groups')} 
               className="bg-teal-600 hover:bg-teal-700"
             >
-              Choose Group Manually
+              Continue
             </Button>
           </div>
         </div>

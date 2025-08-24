@@ -73,6 +73,9 @@ export default function SetupPage() {
         throw new Error(errorData.error || 'Failed to update traveler name')
       }
 
+      // Set flag to indicate user is coming from setup for automatic continue
+      sessionStorage.setItem('fromSetup', 'true')
+      
       // Redirect to app
       router.push('/app')
     } catch (error) {
@@ -82,6 +85,9 @@ export default function SetupPage() {
   }
 
   const handleSkip = () => {
+    // Set flag to indicate user is coming from setup for automatic continue
+    sessionStorage.setItem('fromSetup', 'true')
+    
     // Skip setup and go to app with default name
     router.push('/app')
   }
