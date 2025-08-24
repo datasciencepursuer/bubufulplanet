@@ -17,6 +17,10 @@ export const authConfig = {
     github: {
       enabled: true,
       scopes: ['read:user', 'user:email']
+    },
+    email: {
+      enabled: true,
+      requireEmailConfirmation: false // Set to true in production
     }
   },
 
@@ -59,7 +63,10 @@ export const authConfig = {
     sessionExpired: 'Your session has expired. Please sign in again.',
     maxGroupsReached: 'You have reached the maximum number of groups (5).',
     invitationSent: 'Invitation sent successfully.',
-    invitationFailed: 'Failed to send invitation. Please try again.'
+    invitationFailed: 'Failed to send invitation. Please try again.',
+    emailLoginError: 'Invalid email or password. Please try again.',
+    emailRequired: 'Please enter your email address.',
+    passwordRequired: 'Please enter your password.'
   }
 }
 

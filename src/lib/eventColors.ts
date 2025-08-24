@@ -40,8 +40,13 @@ export const EVENT_COLORS: EventColor[] = [
 
 export const DEFAULT_EVENT_COLOR = '#fbf2c4'
 
-export const getEventColor = (colorValue: string): EventColor => {
-  return EVENT_COLORS.find(c => c.color === colorValue) || EVENT_COLORS[0]
+export const getEventColor = (colorValue: string) => {
+  const eventColor = EVENT_COLORS.find(c => c.color === colorValue) || EVENT_COLORS[0]
+  return {
+    background: eventColor.color,
+    border: eventColor.color,
+    text: eventColor.fontColor
+  }
 }
 
 export const getEventColorById = (colorId: string): EventColor => {

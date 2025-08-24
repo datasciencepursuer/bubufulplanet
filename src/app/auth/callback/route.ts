@@ -77,51 +77,98 @@ export async function GET(request: Request) {
         let isFirstTimeUser = false
 
         if (userGroups.length === 0) {
-          isFirstTimeUser = true
-          // No groups found, create a default one with temporary name
-          const groupName = `${userName}'s Travel Group`
-          const accessCode = Math.random().toString(36).substring(2, 10).toUpperCase()
+          // Double-check to prevent race conditions with concurrent requests
+          const existingGroups = await prisma.userGroup.findMany({
+            where: { userId: user.id }
+          })
           
-          const newGroup = await prisma.travelGroup.create({
-            data: {
-              name: groupName,
-              accessCode,
-              createdById: user.id,
-              groupMembers: {
-                create: {
-                  travelerName: userName, // Use OAuth display name, editable in setup
-                  email: userEmail,
-                  userId: user.id,
-                  role: 'adventurer',
-                  permissions: {
-                    read: true,
-                    create: true,
-                    modify: true
+          if (existingGroups.length === 0) {
+            isFirstTimeUser = true
+            // No groups found, create a default one with temporary name
+            const groupName = `${userName}'s Travel Group`
+            const accessCode = Math.random().toString(36).substring(2, 10).toUpperCase()
+            
+            console.log('OAuth callback: Creating new group for first-time user:', user.id, user.email)
+            
+            const newGroup = await prisma.travelGroup.create({
+              data: {
+                name: groupName,
+                accessCode,
+                createdById: user.id,
+                groupMembers: {
+                  create: {
+                    travelerName: userName, // Use OAuth display name, editable in setup
+                    email: userEmail,
+                    userId: user.id,
+                    role: 'adventurer',
+                    permissions: {
+                      read: true,
+                      create: true,
+                      modify: true
+                    }
                   }
                 }
               }
-            }
-          })
+            })
 
-          // Create UserGroup entry
-          await prisma.userGroup.create({
-            data: {
+            console.log('OAuth callback: Created new group:', newGroup.id, 'for user:', user.id)
+
+            // Create UserGroup entry
+            await prisma.userGroup.create({
+              data: {
+                userId: user.id,
+                groupId: newGroup.id,
+                role: 'leader'
+              }
+            })
+            
+            console.log('OAuth callback: Created UserGroup entry for user:', user.id, 'group:', newGroup.id)
+            
+            // Update userGroups array to include the newly created group
+            userGroups.push({
+              id: '', // Not used in redirect logic
               userId: user.id,
               groupId: newGroup.id,
-              role: 'leader'
-            }
-          })
+              role: 'leader',
+              group: {
+                id: newGroup.id,
+                name: groupName,
+                accessCode
+              }
+            })
+          } else {
+            console.log('OAuth callback: Groups found in race condition check, skipping creation')
+            // Re-fetch userGroups to include existing groups
+            const refreshedGroups = await prisma.userGroup.findMany({
+              where: { userId: user.id },
+              include: {
+                group: {
+                  select: {
+                    id: true,
+                    name: true,
+                    accessCode: true
+                  }
+                }
+              }
+            })
+            userGroups.push(...refreshedGroups)
+          }
         }
         
         // Redirect first-time users to setup
         if (isFirstTimeUser) {
+          console.log('OAuth callback: Redirecting first-time user to setup')
           return NextResponse.redirect(`${origin}/setup`)
         }
         
         // If user has multiple groups, redirect to group selection
         if (userGroups.length > 1) {
+          console.log('OAuth callback: Redirecting to group selection, user has', userGroups.length, 'groups')
           return NextResponse.redirect(`${origin}/groups`)
         }
+        
+        // Single group user, redirect to app
+        console.log('OAuth callback: Redirecting single-group user to app')
       } catch (dbError) {
         console.error('Error processing user groups:', dbError)
         // Continue with redirect even if group operations fail

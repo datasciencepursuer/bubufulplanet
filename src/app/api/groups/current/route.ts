@@ -82,6 +82,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (!userGroup || !userGroup.group) {
+      // Debug: Check what data we actually have
+      console.log('Current API: No group found debug:', {
+        userId: user.id,
+        userEmail: user.email,
+        requestedGroupId,
+        userGroupFound: !!userGroup,
+        userGroupData: userGroup
+      })
+      
       return NextResponse.json({ error: 'No group found' }, { status: 404 })
     }
 

@@ -11,12 +11,17 @@ export const TIME_SLOTS = [
 export function formatTimeSlot(timeSlot: string): string {
   // Special case for end of day
   if (timeSlot === '24:00') {
-    return 'End of Day (12:00 AM)'
+    return 'End of Day (12 AM)'
   }
   
   const [hours, minutes] = timeSlot.split(':').map(Number)
   const period = hours >= 12 ? 'PM' : 'AM'
   const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
+  
+  // Only show minutes if they're not 00
+  if (minutes === 0) {
+    return `${displayHours} ${period}`
+  }
   return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`
 }
 

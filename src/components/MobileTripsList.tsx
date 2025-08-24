@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { format, differenceInDays, isToday, isFuture, isPast } from 'date-fns'
 import { Calendar, MapPin, Clock, Plus, ChevronRight, Plane, Users, Edit, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 interface Trip {
   id: string
@@ -24,6 +24,7 @@ interface MobileTripsListProps {
     create: boolean
     modify: boolean
   }
+  className?: string
 }
 
 export default function MobileTripsList({ 
@@ -32,7 +33,8 @@ export default function MobileTripsList({
   onCreateTrip, 
   onEditTrip,
   onDeleteTrip,
-  permissions = { create: true, modify: true }
+  permissions = { create: true, modify: true },
+  className
 }: MobileTripsListProps) {
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null)
 
@@ -197,7 +199,7 @@ export default function MobileTripsList({
   // Empty state when no trips exist
   if (trips.length === 0) {
     return (
-      <div className="p-6">
+      <div className={`p-6 ${className || ''}`}>
         <Card className="text-center py-12">
           <CardContent className="space-y-4">
             <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
@@ -228,45 +230,53 @@ export default function MobileTripsList({
   }
 
   return (
-    <div className="p-4">
-      {/* Quick Create Button */}
-      {permissions.create && (
-        <div className="mb-6">
-          <Button 
-            onClick={onCreateTrip}
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2 py-3"
-            size="lg"
-          >
-            <Plus className="h-5 w-5" />
-            Create New Trip
-          </Button>
-        </div>
-      )}
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-teal-600" />
+          My Trips
+        </CardTitle>
+        <CardDescription>
+          {trips.length} trip{trips.length !== 1 ? 's' : ''} planned
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {/* Quick Create Button */}
+        {permissions.create && (
+          <div className="mb-6">
+            <Button 
+              onClick={onCreateTrip}
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2 py-3"
+              size="lg"
+            >
+              <Plus className="h-5 w-5" />
+              Create New Trip
+            </Button>
+          </div>
+        )}
 
-      {/* Trip Sections */}
-      {renderSection(
-        "Current Trip", 
-        current, 
-        <Plane className="h-5 w-5 text-green-600" />, 
-        'current'
-      )}
-      
-      {renderSection(
-        "Upcoming Trips", 
-        upcoming, 
-        <Calendar className="h-5 w-5 text-blue-600" />, 
-        'upcoming'
-      )}
-      
-      {renderSection(
-        "Past Trips", 
-        past, 
-        <Clock className="h-5 w-5 text-gray-500" />, 
-        'past'
-      )}
-
-      {/* Footer spacing */}
-      <div className="h-4" />
-    </div>
+        {/* Trip Sections */}
+        {renderSection(
+          "Current Trip", 
+          current, 
+          <Plane className="h-5 w-5 text-green-600" />, 
+          'current'
+        )}
+        
+        {renderSection(
+          "Upcoming Trips", 
+          upcoming, 
+          <Calendar className="h-5 w-5 text-blue-600" />, 
+          'upcoming'
+        )}
+        
+        {renderSection(
+          "Past Trips", 
+          past, 
+          <Clock className="h-5 w-5 text-gray-500" />, 
+          'past'
+        )}
+      </CardContent>
+    </Card>
   )
 }

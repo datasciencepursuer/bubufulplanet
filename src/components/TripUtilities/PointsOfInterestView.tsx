@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MapPin, Plus, Edit2, Trash2, X, Link, ExternalLink, StickyNote, Map, Calendar } from 'lucide-react'
@@ -38,6 +38,7 @@ export default function PointsOfInterestView({
   // Optimistic updates: local state that overrides props data when needed
   const [optimisticData, setOptimisticData] = useState<PointOfInterest[]>([])
   const [hasOptimisticUpdates, setHasOptimisticUpdates] = useState(false)
+  const lastDataRef = useRef<PointOfInterest[]>([])
   
   // Use optimistic data if available, otherwise use props data
   const pointsOfInterest = hasOptimisticUpdates ? optimisticData : data
@@ -50,10 +51,12 @@ export default function PointsOfInterestView({
   const [poiToDelete, setPoiToDelete] = useState<{ id: string; name: string } | null>(null)
   const { canCreate, canModify } = useOptimizedGroup()
   
-  // Update optimistic data when props data changes
+  // Update optimistic data when props data changes (with proper deep comparison)
   useEffect(() => {
-    if (!hasOptimisticUpdates) {
+    const dataChanged = JSON.stringify(data) !== JSON.stringify(lastDataRef.current)
+    if (!hasOptimisticUpdates && dataChanged) {
       setOptimisticData(data)
+      lastDataRef.current = data
     }
   }, [data, hasOptimisticUpdates])
   

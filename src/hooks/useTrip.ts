@@ -343,6 +343,11 @@ export function useCreateEvent(tripId: string) {
         old ? [...old, optimisticEvent] : [optimisticEvent]
       )
 
+      // Trigger animation for the temp ID immediately
+      window.dispatchEvent(new CustomEvent('newEventCreated', { 
+        detail: { eventId: tempId } 
+      }))
+
       return { previousEvents, tempId }
     },
     onSuccess: (data, variables, context) => {
@@ -353,6 +358,11 @@ export function useCreateEvent(tripId: string) {
             event.id === context.tempId ? data.event : event
           ) : [data.event]
         )
+        
+        // Transfer animation state from temp ID to real ID
+        window.dispatchEvent(new CustomEvent('eventIdChanged', { 
+          detail: { oldId: context.tempId, newId: data.event.id } 
+        }))
       }
       success('Event Created', 'Event created successfully!')
     },
@@ -363,10 +373,7 @@ export function useCreateEvent(tripId: string) {
       }
       notifyError('Error', error.message + '. Please try again.')
     },
-    onSettled: () => {
-      // Always refetch after mutation completes
-      queryClient.invalidateQueries({ queryKey: ['events', tripId] })
-    },
+    // No onSettled callback to prevent any cache interference after successful creation
   })
 }
 
@@ -416,8 +423,12 @@ export function useUpdateEvent(tripId: string) {
       }
       notifyError('Error', error.message + '. Please try again.')
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['events', tripId] })
+    onSettled: (data, error) => {
+      // Only invalidate on error to refetch fresh data
+      // On success, our optimistic update should already be correct
+      if (error) {
+        queryClient.invalidateQueries({ queryKey: ['events', tripId] })
+      }
     },
   })
 }
@@ -472,9 +483,13 @@ export function useDeleteEvent(tripId: string) {
       }
       notifyError('Error', error.message + '. Please try again.')
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['events', tripId] })
-      queryClient.invalidateQueries({ queryKey: ['expenses', tripId] })
+    onSettled: (data, error) => {
+      // Only invalidate on error to refetch fresh data
+      // On success, our optimistic update should already be correct
+      if (error) {
+        queryClient.invalidateQueries({ queryKey: ['events', tripId] })
+        queryClient.invalidateQueries({ queryKey: ['expenses', tripId] })
+      }
     },
   })
 }

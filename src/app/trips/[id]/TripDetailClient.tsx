@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import WeeklyCalendarView from '@/components/WeeklyCalendarView'
 import DailyCalendarView from '@/components/DailyCalendarView'
 import MobileCalendarView from '@/components/MobileCalendarView'
+import ThreeDayCalendarView from '@/components/ThreeDayCalendarView'
 import EventModal from '@/components/EventModal'
 import EventPropertiesPanel from '@/components/EventPropertiesPanel'
 import TripForm from '@/components/TripForm'
@@ -86,7 +87,45 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
   const updateEventMutation = useUpdateEvent(tripId)
   const deleteEventMutation = useDeleteEvent(tripId)
   const updateTripMutation = useUpdateTrip(tripId)
-  const [calendarView, setCalendarView] = useState<'daily' | 'weekly'>('weekly')
+
+  // Handle event animation lifecycle
+  useEffect(() => {
+    const handleNewEventCreated = (event: CustomEvent) => {
+      const { eventId } = event.detail
+      setNewEventIds(prev => new Set([...prev, eventId]))
+      
+      // Remove from newEventIds after animation
+      setTimeout(() => {
+        setNewEventIds(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(eventId)
+          return newSet
+        })
+      }, 2000)
+    }
+
+    const handleEventIdChanged = (event: CustomEvent) => {
+      const { oldId, newId } = event.detail
+      setNewEventIds(prev => {
+        if (prev.has(oldId)) {
+          const newSet = new Set(prev)
+          newSet.delete(oldId)
+          newSet.add(newId)
+          return newSet
+        }
+        return prev
+      })
+    }
+
+    window.addEventListener('newEventCreated', handleNewEventCreated as EventListener)
+    window.addEventListener('eventIdChanged', handleEventIdChanged as EventListener)
+
+    return () => {
+      window.removeEventListener('newEventCreated', handleNewEventCreated as EventListener)
+      window.removeEventListener('eventIdChanged', handleEventIdChanged as EventListener)
+    }
+  }, [])
+  const [calendarView, setCalendarView] = useState<'daily' | 'weekly' | 'threeDay'>('threeDay')
   const [selectedDailyDate, setSelectedDailyDate] = useState<string | null>(null)
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set())
   const [newExpenseIds, setNewExpenseIds] = useState<Set<string>>(new Set())
@@ -214,16 +253,17 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
   }
 
   const handleSaveEvent = async (eventData: EventApiData) => {
-    const isEditing = selectedEvent !== undefined
+    const isEditing = selectedEvent !== null
+    const eventToEdit = selectedEvent // Store reference before clearing
     
     // Close modal immediately
     setIsModalOpen(false)
     setSelectedEvent(null)
     
-    if (isEditing) {
+    if (isEditing && eventToEdit) {
       // Use React Query mutation for updates
       updateEventMutation.mutate({
-        id: selectedEvent!.id,
+        id: eventToEdit.id,
         ...eventData
       })
     } else {
@@ -446,28 +486,11 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => {
-                  if (groupMembers.length === 0) {
-                    notifyError('Error', 'Unable to add expenses. No group members found.')
-                    return;
-                  }
-                  setSelectedExpense(undefined);
-                  setPrefilledEventId(null);
-                  setShowExpenseModal(true);
-                }}
-                className="gap-2"
-              >
-                <DollarSign className="h-4 w-4" />
-                Add Expense
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
                 onClick={() => setShowExpensesPanel(true)}
                 className="gap-2"
               >
                 <DollarSign className="h-4 w-4" />
-                View Expenses ({expenses.length})
+                Expenses ({expenses.length})
               </Button>
               <Button 
                 variant="outline" 
@@ -558,80 +581,111 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
           }
         }}
       >
-        {/* Mobile View - Always use mobile calendar on small screens */}
-        <div className="md:hidden h-full">
-          <MobileCalendarView
-            key={`mobile-${trip.id}`}
-            tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
-            tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
-            tripDays={tripDays}
-            events={events}
-            selectedEventId={selectedEventForPanel?.id}
-            newEventIds={newEventIds}
-            deletingEventIds={deletingEventIds}
-            onTimeSlotClick={handleTimeSlotClick}
-            onTimeRangeSelect={handleTimeRangeSelect}
-            onEventClick={handleEventClick}
-            onEventSelect={handleEventSelect}
-            onAddExpenseToEvent={(eventId) => {
-              if (groupMembers.length === 0) {
-                notifyError('Error', 'Unable to add expenses. No group members found.')
-                return
-              }
-              setSelectedExpense(undefined)
-              setPrefilledEventId(eventId)
-              setShowExpenseModal(true)
-            }}
-            onDeleteEvent={handleDeleteEvent}
-            initialDate={selectedDailyDate}
-          />
-        </div>
 
-        {/* Desktop View - Use existing calendar views */}
-        <div className="hidden md:block h-full">
-          {calendarView === 'weekly' ? (
-            <WeeklyCalendarView
-              key={`weekly-${trip.id}`}
+        {/* Calendar Views - Desktop shows selected view, Mobile always shows 3-day */}
+        <div className="h-full">
+          {/* Desktop View Switching */}
+          <div className="hidden md:block h-full">
+            {calendarView === 'weekly' ? (
+              <WeeklyCalendarView
+                key={`weekly-${trip.id}`}
+                tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
+                tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
+                tripName={trip.name}
+                tripDays={tripDays}
+                events={events}
+                selectedEventId={selectedEventForPanel?.id}
+                newEventIds={newEventIds}
+                deletingEventIds={deletingEventIds}
+                onTimeSlotClick={handleTimeSlotClick}
+                onTimeRangeSelect={handleTimeRangeSelect}
+                onEventClick={handleEventClick}
+                onEventSelect={handleEventSelect}
+                onDayHeaderClick={handleDayHeaderClick}
+                onBack={() => router.push('/app')}
+                onCreateEvent={() => {
+                  // Open event creation modal with current week's first day
+                  const firstAvailableDay = tripDays.find(day => new Date(day.date) >= new Date())
+                  if (firstAvailableDay) {
+                    setSelectedDayId(firstAvailableDay.id)
+                    setSelectedTime('18:00') // Default to 6 PM
+                    setSelectedEndTime('19:00') // Default 1-hour event
+                    setIsModalOpen(true)
+                  }
+                }}
+              />
+            ) : (
+                <DailyCalendarView
+                key={`daily-${trip.id}`}
+                tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
+                tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
+                tripDays={tripDays}
+                events={events}
+                selectedEventId={selectedEventForPanel?.id}
+                newEventIds={newEventIds}
+                deletingEventIds={deletingEventIds}
+                onTimeSlotClick={handleTimeSlotClick}
+                onTimeRangeSelect={handleTimeRangeSelect}
+                onEventClick={handleEventClick}
+                onEventSelect={handleEventSelect}
+                onAddExpenseToEvent={(eventId) => {
+                  if (groupMembers.length === 0) {
+                    notifyError('Error', 'Unable to add expenses. No group members found.')
+                    return
+                  }
+                  setSelectedExpense(undefined)
+                  setPrefilledEventId(eventId)
+                  setShowExpenseModal(true)
+                }}
+                onDeleteEvent={handleDeleteEvent}
+                initialDate={selectedDailyDate}
+              />
+            )}
+          </div>
+          
+          {/* Mobile View - Always 3-day */}
+          <div className="md:hidden h-full">
+            <ThreeDayCalendarView
+              key={`three-day-${trip.id}`}
               tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
               tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
+              tripName={trip.name}
               tripDays={tripDays}
               events={events}
               selectedEventId={selectedEventForPanel?.id}
               newEventIds={newEventIds}
               deletingEventIds={deletingEventIds}
               onTimeSlotClick={handleTimeSlotClick}
-              onTimeRangeSelect={handleTimeRangeSelect}
               onEventClick={handleEventClick}
-              onEventSelect={handleEventSelect}
               onDayHeaderClick={handleDayHeaderClick}
-            />
-          ) : (
-            <DailyCalendarView
-              key={`daily-${trip.id}`}
-              tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
-              tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
-              tripDays={tripDays}
-              events={events}
-              selectedEventId={selectedEventForPanel?.id}
-              newEventIds={newEventIds}
-              deletingEventIds={deletingEventIds}
-              onTimeSlotClick={handleTimeSlotClick}
-              onTimeRangeSelect={handleTimeRangeSelect}
-              onEventClick={handleEventClick}
-              onEventSelect={handleEventSelect}
-              onAddExpenseToEvent={(eventId) => {
+              onBack={() => router.push('/app')}
+              onCreateEvent={() => {
+                // Open event creation modal with current day
+                const today = new Date()
+                const firstAvailableDay = tripDays.find(day => new Date(day.date) >= today) || tripDays[0]
+                if (firstAvailableDay) {
+                  setSelectedDayId(firstAvailableDay.id)
+                  setSelectedTime('18:00') // Default to 6 PM
+                  setSelectedEndTime('19:00') // Default 1-hour event
+                  setIsModalOpen(true)
+                }
+              }}
+              onAddExpense={() => {
+                // Open expense modal
                 if (groupMembers.length === 0) {
                   notifyError('Error', 'Unable to add expenses. No group members found.')
                   return
                 }
                 setSelectedExpense(undefined)
-                setPrefilledEventId(eventId)
+                setPrefilledEventId('')
                 setShowExpenseModal(true)
               }}
-              onDeleteEvent={handleDeleteEvent}
-              initialDate={selectedDailyDate}
+              onShowPointsOfInterest={() => {
+                setShowPointsOfInterest(true)
+              }}
+              initialDate={selectedDailyDate || undefined}
             />
-          )}
+          </div>
         </div>
       </div>
 

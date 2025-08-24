@@ -10,7 +10,8 @@ import PointsOfInterestView from '@/components/TripUtilities/PointsOfInterestVie
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { MapPin, Calendar as CalendarIcon, DollarSign, Settings, ArrowLeft, Plus, LogOut, Trash2, Clock, Users, Copy, Check } from 'lucide-react'
+import { MapPin, Calendar as CalendarIcon, DollarSign, Settings, ArrowLeft, Plus, LogOut, Trash2, Clock, Users, Copy, Check, MoreVertical } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import BearGlobeLoader from '@/components/BearGlobeLoader'
 // Removed useGroupedFetch - using createGroupedFetch from groupUtils
@@ -70,6 +71,37 @@ export default function AppPage() {
           // Redirect to login if not authenticated
           router.push('/login')
           return
+        }
+
+        // For users who might not have groups set up (e.g., email auth users)
+        // Check if they need setup by calling the setup API
+        try {
+          const setupResponse = await fetch('/api/auth/setup-new-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          })
+
+          if (setupResponse.ok) {
+            const setupData = await setupResponse.json()
+            if (setupData.redirect && setupData.redirect !== '/app') {
+              // User needs setup or has multiple groups
+              router.push(setupData.redirect)
+              return
+            }
+          } else {
+            // Check if it's an OAuth authentication error
+            const errorData = await setupResponse.json().catch(() => ({}))
+            if (errorData.error === 'OAuth authentication incomplete') {
+              console.log('OAuth authentication incomplete, redirecting to login')
+              router.push('/login')
+              return
+            }
+          }
+        } catch (setupError) {
+          console.error('Setup check failed, continuing with normal flow:', setupError)
+          // Continue with normal flow even if setup check fails
         }
       } catch (error) {
         console.error('Auth check failed:', error)
@@ -209,9 +241,26 @@ export default function AppPage() {
       }
     }
     
-    // Default fallback: redirect to groups page
-    console.log('App: Timeout fallback - redirecting to groups page')
-    router.push('/groups')
+    // Default fallback: try setup API then redirect accordingly
+    console.log('App: Timeout fallback - checking user setup')
+    try {
+      const setupResponse = await fetch('/api/auth/setup-new-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (setupResponse.ok) {
+        const setupData = await setupResponse.json()
+        router.push(setupData.redirect || '/groups')
+      } else {
+        router.push('/groups')
+      }
+    } catch (error) {
+      console.error('App: Timeout fallback - setup check failed:', error)
+      router.push('/groups')
+    }
   }
 
   // Cleanup timeout on unmount
@@ -784,24 +833,39 @@ export default function AppPage() {
       {/* App Header */}
       <header className="bg-white border-b sticky top-0 z-40">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-3 items-center h-16">
+          {/* Mobile Header */}
+          <div className="md:hidden flex items-center justify-between h-14">
+            <h2 className="text-lg font-bold bg-gradient-to-r from-teal-800 to-teal-600 bg-clip-text text-transparent">
+              Bubuful Planet
+            </h2>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => router.push('/groups')} className="gap-2">
+                  <Users className="w-4 h-4" />
+                  Change Group
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/group-settings')} className="gap-2">
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout} className="gap-2">
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Desktop Header */}
+          <div className="hidden md:grid grid-cols-3 items-center h-16">
             {/* Left Section */}
             <div className="flex items-center gap-2 lg:gap-4 min-w-0">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => {
-                  // Always go to groups page for group switching
-                  router.push('/groups')
-                }}
-                className="gap-1 lg:gap-2"
-                title="Switch groups"
-              >
-                <ArrowLeft className="w-4 h-4" /> 
-                <span className="hidden sm:inline">
-                  Groups
-                </span>
-              </Button>
               <div className="min-w-0">
                 {selectedGroup ? (
                   <GroupNameEditor
@@ -886,17 +950,48 @@ export default function AppPage() {
       </header>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4 md:py-8">
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
           <div className="lg:col-span-2 space-y-4 lg:space-y-4">
             {/* Group Title and Welcome */}
             <div className="mb-4 lg:mb-6">
-              {/* Mobile: Simple title */}
+              {/* Mobile: Group name and trips title */}
               <div className="lg:hidden mb-4">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Your Trips
-                </h2>
+                {/* Travel Group Name */}
+                {selectedGroup ? (
+                  <div className="mb-3">
+                    <GroupNameEditor
+                      groupId={selectedGroup.id}
+                      currentName={selectedGroup.name}
+                      canEdit={isAdventurer}
+                      onNameUpdate={updateGroupName}
+                      className="text-lg font-semibold text-gray-900"
+                    />
+                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                      <span>Access Code:</span>
+                      <span className="font-mono font-medium">{selectedGroup.accessCode}</span>
+                      <button
+                        onClick={handleCopyAccessCode}
+                        className="relative inline-flex items-center justify-center w-4 h-4 text-gray-400 hover:text-teal-600 transition-colors duration-200 rounded-sm hover:bg-teal-50"
+                        title={accessCodeCopied ? "Copied!" : "Copy access code"}
+                      >
+                        {accessCodeCopied ? (
+                          <Check className="w-3 h-3 text-teal-600" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-3">
+                    <h1 className="text-lg font-semibold text-gray-900">
+                      Select a Group
+                    </h1>
+                  </div>
+                )}
+                
                 {selectedGroupMember && (
                   <div className="mt-2">
                     <p className="text-sm text-gray-600 mb-2">
@@ -915,7 +1010,7 @@ export default function AppPage() {
               <div className="hidden lg:flex lg:justify-between lg:items-start space-y-4 lg:space-y-0">
                 <div>
                   <h2 className="text-3xl font-bold mb-2">
-                    {selectedGroup ? `${selectedGroup.name} - Plan Your Trips` : 'Plan Your Trips'}
+                    {selectedGroup ? selectedGroup.name : 'Travel Planning'}
                   </h2>
                   <p className="text-gray-600">
                     Drag and select dates on the calendar to create a new trip
@@ -965,6 +1060,7 @@ export default function AppPage() {
             {/* Mobile Trip Management */}
             <div className="lg:hidden space-y-6">
               <MobileTripsList
+                className="w-full"
                 trips={trips}
                 onTripClick={(tripId) => router.push(`/trips/${tripId}`)}
                 onCreateTrip={handleCreateTrip}
