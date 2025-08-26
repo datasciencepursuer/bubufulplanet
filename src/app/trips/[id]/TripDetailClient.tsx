@@ -24,6 +24,7 @@ import { normalizeDate, createAbsoluteDate, calculateDefaultEndTime, formatDateF
 import { useTripData, useCreateExpense, useUpdateExpense, useDeleteExpense, useCreateEvent, useUpdateEvent, useDeleteEvent, useUpdateTrip } from '@/hooks/useTrip'
 import { useDataCache } from '@/contexts/DataCacheContext'
 import { useQueryClient } from '@tanstack/react-query'
+import { rememberLastTrip } from '@/lib/optimizedGroupSwitch'
 
 type EventInsert = Omit<Event, 'id' | 'createdAt'>
 
@@ -75,6 +76,27 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
     isError,
     error
   } = useTripData(tripId)
+
+  // Track trip activity for future logins
+  useEffect(() => {
+    if (trip && !loading && !isError) {
+      console.log('TripDetail: Tracking trip activity:', tripId, 'in group:', trip.groupId)
+      // Update both localStorage and database
+      rememberLastTrip(tripId, trip.groupId || undefined)
+      
+      // Also update in database
+      fetch('/api/user/last-active-trip', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tripId }),
+      }).catch(error => {
+        console.error('Failed to update last active trip in database:', error)
+        // Don't throw - this is not critical for user experience
+      })
+    }
+  }, [trip, tripId, loading, isError])
   
   // Get group members from cache context
   const { groupMembers, isLoadingMembers } = useDataCache()

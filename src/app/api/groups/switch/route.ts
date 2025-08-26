@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User is not a member of this group' }, { status: 403 })
     }
 
-    // Ensure UserGroup record exists
+    // Ensure UserGroup record exists and update lastActiveAt
     await prisma.userGroup.upsert({
       where: {
         unique_user_group: {
@@ -44,11 +44,14 @@ export async function POST(request: NextRequest) {
           groupId: groupId
         }
       },
-      update: {},
+      update: {
+        lastActiveAt: new Date() // Update last active timestamp when switching
+      },
       create: {
         userId: user.id,
         groupId: groupId,
-        role: groupMember.role === 'adventurer' ? 'leader' : 'member'
+        role: groupMember.role === 'adventurer' ? 'leader' : 'member',
+        lastActiveAt: new Date() // Set last active timestamp when creating
       }
     })
 

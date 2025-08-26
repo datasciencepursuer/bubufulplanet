@@ -9,20 +9,21 @@ datasource db {
 }
 
 model Trip {
-  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name             String            @db.VarChar(255)
-  startDate        DateTime          @map("start_date") @db.Date
-  endDate          DateTime          @map("end_date") @db.Date
-  destination      String?           @db.VarChar(255)
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  userId           String            @map("user_id") @db.VarChar(255)
-  groupId          String?           @map("group_id") @db.Uuid
-  packingItems     PackingItem[]
-  pointsOfInterest PointOfInterest[]
-  tripDays         TripDay[]
-  expenses         Expense[]
-  group            TravelGroup?      @relation(fields: [groupId], references: [id])
+  id                        String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String            @db.VarChar(255)
+  startDate                 DateTime          @map("start_date") @db.Date
+  endDate                   DateTime          @map("end_date") @db.Date
+  destination               String?           @db.VarChar(255)
+  createdAt                 DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  userId                    String            @map("user_id") @db.VarChar(255)
+  groupId                   String?           @map("group_id") @db.Uuid
+  packingItems              PackingItem[]
+  pointsOfInterest          PointOfInterest[]
+  tripDays                  TripDay[]
+  expenses                  Expense[]
+  group                     TravelGroup?      @relation(fields: [groupId], references: [id])
+  userGroupsWithLastAccess  UserGroup[]       @relation("UserGroupLastTrip") // Users who last accessed this trip
 
   @@index([userId], map: "idx_trips_user_id")
   @@index([startDate, endDate], map: "idx_trips_dates")
@@ -299,16 +300,21 @@ model ParticipantItem {
 }
 
 model UserGroup {
-  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String       @map("user_id") @db.VarChar(255) // Supabase user ID
-  groupId     String       @map("group_id") @db.Uuid
-  role        String       @default("member") @db.VarChar(50) // "leader" or "member"
-  joinedAt    DateTime     @default(now()) @map("joined_at") @db.Timestamptz(6)
-  invitedBy   String?      @map("invited_by") @db.VarChar(255) // User ID who invited
-  group       TravelGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String       @map("user_id") @db.VarChar(255) // Supabase user ID
+  groupId         String       @map("group_id") @db.Uuid
+  role            String       @default("member") @db.VarChar(50) // "leader" or "member"
+  joinedAt        DateTime     @default(now()) @map("joined_at") @db.Timestamptz(6)
+  lastActiveAt    DateTime     @default(now()) @map("last_active_at") @db.Timestamptz(6) // Track when user last used this group
+  lastActiveTripId String?     @map("last_active_trip_id") @db.Uuid // Track last active trip in this group
+  invitedBy       String?      @map("invited_by") @db.VarChar(255) // User ID who invited
+  group           TravelGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  lastActiveTrip  Trip?        @relation("UserGroupLastTrip", fields: [lastActiveTripId], references: [id], onDelete: SetNull)
   
   @@unique([userId, groupId], name: "unique_user_group")
   @@index([userId], map: "idx_user_groups_user_id")
   @@index([groupId], map: "idx_user_groups_group_id")
+  @@index([userId, lastActiveAt], map: "idx_user_groups_user_last_active")
+  @@index([lastActiveTripId], map: "idx_user_groups_last_active_trip")
   @@map("user_groups")
 }

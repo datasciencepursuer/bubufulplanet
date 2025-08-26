@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       })
 
       if (groupMember) {
-        // Ensure UserGroup record exists
+        // Ensure UserGroup record exists and update lastActiveAt
         await prisma.userGroup.upsert({
           where: {
             unique_user_group: {
@@ -38,11 +38,14 @@ export async function GET(request: NextRequest) {
               groupId: requestedGroupId
             }
           },
-          update: {},
+          update: {
+            lastActiveAt: new Date() // Update last active timestamp when accessing
+          },
           create: {
             userId: user.id,
             groupId: requestedGroupId,
-            role: groupMember.role === 'adventurer' ? 'leader' : 'member'
+            role: groupMember.role === 'adventurer' ? 'leader' : 'member',
+            lastActiveAt: new Date() // Set last active timestamp when creating
           }
         })
 
@@ -65,7 +68,7 @@ export async function GET(request: NextRequest) {
       })
       }
     } else {
-      // Get user's first group (default behavior)
+      // Get user's most recently active group (default behavior)
       userGroup = await prisma.userGroup.findFirst({
         where: { userId: user.id },
         include: { 
@@ -77,7 +80,8 @@ export async function GET(request: NextRequest) {
               createdAt: true
             }
           }
-        }
+        },
+        orderBy: { lastActiveAt: 'desc' } // Get the most recently used group
       })
     }
 
@@ -215,10 +219,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Traveler name is required' }, { status: 400 })
     }
 
-    // Get user's current group
+    // Get user's most recently active group
     const userGroup = await prisma.userGroup.findFirst({
       where: { userId: user.id },
-      include: { group: true }
+      include: { group: true },
+      orderBy: { lastActiveAt: 'desc' }
     })
 
     if (!userGroup) {

@@ -132,6 +132,8 @@ export async function GET(request: Request) {
           groupId: newGroup.id,
           role: 'leader',
           joinedAt: new Date(),
+          lastActiveAt: new Date(),
+          lastActiveTripId: null,
           invitedBy: null,
           group: {
             id: newGroup.id,

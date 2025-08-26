@@ -40,10 +40,11 @@ export async function GET(request: NextRequest) {
       
       groupId = requestedGroupId
     } else {
-      // Fallback to user's first group
+      // Fallback to user's most recently active group
       const userGroup = await prisma.userGroup.findFirst({
         where: { userId: user.id },
-        include: { group: true }
+        include: { group: true },
+        orderBy: { lastActiveAt: 'desc' }
       })
 
       if (!userGroup) {
@@ -107,10 +108,11 @@ export async function POST(request: NextRequest) {
       
       groupId = requestedGroupId
     } else {
-      // Fallback to user's first group
+      // Fallback to user's most recently active group
       const userGroup = await prisma.userGroup.findFirst({
         where: { userId: user.id },
-        include: { group: true }
+        include: { group: true },
+        orderBy: { lastActiveAt: 'desc' }
       })
 
       if (!userGroup) {

@@ -23,15 +23,25 @@ interface AllTripsViewProps {
   onTripsChange: () => void
   onEditTrip?: (trip: Trip) => void
   onDeleteTrip?: (tripId: string, tripName: string, event: React.MouseEvent) => void
+  onTripClick?: (tripId: string) => void
   className?: string
 }
 
-export default function AllTripsView({ trips, onTripsChange, onEditTrip, onDeleteTrip, className }: AllTripsViewProps) {
+export default function AllTripsView({ trips, onTripsChange, onEditTrip, onDeleteTrip, onTripClick, className }: AllTripsViewProps) {
   const { error } = useNotify()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tripToDelete, setTripToDelete] = useState<{id: string, name: string} | null>(null)
   const [showAllModal, setShowAllModal] = useState(false)
   const router = useRouter()
+
+  const handleTripClick = (tripId: string) => {
+    if (onTripClick) {
+      onTripClick(tripId)
+    } else {
+      // Fallback to direct navigation if no onTripClick prop
+      router.push(`/trips/${tripId}`)
+    }
+  }
 
   const categorizeTrips = () => {
     const today = new Date()
@@ -156,7 +166,7 @@ export default function AllTripsView({ trips, onTripsChange, onEditTrip, onDelet
           ) : nextTrip ? (
             <div
               className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
-              onClick={() => router.push(`/trips/${nextTrip.id}`)}
+              onClick={() => handleTripClick(nextTrip.id)}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
@@ -249,7 +259,7 @@ export default function AllTripsView({ trips, onTripsChange, onEditTrip, onDelet
                       </h3>
                       <div className="space-y-2">
                         {current.map((trip) => (
-                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} onEdit={onEditTrip} />
+                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} onEdit={onEditTrip} onTripClick={handleTripClick} />
                         ))}
                       </div>
                     </div>
@@ -264,7 +274,7 @@ export default function AllTripsView({ trips, onTripsChange, onEditTrip, onDelet
                       </h3>
                       <div className="space-y-2">
                         {upcoming.map((trip) => (
-                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} onEdit={onEditTrip} />
+                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} onEdit={onEditTrip} onTripClick={handleTripClick} />
                         ))}
                       </div>
                     </div>
@@ -279,7 +289,7 @@ export default function AllTripsView({ trips, onTripsChange, onEditTrip, onDelet
                       </h3>
                       <div className="space-y-2">
                         {past.map((trip) => (
-                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} onEdit={onEditTrip} />
+                          <TripCard key={trip.id} trip={trip} onDelete={handleDeleteTripClick} onEdit={onEditTrip} onTripClick={handleTripClick} />
                         ))}
                       </div>
                     </div>
@@ -328,18 +338,27 @@ function getTripStatus(trip: Trip) {
 }
 
 // Helper component for trip cards in the modal
-function TripCard({ trip, onDelete, onEdit }: { 
+function TripCard({ trip, onDelete, onEdit, onTripClick }: { 
   trip: Trip; 
   onDelete: (id: string, name: string, e: React.MouseEvent) => void;
   onEdit?: (trip: Trip) => void;
+  onTripClick?: (tripId: string) => void;
 }) {
   const router = useRouter()
   const { status, color, icon: StatusIcon } = getTripStatus(trip)
   
+  const handleClick = () => {
+    if (onTripClick) {
+      onTripClick(trip.id)
+    } else {
+      router.push(`/trips/${trip.id}`)
+    }
+  }
+  
   return (
     <div
       className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
-      onClick={() => router.push(`/trips/${trip.id}`)}
+      onClick={handleClick}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">

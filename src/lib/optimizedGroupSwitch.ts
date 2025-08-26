@@ -284,3 +284,64 @@ export function clearLastSelectedGroup(): void {
     console.error('Error clearing last selected group:', error)
   }
 }
+
+/**
+ * Remember the last active trip for auto-redirect on login
+ */
+export function rememberLastTrip(tripId: string, groupId?: string): void {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.setItem('lastActiveTripId', tripId)
+    localStorage.setItem('lastTripActiveAt', Date.now().toString())
+    if (groupId) {
+      localStorage.setItem('lastActiveTripGroupId', groupId)
+    }
+  } catch (error) {
+    console.error('Error remembering last active trip:', error)
+  }
+}
+
+/**
+ * Get the last active trip ID and group (valid for 7 days)
+ */
+export function getLastAccessedTrip(): { tripId: string; groupId?: string } | null {
+  if (typeof window === 'undefined') return null
+  
+  try {
+    const tripId = localStorage.getItem('lastActiveTripId')
+    const activeAt = localStorage.getItem('lastTripActiveAt')
+    const groupId = localStorage.getItem('lastActiveTripGroupId')
+    
+    if (!tripId || !activeAt) return null
+    
+    // Check if the stored trip ID is less than 7 days old (more persistent than groups)
+    const age = Date.now() - parseInt(activeAt, 10)
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
+    
+    if (age > SEVEN_DAYS) {
+      clearLastAccessedTrip()
+      return null
+    }
+    
+    return { tripId, groupId: groupId || undefined }
+  } catch (error) {
+    console.error('Error getting last active trip:', error)
+    return null
+  }
+}
+
+/**
+ * Clear the last active trip memory
+ */
+export function clearLastAccessedTrip(): void {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.removeItem('lastActiveTripId')
+    localStorage.removeItem('lastTripActiveAt')
+    localStorage.removeItem('lastActiveTripGroupId')
+  } catch (error) {
+    console.error('Error clearing last active trip:', error)
+  }
+}

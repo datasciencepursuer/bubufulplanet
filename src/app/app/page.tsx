@@ -17,7 +17,7 @@ import BearGlobeLoader from '@/components/BearGlobeLoader'
 // Removed useGroupedFetch - using createGroupedFetch from groupUtils
 import { useNotify } from '@/hooks/useNotify'
 import { createClient } from '@/utils/supabase/client'
-import { optimizedGroupSwitcher, getCachedGroupData, getLastSelectedGroupId } from '@/lib/optimizedGroupSwitch'
+import { optimizedGroupSwitcher, getCachedGroupData, getLastSelectedGroupId, getLastAccessedTrip, rememberLastTrip } from '@/lib/optimizedGroupSwitch'
 import TravelerNameEditor from '@/components/TravelerNameEditor'
 // Removed GroupSelector - using direct optimized data access
 import GroupNameEditor from '@/components/GroupNameEditor'
@@ -217,6 +217,48 @@ export default function AppPage() {
       
       console.log('App: Using optimized group data:', selectedGroup.id, selectedGroup.name)
       setGroupSelectionComplete(true)
+
+      // Ensure visiting this group updates lastActiveAt timestamp
+      try {
+        await fetch(`/api/groups/current?groupId=${selectedGroup.id}`, {
+          method: 'GET',
+          cache: 'no-store'
+        })
+        console.log('App: Updated lastActiveAt for current group visit')
+      } catch (error) {
+        console.error('App: Failed to update group activity timestamp:', error)
+        // Don't block the flow if this fails
+      }
+      
+      // Check for last active trip and redirect if found
+      const lastTrip = getLastAccessedTrip()
+      if (lastTrip && lastTrip.groupId === selectedGroup.id) {
+        console.log('App: Found last active trip, checking validity and redirecting:', lastTrip.tripId)
+        try {
+          // Verify the trip still exists and user has access
+          const response = await fetch(`/api/trips/${lastTrip.tripId}`, {
+            method: 'HEAD', // Just check if it exists
+            cache: 'no-store'
+          })
+          
+          if (response.ok) {
+            console.log('App: Last active trip is valid, redirecting')
+            router.push(`/trips/${lastTrip.tripId}`)
+            return
+          } else {
+            console.log('App: Last active trip no longer valid, clearing')
+            // Clear invalid trip data
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('lastActiveTripId')
+              localStorage.removeItem('lastTripActiveAt')
+              localStorage.removeItem('lastActiveTripGroupId')
+            }
+          }
+        } catch (error) {
+          console.error('App: Error checking last trip validity:', error)
+          // Continue with normal flow if trip check fails
+        }
+      }
       
       // Load additional data for the selected group
       await loadDataForSelectedGroup()
@@ -670,6 +712,8 @@ export default function AppPage() {
       // Only navigate to trip page for new trips
       if (!isEdit) {
         const { trip } = await response.json()
+        // Track the new trip before navigating
+        rememberLastTrip(trip.id, selectedGroup?.id)
         router.push(`/trips/${trip.id}`)
       }
     } catch (error) {
@@ -758,6 +802,12 @@ export default function AppPage() {
       console.error('Error updating traveler name:', error)
       throw error
     }
+  }
+
+  const handleTripNavigation = (tripId: string) => {
+    // Track trip access before navigating
+    rememberLastTrip(tripId, selectedGroup?.id)
+    router.push(`/trips/${tripId}`)
   }
 
   // Categorize trips as current, upcoming, or past
@@ -1059,6 +1109,7 @@ export default function AppPage() {
                 onTripsChange={forceRefreshAll}
                 onEditTrip={handleEditTrip}
                 onDeleteTrip={handleDeleteTripClick}
+                onTripClick={handleTripNavigation}
               />
               
               <AppMonthlyCalendar 
@@ -1078,7 +1129,7 @@ export default function AppPage() {
               <MobileTripsList
                 className="w-full"
                 trips={trips}
-                onTripClick={(tripId) => router.push(`/trips/${tripId}`)}
+                onTripClick={handleTripNavigation}
                 onCreateTrip={handleCreateTrip}
                 onEditTrip={handleEditTrip}
                 onDeleteTrip={handleDeleteTripClick}
