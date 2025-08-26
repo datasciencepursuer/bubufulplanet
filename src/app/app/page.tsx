@@ -140,12 +140,12 @@ export default function AppPage() {
       }
       
       initializationTimeoutRef.current = setTimeout(() => {
-        console.log('App: Initialization timeout reached, checking for fallback options')
-        if (!appInitialized && !initializationTimedOut) {
-          setInitializationTimedOut(true)
-          handleInitializationTimeout()
+        console.log('App: Initialization taking too long, auto-redirecting to complete setup')
+        if (!appInitialized) {
+          // Bypass the "Group is ready" prompt and redirect immediately
+          router.push('/groups')
         }
-      }, 10000)
+      }, 3000) // Reduced timeout to 3 seconds for faster fallback
       
       // If still loading, wait
       if (groupLoading) {
@@ -271,55 +271,7 @@ export default function AppPage() {
     handleGroupData()
   }, [groupLoading, selectedGroup, appInitialized, router])
 
-  // Handle initialization timeout - fallback to group selection
-  const handleInitializationTimeout = async () => {
-    console.log('App: Handling initialization timeout')
-    
-    // Clear any pending timeouts
-    if (initializationTimeoutRef.current) {
-      clearTimeout(initializationTimeoutRef.current)
-      initializationTimeoutRef.current = null
-    }
-    
-    // Check if we have a last selected group to try (only for existing users)
-    const lastSelectedGroupId = getLastSelectedGroupId()
-    if (lastSelectedGroupId && selectedGroup) {
-      console.log('App: Timeout fallback - attempting last selected group:', lastSelectedGroupId)
-      try {
-        await optimizedGroupSwitcher.switchToGroup(lastSelectedGroupId, false)
-        setInitializationTimedOut(false)
-        initializationInProgress.current = false
-        return
-      } catch (error) {
-        console.error('App: Timeout fallback - failed to switch to last group:', error)
-        // Clear invalid group ID from localStorage
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('lastSelectedGroupId')
-        }
-      }
-    }
-    
-    // Default fallback: try setup API then redirect accordingly
-    console.log('App: Timeout fallback - checking user setup')
-    try {
-      const setupResponse = await fetch('/api/auth/setup-new-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-
-      if (setupResponse.ok) {
-        const setupData = await setupResponse.json()
-        router.push(setupData.redirect || '/groups')
-      } else {
-        router.push('/groups')
-      }
-    } catch (error) {
-      console.error('App: Timeout fallback - setup check failed:', error)
-      router.push('/groups')
-    }
-  }
+  // Removed handleInitializationTimeout - no longer using timeout fallback
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -842,8 +794,8 @@ export default function AppPage() {
     return { currentTrip: current || null, upcomingTrips: upcoming, pastTrips: past }
   }, [trips])
 
-  // Show loading until optimized group data is loaded and processed (or timeout)
-  if ((!appInitialized || !groupSelectionComplete || groupLoading || tripsLoading || utilityDataLoading) && !initializationTimedOut) {
+  // Show loading until optimized group data is loaded and processed
+  if (!appInitialized || !groupSelectionComplete || groupLoading || tripsLoading || utilityDataLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -869,30 +821,7 @@ export default function AppPage() {
     )
   }
 
-  // Show timeout fallback message
-  if (initializationTimedOut) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <BearGlobeLoader />
-          <div className="mt-2">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">
-              Your Group is ready!
-            </h2>
-            <p className="text-sm text-gray-600 mb-3">
-              Everything is set up and ready to go. Click continue to access your travel group.
-            </p>
-            <Button 
-              onClick={() => router.push('/groups')} 
-              className="bg-teal-600 hover:bg-teal-700"
-            >
-              Continue
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Removed timeout fallback - normal initialization will complete
 
   return (
     <div className="min-h-screen bg-gray-50">
