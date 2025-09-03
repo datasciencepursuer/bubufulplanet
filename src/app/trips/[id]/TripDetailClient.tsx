@@ -16,6 +16,7 @@ import PointsOfInterestView from '@/components/TripUtilities/PointsOfInterestVie
 import ConfirmDialog from '@/components/ConfirmDialog'
 import ExpenseModal from '@/components/ExpenseModal'
 import TripExpensesPanel from '@/components/TripExpensesPanel'
+import DestinationRangeSelector from '@/components/DestinationRangeSelector'
 import type { Trip, TripDay, Event, GroupMember } from '@prisma/client'
 import type { Expense } from '@/types/expense'
 import type { CreateExpenseRequest, UpdateExpenseRequest } from '@/types/expense'
@@ -147,7 +148,8 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
       window.removeEventListener('eventIdChanged', handleEventIdChanged as EventListener)
     }
   }, [])
-  const [calendarView, setCalendarView] = useState<'daily' | 'weekly' | 'threeDay'>('threeDay')
+  const [calendarView, setCalendarView] = useState<'daily' | 'weekly' | 'threeDay'>('weekly')
+  const [mobileCalendarView, setMobileCalendarView] = useState<'daily' | 'threeDay'>('daily')
   const [selectedDailyDate, setSelectedDailyDate] = useState<string | null>(null)
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set())
   const [newExpenseIds, setNewExpenseIds] = useState<Set<string>>(new Set())
@@ -173,6 +175,9 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
   
   // Points of Interest state
   const [showPointsOfInterest, setShowPointsOfInterest] = useState(false)
+  
+  // Destination management state
+  const [showDestinationSelector, setShowDestinationSelector] = useState(false)
   
   // Expense state
   const [showExpenseModal, setShowExpenseModal] = useState(false)
@@ -425,6 +430,38 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
     }))
   }
 
+  const handleSaveDestinations = async (ranges: Array<{
+    destination: string
+    startDate: string
+    endDate: string
+    dayIds: string[]
+  }>) => {
+    try {
+      const response = await fetch(`/api/trips/${tripId}/destinations`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ranges })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update destinations')
+      }
+
+      // Close the destination selector
+      setShowDestinationSelector(false)
+      
+      // Refresh the trip data to get updated destinations
+      queryClient.invalidateQueries({ queryKey: ['tripDays', tripId] })
+      
+      success('Success', 'Destinations updated successfully')
+    } catch (error) {
+      console.error('Error updating destinations:', error)
+      notifyError('Error', 'Failed to update destinations. Please try again.')
+    }
+  }
+
   // Show loading spinner only if we don't have initial data and we're loading
   if ((loading && !initialData) || isLoadingMembers) {
     return <BearGlobeLoader />
@@ -526,6 +563,15 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
               <Button 
                 variant="outline" 
                 size="sm"
+                onClick={() => setShowDestinationSelector(true)}
+                className="gap-2"
+              >
+                <MapPin className="h-4 w-4" />
+                Destinations
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
                 onClick={() => setShowTripEditForm(true)}
                 className="gap-2"
               >
@@ -582,9 +628,31 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
           </div>
         </div>
 
-        {/* Mobile Title */}
+        {/* Mobile View Selector */}
         <div className="mb-4 md:hidden">
-          <h2 className="text-xl font-semibold">Trip Schedule</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Trip Schedule</h2>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant={mobileCalendarView === 'daily' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMobileCalendarView('daily')}
+                className="gap-2"
+              >
+                <CalendarDays className="h-4 w-4" />
+                Daily
+              </Button>
+              <Button
+                variant={mobileCalendarView === 'threeDay' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMobileCalendarView('threeDay')}
+                className="gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                3-Day
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -665,48 +733,76 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
             )}
           </div>
           
-          {/* Mobile View - Always 3-day */}
+          {/* Mobile View - Switchable between daily and 3-day */}
           <div className="md:hidden h-full">
-            <ThreeDayCalendarView
-              key={`three-day-${trip.id}`}
-              tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
-              tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
-              tripName={trip.name}
-              tripDays={tripDays}
-              events={events}
-              selectedEventId={selectedEventForPanel?.id}
-              newEventIds={newEventIds}
-              deletingEventIds={deletingEventIds}
-              onTimeSlotClick={handleTimeSlotClick}
-              onEventClick={handleEventClick}
-              onDayHeaderClick={handleDayHeaderClick}
-              onBack={() => router.push('/app')}
-              onCreateEvent={() => {
-                // Open event creation modal with current day
-                const today = new Date()
-                const firstAvailableDay = tripDays.find(day => new Date(day.date) >= today) || tripDays[0]
-                if (firstAvailableDay) {
-                  setSelectedDayId(firstAvailableDay.id)
-                  setSelectedTime('18:00') // Default to 6 PM
-                  setSelectedEndTime('19:00') // Default 1-hour event
-                  setIsModalOpen(true)
-                }
-              }}
-              onAddExpense={() => {
-                // Open expense modal
-                if (groupMembers.length === 0) {
-                  notifyError('Error', 'Unable to add expenses. No group members found.')
-                  return
-                }
-                setSelectedExpense(undefined)
-                setPrefilledEventId('')
-                setShowExpenseModal(true)
-              }}
-              onShowPointsOfInterest={() => {
-                setShowPointsOfInterest(true)
-              }}
-              initialDate={selectedDailyDate || undefined}
-            />
+            {mobileCalendarView === 'daily' ? (
+              <DailyCalendarView
+                key={`mobile-daily-${trip.id}`}
+                tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
+                tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
+                tripDays={tripDays}
+                events={events}
+                selectedEventId={selectedEventForPanel?.id}
+                newEventIds={newEventIds}
+                deletingEventIds={deletingEventIds}
+                onTimeSlotClick={handleTimeSlotClick}
+                onTimeRangeSelect={handleTimeRangeSelect}
+                onEventClick={handleEventClick}
+                onEventSelect={handleEventSelect}
+                onAddExpenseToEvent={(eventId) => {
+                  if (groupMembers.length === 0) {
+                    notifyError('Error', 'Unable to add expenses. No group members found.')
+                    return
+                  }
+                  setSelectedExpense(undefined)
+                  setPrefilledEventId(eventId)
+                  setShowExpenseModal(true)
+                }}
+                onDeleteEvent={handleDeleteEvent}
+                initialDate={selectedDailyDate}
+              />
+            ) : (
+              <ThreeDayCalendarView
+                key={`three-day-${trip.id}`}
+                tripStartDate={trip.startDate ? normalizeDate(trip.startDate) : ''}
+                tripEndDate={trip.endDate ? normalizeDate(trip.endDate) : ''}
+                tripName={trip.name}
+                tripDays={tripDays}
+                events={events}
+                selectedEventId={selectedEventForPanel?.id}
+                newEventIds={newEventIds}
+                deletingEventIds={deletingEventIds}
+                onTimeSlotClick={handleTimeSlotClick}
+                onEventClick={handleEventClick}
+                onDayHeaderClick={handleDayHeaderClick}
+                onBack={() => router.push('/app')}
+                onCreateEvent={() => {
+                  // Open event creation modal with current day
+                  const today = new Date()
+                  const firstAvailableDay = tripDays.find(day => new Date(day.date) >= today) || tripDays[0]
+                  if (firstAvailableDay) {
+                    setSelectedDayId(firstAvailableDay.id)
+                    setSelectedTime('18:00') // Default to 6 PM
+                    setSelectedEndTime('19:00') // Default 1-hour event
+                    setIsModalOpen(true)
+                  }
+                }}
+                onAddExpense={() => {
+                  // Open expense modal
+                  if (groupMembers.length === 0) {
+                    notifyError('Error', 'Unable to add expenses. No group members found.')
+                    return
+                  }
+                  setSelectedExpense(undefined)
+                  setPrefilledEventId('')
+                  setShowExpenseModal(true)
+                }}
+                onShowPointsOfInterest={() => {
+                  setShowPointsOfInterest(true)
+                }}
+                initialDate={selectedDailyDate || undefined}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -784,6 +880,31 @@ export default function TripDetailClient({ tripId, initialData }: TripDetailClie
         </div>
       )}
 
+      {/* Destination Range Selector Modal */}
+      {showDestinationSelector && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Manage Destinations</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDestinationSelector(false)}
+                className="p-1"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <DestinationRangeSelector
+                tripDays={tripDays}
+                onSave={handleSaveDestinations}
+                onCancel={() => setShowDestinationSelector(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

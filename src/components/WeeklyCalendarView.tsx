@@ -499,6 +499,11 @@ export default function WeeklyCalendarView({
                       }`}>
                         {format(date, 'd')}
                       </div>
+                      {tripDay?.destination && dateInfo.isWithinTripDates && (
+                        <div className="text-xs text-teal-600 font-medium mt-1 truncate px-1">
+                          {tripDay.destination}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -601,6 +606,11 @@ export default function WeeklyCalendarView({
                       }`}>
                         {format(date, 'd')}
                       </div>
+                      {tripDay?.destination && dateInfo.isWithinTripDates && (
+                        <div className="text-xs text-teal-600 font-medium mt-2 truncate px-1">
+                          {tripDay.destination}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
